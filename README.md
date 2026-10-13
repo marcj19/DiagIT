@@ -19,6 +19,10 @@ com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver de
    e cada achado como **Comprovado**, **Indício** ou **Informação**, com *O que fazer*.
    Um indício anterior ao teste aprovado não deixa a peça suspeita; se o problema voltar depois da aprovação, o DiagIT pede para repetir o teste.
 6. **Resolver**: aplica as soluções com um clique (sempre pedindo confirmação).
+   Os achados principais têm **Resolver passo a passo** (guias dentro do app, ex.: reinstalar o driver de vídeo do jeito certo, voltar a BIOS
+   para o padrão) e **Já fiz isso**. Toda correção entra em **Suas correções**, no Início: o DiagIT compara antes e depois e diz se **resolveu**
+   (nenhuma ocorrência por tempo suficiente), se está **acompanhando**, ou se **não resolveu** (o problema voltou).
+   Para defeitos que aparecem de vez em quando, o **check-up à noite** (3 h ou 8 h) testa por horas e impede o PC de dormir.
 7. **Avançado**: *Ao vivo* (gráficos em tempo real), *Hardware* (tudo que foi lido do PC) e *Partidas gravadas*. Testes individuais e mais longos ficam em *Verificar peças*.
 
 ## Testes (resultado verificável, não estimativa)

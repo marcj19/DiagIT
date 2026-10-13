@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text.RegularExpressions;
@@ -13,6 +13,8 @@ namespace DiagIT
         FlatButton heroPrimary, heroSecondary;
         PartsGrid parts;
         readonly List<StepRow> homeSteps = new List<StepRow>();
+        SectionTitle fixesTitle;
+        FixList fixList;
 
         static readonly TestKind[] KindOrder = { TestKind.Cpu, TestKind.Ram, TestKind.Gpu, TestKind.Disk, TestKind.Combined };
 
@@ -74,6 +76,15 @@ namespace DiagIT
             parts.TileClicked += delegate(int c) { OpenComponent(c); };
             homeFlow.Controls.Add(parts);
             homeFlow.Controls.Add(new SectionTitle("O que fazer agora", false));
+            fixesTitle = new SectionTitle("Suas correções", false);
+            fixList = new FixList();
+            fixList.RemoveClicked += delegate(FixStatus st)
+            {
+                if (MessageBox.Show(this, "Parar de acompanhar \"" + st.Fix.Title + "\"?", "Suas correções", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                FixLog.Remove(st.Fix.Id);
+                if (lastDiag != null) lastDiag.Fixes.Remove(st);
+                RefreshHome();
+            };
             RefreshHome();
         }
 
@@ -159,6 +170,17 @@ namespace DiagIT
             if (d != null)
             {
                 int n = 0;
+                string[] saved = GuideInProgress();
+                Guide inProg = saved != null ? Rules.GuideById(saved[0]) : null;
+                if (inProg != null)
+                {
+                    int st = 0; if (saved.Length > 1) int.TryParse(saved[1], out st);
+                    st = Math.Max(0, Math.Min(inProg.Steps.Count - 1, st));
+                    StepRow r = new StepRow(++n, "Continuar: " + inProg.Title, "Passo " + (st + 1) + " de " + inProg.Steps.Count + ": " + Rules.Fill(inProg.Steps[st].Title) + ".", "Continuar", true);
+                    string gid = inProg.Id;
+                    r.Button.Click += delegate { OpenGuide(gid, null); };
+                    homeSteps.Add(r);
+                }
                 if (pend.Count > 0)
                 {
                     List<string> names = new List<string>();
@@ -177,15 +199,35 @@ namespace DiagIT
                     bool covered = s.HasTest && pend.Contains(s.Test) && s.Status != CompStatus.Failed;
                     if (covered || (s.Status != CompStatus.Failed && s.Status != CompStatus.Suspect)) continue;
                     string sub = c == (int)Comp.Software && s.Cause.BugCode >= 0 ? s.Detail : s.Cause.Advice;
-                    StepRow r = new StepRow(++n, s.Cause.Plain, Analyzer.FirstSentence(sub), "Ver como resolver", false);
+                    string guide = s.Cause.Guide;
+                    Guide gd = guide != null ? Rules.GuideById(guide) : null;
+                    if (gd != null) sub = gd.Title + ": " + Analyzer.FirstSentence(Rules.Fill(gd.Summary));
+                    else if (sub.StartsWith("Sem teste automático", StringComparison.Ordinal)) sub = s.Cause.Advice;
+                    StepRow r = new StepRow(++n, s.Cause.Plain, gd != null ? sub : Analyzer.FirstSentence(sub), guide != null ? "Resolver passo a passo" : "Ver como resolver", guide != null);
                     int comp = c;
-                    r.Button.Click += delegate { OpenComponent(comp); };
+                    Finding cause = s.Cause;
+                    r.Button.Click += delegate { if (guide != null) OpenGuide(guide, cause); else OpenComponent(comp); };
+                    homeSteps.Add(r);
+                }
+                // tela azul com as peças aprovadas só em testes curtos: o defeito pode ser intermitente
+                bool bsod = d.Findings.Exists(delegate(Finding f) { return f.BugCode >= 0 && f.W.Count > 0; });
+                bool longDone = d.Tests.Exists(delegate(TestResult t) { return t.Status == "passed" && t.PlannedSec >= 1800 && t.Start > DateTime.Now.AddDays(-30); });
+                if (n < 3 && bsod && !longDone && pend.Count == 0)
+                {
+                    StepRow r = new StepRow(++n, "Fazer o teste longo esta noite", "As peças passaram nos testes rápidos, mas defeitos que aparecem de vez em quando só se mostram depois de horas. Cerca de 3 horas; o PC não dorme até terminar.", "Agendar para agora", false);
+                    r.Button.Click += delegate { StartLongPlan(3); };
                     homeSteps.Add(r);
                 }
                 if (n == 0)
                     homeSteps.Add(new StepRow(1, "Tudo certo por aqui", "O DiagIT continua de olho nas suas partidas e avisa se algo mudar.", null, false));
             }
             foreach (StepRow r in homeSteps) homeFlow.Controls.Add(r);
+            // correções acompanhadas, depois dos passos (a ordem do FlowPanel é a de inclusão)
+            homeFlow.Controls.Remove(fixesTitle); homeFlow.Controls.Remove(fixList);
+            fixList.Items.Clear();
+            if (d != null) fixList.Items.AddRange(d.Fixes);
+            if (fixList.Items.Count > 0) { homeFlow.Controls.Add(fixesTitle); homeFlow.Controls.Add(fixList); }
+            fixList.Invalidate();
             homeFlow.Relayout();
         }
     }

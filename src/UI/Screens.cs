@@ -778,6 +778,136 @@ namespace DiagIT
         }
     }
 
+    /// <summary>"Suas correções": cada correção com o estado do acompanhamento (resolvido / acompanhando / não resolveu).</summary>
+    public class FixList : FlowControl
+    {
+        public readonly List<FixStatus> Items = new List<FixStatus>();
+        public event Action<FixStatus> RemoveClicked;
+        readonly List<Rectangle> removeRects = new List<Rectangle>();
+        int[] hs = new int[0];
+
+        public override int Measure(int width)
+        {
+            hs = new int[Items.Count];
+            int h = 0, tw = width - Theme.S(36) - Theme.S(170);
+            for (int i = 0; i < Items.Count; i++)
+            {
+                hs[i] = Math.Max(Theme.S(78), Theme.S(52) + H(Items[i].Text, Theme.Font(9.5f), tw) + Theme.S(16));
+                h += hs[i] + (i > 0 ? Theme.S(10) : 0);
+            }
+            return h;
+        }
+
+        static CompStatus Look(int state) { return state == 1 ? CompStatus.Ok : state == 2 ? CompStatus.Suspect : CompStatus.Untested; }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            bool hit = removeRects.Exists(delegate(Rectangle r) { return r.Contains(e.Location); });
+            Cursor = hit ? Cursors.Hand : Cursors.Default;
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            for (int i = 0; i < removeRects.Count && i < Items.Count; i++)
+                if (removeRects[i].Contains(e.Location) && RemoveClicked != null) { RemoveClicked(Items[i]); break; }
+            base.OnMouseClick(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.Clear(Theme.Bg);
+            removeRects.Clear();
+            int y = 0;
+            for (int i = 0; i < Items.Count && i < hs.Length; i++)
+            {
+                FixStatus st = Items[i];
+                Rectangle r = new Rectangle(0, y, Width, hs[i]);
+                CompStatus look = Look(st.State);
+                Card(g, r, Theme.Panel, st.State == 2 ? Theme.Mix(Theme.Warn, Theme.Panel, 100) : st.State == 1 ? Theme.Mix(Theme.Good, Theme.Panel, 90) : Theme.Border, Theme.S(14));
+                int x = r.X + Theme.S(18), tw = r.Width - Theme.S(36) - Theme.S(170);
+                int pw = Theme.StatusPill(g, x, r.Y + Theme.S(14), look, st.Headline, Theme.Panel);
+                Theme.Text_(g, st.Fix.Title, Theme.Font(10f, FontStyle.Bold), Theme.Text, new Rectangle(x + pw + Theme.S(12), r.Y + Theme.S(14), tw - pw - Theme.S(12), Theme.S(24)), TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, st.Text, Theme.Font(9.5f), new Rectangle(x, r.Y + Theme.S(48), tw, r.Height - Theme.S(52)), Theme.Muted, WB);
+                Theme.Text_(g, "Feito em " + st.Fix.When.ToString("dd/MM"), Theme.Font(8.5f), Theme.Faint, new Rectangle(r.Right - Theme.S(170), r.Y + Theme.S(16), Theme.S(152), Theme.S(20)), TextFormatFlags.Right);
+                string rl = "Parar de acompanhar";
+                int rw = TextRenderer.MeasureText(rl, Theme.Font(8.5f)).Width;
+                Rectangle rr = new Rectangle(r.Right - Theme.S(18) - rw, r.Bottom - Theme.S(30), rw, Theme.S(20));
+                Theme.Text_(g, rl, Theme.Font(8.5f), Theme.AccentHover, rr, 0);
+                removeRects.Add(rr);
+                y += hs[i] + Theme.S(10);
+            }
+        }
+    }
+
+    /// <summary>Um passo de guia: o atual aparece aberto com o texto e os botões; os feitos ficam com um "✓".</summary>
+    public class GuideStepCard : FlowControl
+    {
+        public int Index;
+        public GuideStep Step;
+        public int State;   // 0 a fazer, 1 atual, 2 feito
+        public readonly List<FlatButton> ActionButtons = new List<FlatButton>();
+        public FlatButton DoneButton;
+        public event EventHandler HeaderClicked;
+        int hT;
+        const int Collapsed = 66;
+
+        public GuideStepCard(int index, GuideStep step, bool last)
+        {
+            Index = index; Step = step; BackColor = Theme.Panel; AccessibleName = step.Title; Cursor = Cursors.Hand;
+            foreach (GuideAction a in step.Actions)
+            {
+                FlatButton b = new FlatButton(a.Label, false);
+                b.Tag = a;
+                ActionButtons.Add(b); Controls.Add(b);
+            }
+            DoneButton = new FlatButton(last ? "Feito" : "Feito, próximo passo", true);
+            Controls.Add(DoneButton);
+        }
+
+        public override int Measure(int width)
+        {
+            bool open = State == 1;
+            foreach (Control c in Controls) c.Visible = open;
+            if (!open) return Theme.S(Collapsed);
+            int tx = Theme.S(70), tw = width - tx - Theme.S(24);
+            hT = H(Rules.Fill(Step.Text), Theme.Font(10.5f), tw);
+            int y = Theme.S(20) + Theme.S(26) + Theme.S(8) + hT + Theme.S(16);
+            int x = tx;
+            foreach (FlatButton b in ActionButtons)
+            {
+                if (x + b.Width > width - Theme.S(24) && x > tx) { x = tx; y += b.Height + Theme.S(10); }
+                b.Location = new Point(x, y); x += b.Width + Theme.S(10);
+            }
+            if (x + DoneButton.Width > width - Theme.S(24) && x > tx) { x = tx; y += DoneButton.Height + Theme.S(10); }
+            DoneButton.Location = new Point(x, y);
+            return y + DoneButton.Height + Theme.S(20);
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            if (e.Y < Theme.S(Collapsed) && HeaderClicked != null) HeaderClicked(this, EventArgs.Empty);
+            base.OnMouseClick(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.Clear(Theme.Bg);
+            bool open = State == 1, done = State == 2;
+            Card(g, ClientRectangle, open ? Theme.Mix(Theme.Accent, Theme.Panel, 18) : Theme.Panel, open ? Theme.Accent : Theme.Border, Theme.S(16));
+            int d = Theme.S(32), cy = Theme.S(17);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (SolidBrush b = new SolidBrush(done ? Theme.Mix(Theme.Good, Theme.Panel, 50) : open ? Theme.AccentSoft : Theme.Panel2)) g.FillEllipse(b, Theme.S(20), cy, d, d);
+            if (done) { float ic = Theme.S(16f); Icons.Draw(g, "check", new RectangleF(Theme.S(20) + (d - ic) / 2f, cy + (d - ic) / 2f, ic, ic), Theme.GoodText, Theme.S(2.6f)); }
+            else Theme.Text_(g, (Index + 1).ToString(), Theme.Font(10f, FontStyle.Bold), open ? Theme.AccentText : Theme.Muted, new Rectangle(Theme.S(20), cy, d, d), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            int tx = Theme.S(70), tw = Width - tx - Theme.S(24);
+            Theme.Text_(g, Rules.Fill(Step.Title), Theme.Font(11f, FontStyle.Bold), done ? Theme.Muted : Theme.Text, new Rectangle(tx, Theme.S(20), tw, Theme.S(26)), TextFormatFlags.VerticalCenter);
+            if (open) TextRenderer.DrawText(g, Rules.Fill(Step.Text), Theme.Font(10.5f), new Rectangle(tx, Theme.S(54), tw, hT), Theme.Soft, WB);
+        }
+    }
+
     /// <summary>Veredito no topo da página de Resultados.</summary>
     public class VerdictBlock : BufferedControl
     {

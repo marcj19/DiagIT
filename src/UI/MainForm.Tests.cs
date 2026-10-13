@@ -54,7 +54,7 @@ namespace DiagIT
         // verificação em andamento (mostrada na página "Verificando")
         readonly List<object[]> runPlan = new List<object[]>();
         readonly List<TestResult> runResults = new List<TestResult>();
-        bool runGuided;
+        bool runGuided, runLong;
 
         void BuildTests()
         {
@@ -281,18 +281,28 @@ namespace DiagIT
             t.BackColor = Theme.Panel;
             t.SetBounds(Theme.S(14), Theme.S(12), Theme.S(330), Theme.S(22));
             c.Controls.Add(t);
-            Label desc = Body("Testa todas as peças em sequência (cerca de 20 minutos). Ao final, os Resultados mostram o estado comprovado de cada uma.", true);
+            Label desc = Body("Testa todas as peças em sequência. Rápido: cerca de 20 minutos. À noite: horas de teste, para o defeito que só aparece de vez em quando (o PC não dorme até terminar).", true);
             desc.BackColor = Theme.Panel;
             desc.SetBounds(Theme.S(14), Theme.S(36), Theme.S(330), Theme.S(70));
             c.Controls.Add(desc);
+            Segmented dur = new Segmented(new string[] { "Rápido", "Noite 3 h", "Noite 8 h" }, 0);
+            dur.BackColor = Theme.Panel;
+            c.Controls.Add(dur);
             FlatButton go = new FlatButton("Fazer o check-up", true);
-            go.Click += delegate { StartPlan(QuickPlan(null), true); };
+            go.Click += delegate
+            {
+                if (dur.SelectedIndex == 0) StartPlan(QuickPlan(null), true);
+                else StartLongPlan(dur.SelectedIndex == 1 ? 3 : 8);
+            };
             c.Controls.Add(go);
             testButtons.Add(go);
             c.Resize += delegate
             {
                 t.Width = c.Width - Theme.S(28); desc.Width = c.Width - Theme.S(28);
+                bool oneLine = Theme.S(14) + dur.Width + Theme.S(12) + go.Width + Theme.S(14) <= c.Width;
                 go.Location = new Point(c.Width - go.Width - Theme.S(14), c.Height - go.Height - Theme.S(12));
+                dur.Location = new Point(Theme.S(14), oneLine ? go.Top + (go.Height - dur.Height) / 2 : go.Top - dur.Height - Theme.S(8));
+                desc.Height = Math.Max(Theme.S(36), (oneLine ? go.Top : dur.Top) - desc.Top - Theme.S(8));
             };
             return c;
         }
@@ -304,6 +314,46 @@ namespace DiagIT
             foreach (TestDef d in testDefs)
                 if (kinds == null || kinds.Contains(d.Kind)) r.Add(new object[] { d.Kind, d.Secs[0], d.Opts != null ? d.Opts[0] : null });
             return r;
+        }
+
+        /// <summary>
+        /// Teste longo (noite): a memória fica com 40% do tempo (defeito intermitente de RAM é o mais comum), processador,
+        /// placa de vídeo e fonte (tudo no máximo) com 20% cada; o disco só a amostragem rápida.
+        /// </summary>
+        List<object[]> LongPlan(int hours)
+        {
+            int total = hours * 3600;
+            List<object[]> r = new List<object[]>();
+            foreach (TestDef d in testDefs)
+            {
+                object opt = d.Opts != null ? d.Opts[0] : null;
+                switch (d.Kind)
+                {
+                    case TestKind.Ram: r.Insert(0, new object[] { d.Kind, (int)(total * 0.40), opt }); break;
+                    case TestKind.Cpu: case TestKind.Gpu: case TestKind.Combined: r.Add(new object[] { d.Kind, (int)(total * 0.20), opt }); break;
+                    case TestKind.Disk: r.Add(new object[] { d.Kind, d.Secs[0], opt }); break;
+                }
+            }
+            return r;
+        }
+
+        void StartLongPlan(int hours)
+        {
+            if (MessageBox.Show(this, "O teste longo leva cerca de " + hours + " horas e usa o PC no máximo o tempo todo.\n\n" +
+                "• Feche os jogos e salve o que estiver aberto.\n• Deixe o PC na tomada; ele não vai dormir até terminar.\n" +
+                "• O teste para sozinho se alguma peça esquentar demais.\n\nComeçar agora?", "Teste longo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            runLong = true;
+            if (!StartPlan(LongPlan(hours), true)) runLong = false;
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        static extern uint SetThreadExecutionState(uint flags);
+        const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x00000001, ES_AWAYMODE_REQUIRED = 0x00000040;
+
+        /// <summary>Impede o PC de dormir durante uma verificação (a tela pode apagar).</summary>
+        static void KeepAwake(bool on)
+        {
+            try { SetThreadExecutionState(on ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED : ES_CONTINUOUS); } catch { }
         }
 
         static int PlanSeconds(List<object[]> plan)
@@ -323,6 +373,7 @@ namespace DiagIT
             runResults.Clear();
             runGuided = guided;
             if (!StartTest((TestKind)plan[0][0], (int)plan[0][1], plan[0][2], true)) { testQueue.Clear(); runPlan.Clear(); return false; }
+            KeepAwake(true);
             Navigate(P_RUN);
             return true;
         }
@@ -411,6 +462,8 @@ namespace DiagIT
 
         void EndRunUi()
         {
+            KeepAwake(false);
+            runLong = false;
             testsRoot.RowStyles[3].Height = 0;
             foreach (FlatButton b in testButtons) b.Enabled = true;
         }

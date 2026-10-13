@@ -13,7 +13,7 @@ namespace DiagIT
     public partial class MainForm : Form
     {
         // páginas: as 5 primeiras são o caminho de quem é leigo; as demais ficam em "Avançado"
-        public const int P_HOME = 0, P_PROBLEM = 1, P_TESTS = 2, P_DIAG = 3, P_FIX = 4, P_LIVE = 5, P_HW = 6, P_SESS = 7, P_SET = 8, P_RUN = 9, PAGES = 10;
+        public const int P_HOME = 0, P_PROBLEM = 1, P_TESTS = 2, P_DIAG = 3, P_FIX = 4, P_LIVE = 5, P_HW = 6, P_SESS = 7, P_SET = 8, P_RUN = 9, P_GUIDE = 10, PAGES = 11;
         readonly Watcher w;
         readonly AppSettings cfg;
         readonly TestRunner runner;
@@ -66,6 +66,7 @@ namespace DiagIT
             BuildHome();      // depois dos testes: o Início usa a lista de testes para montar o check-up
             BuildProblem();
             BuildRun();
+            BuildGuide();
             BuildTray();
             runner.Finished += delegate(TestResult r) { Post(delegate { OnTestFinished(r); }); };
 
@@ -286,7 +287,7 @@ namespace DiagIT
             {
                 pages[i].Visible = i == idx;
                 if (navs[i] == null) continue;
-                navs[i].Selected = i == idx || (idx == P_RUN && i == P_TESTS);
+                navs[i].Selected = i == idx || (idx == P_RUN && i == P_TESTS) || (idx == P_GUIDE && i == P_FIX);
                 navs[i].Invalidate();
             }
             if (idx == P_HOME) RefreshHome();
@@ -431,7 +432,10 @@ namespace DiagIT
                 if (hw == null || refreshEvents || (DateTime.Now - hwAt).TotalMinutes > 5) { hw = HwFacts.Collect(w.Sensors); hwAt = DateTime.Now; }
                 SetDiagStatus("Analisando...");
                 List<SessionData> sds = LoadData(ScopeSessions(scope, sel));
-                Diagnosis d = Analyzer.Run(sds, events, disks, 30, TestStore.ListAll(), hw);
+                // o acompanhamento das correções olha todas as partidas dos 30 dias, mesmo com outro escopo selecionado
+                List<SessionData> all = scope == 0 ? sds : LoadData(ScopeSessions(0, sel));
+                Diagnosis d = Analyzer.Run(sds, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load());
+                if (scope != 0) { Diagnosis full = Analyzer.Run(all, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load()); d.Fixes = full.Fixes; }
                 Post(delegate { done(d, sds); });
                 SetDiagStatus("Análise concluída às " + DateTime.Now.ToString("HH:mm:ss"));
             }
@@ -542,6 +546,7 @@ namespace DiagIT
 
             flist = new FindingList();
             flist.Dock = DockStyle.Fill;
+            flist.CardAction += delegate(Finding f, string action) { OnFindingAction(f, action); };
             t.Controls.Add(flist, 1, 0);
         }
 
@@ -588,11 +593,42 @@ namespace DiagIT
             bars.Invalidate();
             lblDiagStatus.Text = "Base: " + d.Tests.Count + " teste(s), " + d.Sessions + " sessão(ões) gravada(s), " + d.EventsTotal + " eventos do Windows (" + d.Days + " dias).";
             flist.SetFindings(d.Findings);
+            NotifyFixChanges(d);
             RefreshHome();
             if (goResultsAfterRun) { goResultsAfterRun = false; if (curPage == P_RUN) Navigate(P_DIAG); }
         }
 
         bool goResultsAfterRun;
+
+        /// <summary>"Já fiz isso" / "Passo a passo" num achado.</summary>
+        void OnFindingAction(Finding f, string action)
+        {
+            if (action == "guide" && f.Guide != null) { OpenGuide(f.Guide, f); return; }
+            if (action != "fix") return;
+            string scope = Analyzer.ScopeOf(f);
+            if (MessageBox.Show(this, "Marcar como feito: \"" + Analyzer.FirstSentence(f.Advice) + "\"\n\nO DiagIT vai acompanhar se os " + Analyzer.ScopeName(scope) +
+                " voltam e mostrar o resultado no Início.", "Já fiz isso", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
+            FixLog.Add("achado:" + (f.BugCode >= 0 ? "0x" + f.BugCode.ToString("X") : f.Title.Length > 40 ? f.Title.Substring(0, 40) : f.Title),
+                "Segui o conselho para: " + f.Plain, scope);
+            StartAnalyzeClick(false);
+        }
+
+        /// <summary>Avisa quando uma correção passa a "resolvido" ou "não resolveu".</summary>
+        void NotifyFixChanges(Diagnosis d)
+        {
+            if (d.Fixes.Count == 0) return;
+            List<FixEntry> all = FixLog.Load();
+            bool changed = false;
+            foreach (FixStatus st in d.Fixes)
+            {
+                FixEntry e = all.Find(delegate(FixEntry x) { return x.Id == st.Fix.Id; });
+                if (e == null || e.LastState == st.State) continue;
+                if (st.State == 1) Balloon("Resolvido: " + e.Title, st.Text, ToolTipIcon.Info);
+                else if (st.State == 2) Balloon("Ainda não resolveu: " + e.Title, st.Text, ToolTipIcon.Warning);
+                e.LastState = st.State; changed = true;
+            }
+            if (changed) FixLog.Save(all);
+        }
 
         void ExportReport()
         {

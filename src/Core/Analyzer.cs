@@ -29,6 +29,8 @@ namespace DiagIT
         /// <summary>Driver apontado como culpado (telas azuis) e em quantas das ocorrências.</summary>
         public string Culprit;
         public int CulpritCount, CulpritOf;
+        /// <summary>Guia passo a passo que resolve este achado (data/guias.json), ou null.</summary>
+        public string Guide;
         /// <summary>O mesmo achado em linguagem do dia a dia (camada simples da interface). Vazio = usa o Title.</summary>
         public string Simple = "";
 
@@ -67,6 +69,7 @@ namespace DiagIT
         public CompState[] States = new CompState[8];
         public List<TestResult> Tests = new List<TestResult>();
         public HwSnapshot Hw;
+        public List<FixStatus> Fixes = new List<FixStatus>();   // acompanhamento das correções ("corrigiu?")
     }
 
     public static class CompInfo
@@ -151,6 +154,11 @@ namespace DiagIT
 
         public static Diagnosis Run(List<SessionData> sessions, List<WinEvent> events, List<DiskHealth> disks, int days, List<TestResult> tests, HwSnapshot hw)
         {
+            return Run(sessions, events, disks, days, tests, hw, null);
+        }
+
+        public static Diagnosis Run(List<SessionData> sessions, List<WinEvent> events, List<DiskHealth> disks, int days, List<TestResult> tests, HwSnapshot hw, List<FixEntry> fixes)
+        {
             Diagnosis d = new Diagnosis();
             d.Hw = hw;
             Rules.SetContext(hw != null ? hw.GpuName : null, hw != null ? hw.CpuName : null);   // textos conforme a marca do PC
@@ -182,6 +190,8 @@ namespace DiagIT
                 f.Title = Rules.Fill(f.Title); f.Simple = Rules.Fill(f.Simple);
                 f.Evidence = Rules.Fill(f.Evidence); f.Advice = Rules.Fill(f.Advice);
             }
+            AssignGuides(d);
+            FixRules(d, events, sessions, fixes);
             Finish(d);
             BuildStates(d);
             return d;

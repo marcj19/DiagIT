@@ -192,6 +192,20 @@ namespace DiagIT
                 bool drvOk = Rules.Drivers.Count >= 50;
                 foreach (DriverRule dr in Rules.Drivers) if (!Rules.DriverTypes.ContainsKey(dr.Type) || dr.File.Length < 2 || dr.Name.Length == 0) drvOk = false;
                 Check(drvOk, "drivers: todo driver tem nome e aponta para um tipo existente (" + Rules.Drivers.Count + " drivers)");
+                bool guiasOk = Rules.Guides.Count >= 5;
+                string[] acoesValidas = { "bloquear-wu", "tirar-hd", "reiniciar-avancado", "reiniciar-bios", "teste-gpu", "teste-memoria" };
+                foreach (Guide gu in Rules.Guides)
+                {
+                    if (gu.Id.Length == 0 || gu.Title.Length == 0 || gu.Done.Length == 0 || gu.Steps.Count == 0 || Array.IndexOf(Analyzer.Scopes, gu.Scope) < 0) guiasOk = false;
+                    foreach (GuideStep st in gu.Steps)
+                    {
+                        if (st.Title.Length == 0 || st.Text.Length == 0 || Rules.Fill(st.Text).Contains("{")) guiasOk = false;
+                        foreach (GuideAction ga in st.Actions)
+                            if (ga.Label.Length == 0 || (ga.Type != "abrir" && ga.Type != "diagit") || (ga.Type == "diagit" && Array.IndexOf(acoesValidas, ga.Target) < 0)) guiasOk = false;
+                    }
+                }
+                foreach (KeyValuePair<string, string> gl in Rules.GuideLinks) if (Rules.GuideById(gl.Value) == null) guiasOk = false;
+                Check(guiasOk, "guias: todo guia tem passos, escopo válido e ações conhecidas; todo achado aponta para um guia existente (" + Rules.Guides.Count + " guias)");
                 bool marcadores = true;
                 foreach (BugRule b in Rules.Bugs) if (Rules.Fill(b.Advice).Contains("{")) marcadores = false;
                 Check(marcadores, "nenhum {marcador} desconhecido nos conselhos");
@@ -234,6 +248,7 @@ namespace DiagIT
                 Check(fv != null && fv.Plain == "O PC teve 2 telas azuis causadas pelo driver de vídeo da NVIDIA", "frase simples nomeia o driver culpado");
                 Check(fv != null && fv.Advice.StartsWith("O Windows aponta o driver de vídeo da NVIDIA") && fv.Advice.Contains("NVIDIA App"), "conselho do tipo de driver, com o painel da marca");
                 Check(fv != null && fv.W[Comp.Software] > fv.W[Comp.Gpu], "driver culpado consistente: peso passa para Drivers e Windows");
+                Check(fv != null && fv.Guide == "driver-video-limpo", "tela azul do driver de vídeo ganha o guia de reinstalação limpa");
                 string vt2, vs2;
                 Analyzer.PlainVerdict(d, out vt2, out vs2);
                 Say("  Veredito: " + vt2 + " | " + vs2);
@@ -288,6 +303,32 @@ namespace DiagIT
                 Check(ds.Culprit == "bar.sys" && ds.CulpritHow.StartsWith("pilha") && ds.StackModules.Count == 3, "0x1A: culpado pela pilha, pulando núcleo e Wdf01000");
                 CrashDump dk = fakeDump(0x1A, new ulong[] { 0xFFFFF80000000777UL, 0x1234 });
                 Check(dk.Culprit == "ntoskrnl.exe", "só o núcleo na pilha: aponta o núcleo (memória/hardware)");
+
+                Say("== 12. Ciclo \"corrigiu?\"");
+                Func<double, FixEntry> fixAt = delegate(double daysAgo)
+                {
+                    FixEntry fe = new FixEntry(); fe.Id = "t" + daysAgo; fe.When = DateTime.Now.AddDays(-daysAgo); fe.Kind = "guia:driver-video-limpo";
+                    fe.Title = "Reinstalei o driver de vídeo do jeito certo"; fe.Scope = "video"; return fe;
+                };
+                Func<int[], double, Diagnosis> runFix = delegate(int[] bsodDaysAgo, double fixDaysAgo)
+                {
+                    List<WinEvent[]> parts = new List<WinEvent[]>();
+                    foreach (int dd in bsodDaysAgo) parts.Add(bsodWith(0x116, "nvlddmkm.sys", dd * 24));
+                    return Analyzer.Run(new List<SessionData>(), join(parts.ToArray()), new List<DiskHealth>(), 30, new List<TestResult>(), nv, new List<FixEntry> { fixAt(fixDaysAgo) });
+                };
+                d = runFix(new int[] { 10, 8 }, 5);
+                Say("  " + d.Fixes[0].Headline + ": " + d.Fixes[0].Text);
+                Check(d.Fixes.Count == 1 && d.Fixes[0].State == 0 && d.Fixes[0].Before == 2 && d.Fixes[0].After == 0, "sem volta há 5 dias (antes a cada ~1 dia): acompanhando");
+                d = runFix(new int[] { 25, 24 }, 20);
+                Say("  " + d.Fixes[0].Headline + ": " + d.Fixes[0].Text);
+                Finding old = d.Findings.Find(delegate(Finding f) { return f.BugCode == 0x116; });
+                Check(d.Fixes[0].State == 1, "20 dias sem tela azul depois da correção: resolvido");
+                Check(old != null && old.W[Comp.Software] < 0.2 && old.Evidence.Contains("antes da correção"), "resolvido: telas azuis antigas pesam bem menos");
+                d = runFix(new int[] { 10, 2 }, 5);
+                Say("  " + d.Fixes[0].Headline + ": " + d.Fixes[0].Text);
+                Check(d.Fixes[0].State == 2 && d.Fixes[0].After == 1, "voltou depois da correção: não resolveu");
+                d = runFix(new int[] { }, 5);
+                Check(d.Fixes[0].State == 3, "nada registrado antes: sem como comparar");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;

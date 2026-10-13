@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace DiagIT
@@ -71,6 +71,30 @@ namespace DiagIT
             }
             f.Advice = "O Windows aponta " + (r != null ? "o " + r.Name : "o driver " + top) + " (" + top + ") como causa. " +
                 (ty != null ? ty.Advice : "Descubra de qual programa é esse driver (pesquise o nome do arquivo) e atualize ou desinstale esse programa.");
+        }
+
+        /// <summary>Liga cada achado ao guia passo a passo que o resolve (data/guias.json).</summary>
+        static void AssignGuides(Diagnosis d)
+        {
+            foreach (Finding f in d.Findings)
+            {
+                if (f.Sev == Sev.Ok) continue;
+                if (f.BugCode >= 0)
+                {
+                    DriverType ty = Rules.DriverTypeOf(Rules.Driver(f.Culprit));
+                    if (CulpritPhrase(f) != null && ty != null && ty.Key == "video") f.Guide = "driver-video-limpo";
+                    else if (CulpritPhrase(f) == null)
+                    {
+                        string fam = Rules.Bug(f.BugCode).Family;
+                        if (fam == "ligada à memória" || fam == "de erro de hardware") f.Guide = "bios-padrao";
+                        else if (fam == "ligada à placa de vídeo") f.Guide = "driver-video-limpo";
+                    }
+                    continue;
+                }
+                foreach (KeyValuePair<string, string> kv in Rules.GuideLinks)
+                    if (f.Title.StartsWith(kv.Key, StringComparison.Ordinal)) { f.Guide = kv.Value; break; }
+                if (f.Guide != null && Rules.GuideById(f.Guide) == null) f.Guide = null;
+            }
         }
 
         /// <summary>Nome do culpado para a frase simples ("causadas pelo driver de vídeo da NVIDIA"), ou null.</summary>

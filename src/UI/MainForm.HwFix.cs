@@ -119,7 +119,9 @@ namespace DiagIT
                         if (!NeedAdmin()) return;
                         if (MessageBox.Show(this, "Definir a memória virtual em " + pageInit.ToString("N0") + "–" + pageMax.ToString("N0") + " MB no disco do sistema?\nSerá necessário reiniciar o computador.",
                             "Memória virtual", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-                        string msg; Fixes.SetPagefile(pageInit, pageMax, out msg); Console_(msg); RefreshFixes();
+                        string msg;
+                        if (Fixes.SetPagefile(pageInit, pageMax, out msg)) FixLog.Add("resolver:memoria-virtual", "Ajustei a memória virtual", "geral");
+                        Console_(msg); RefreshFixes();
                     },
                     delegate
                     {
@@ -133,7 +135,9 @@ namespace DiagIT
                         if (hdd.Count == 0) { Console_("Nenhum arquivo de paginação em HD (ou o Windows não está em SSD). Nada a alterar."); return; }
                         if (MessageBox.Show(this, "Remover o arquivo de paginação do HD (" + string.Join(", ", hdd.ToArray()) + ":) e manter só no SSD do Windows, com tamanho gerenciado pelo sistema?\nSerá necessário reiniciar o computador.",
                             "Memória virtual", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-                        string msg; Fixes.MovePagefileOffHdd(out msg); Console_(msg); RefreshFixes();
+                        string msg;
+                        if (Fixes.MovePagefileOffHdd(out msg)) FixLog.Add("resolver:paginacao-hd", "Tirei a memória virtual do HD", "engasgos");
+                        Console_(msg); RefreshFixes();
                     }
                 });
 
@@ -148,6 +152,7 @@ namespace DiagIT
                         if (!NeedAdmin()) return;
                         if (MessageBox.Show(this, "Executar SFC /scannow e depois DISM /RestoreHealth? Leva de 15 a 30 minutos.", "Reparar Windows",
                             MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                        FixLog.Add("resolver:sfc", "Reparei os arquivos do Windows (SFC + DISM)", "geral");
                         RunTools(new string[][]
                         {
                             new string[] { Fixes.Sys("sfc.exe"), "/scannow", "u" },
@@ -244,7 +249,9 @@ namespace DiagIT
                         if (!NeedAdmin()) return;
                         if (MessageBox.Show(this, "Impedir que o Windows Update instale drivers?\nAs atualizações do Windows continuam normais; drivers passam a ser atualizados só por você.",
                             "Windows Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-                        string msg; Fixes.SetWuDriversBlocked(true, out msg); Console_(msg); RefreshFixes();
+                        string msg;
+                        if (Fixes.SetWuDriversBlocked(true, out msg)) FixLog.Add("resolver:wu-drivers", "Impedi o Windows Update de trocar drivers", "video");
+                        Console_(msg); RefreshFixes();
                     },
                     delegate
                     {

@@ -24,6 +24,7 @@ O conhecimento do DiagIT fica em arquivos JSON na pasta [`data/`](data). Dá par
 | [`programas.json`](data/programas.json) | Programas em segundo plano que a comunidade associa a engasgos |
 | [`linguagem-simples.json`](data/linguagem-simples.json) | Tradução dos títulos técnicos para linguagem simples |
 | [`drivers.json`](data/drivers.json) | O que é cada driver que aparece como culpado de tela azul (`nvlddmkm.sys` → driver de vídeo da NVIDIA) e o conselho para cada tipo |
+| [`guias.json`](data/guias.json) | Soluções passo a passo dentro do app (texto, botões de ação) e quais achados cada guia resolve; ao concluir, a correção entra no acompanhamento "corrigiu?" |
 
 Nos textos, use os marcadores, que o DiagIT troca pelo nome certo para cada PC:
 `{painel_video}`, `{site_driver}`, `{nome_ddu}`, `{perfil_memoria}`, `{ajustes_cpu}`.

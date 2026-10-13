@@ -121,8 +121,8 @@ namespace DiagIT
             bool busy = r != null && c != null;
 
             bool halted = !busy && runPlan.Count > 0 && runResults.Count < runPlan.Count;
-            runHead.Set(runGuided ? "PASSO 3 DE 3" : "VERIFICAÇÃO", busy ? "Verificando seu PC" : halted ? "Verificação interrompida" : runResults.Count > 0 ? "Verificação concluída" : "Nenhuma verificação em andamento",
-                busy ? "Pode sair de perto. O DiagIT avisa quando terminar." :
+            runHead.Set(runLong ? "TESTE LONGO" : runGuided ? "PASSO 3 DE 3" : "VERIFICAÇÃO", busy ? "Verificando seu PC" : halted ? "Verificação interrompida" : runResults.Count > 0 ? "Verificação concluída" : "Nenhuma verificação em andamento",
+                busy ? (runLong ? "Pode ir dormir: o PC não vai entrar em suspensão e o DiagIT mostra o resultado quando terminar." : "Pode sair de perto. O DiagIT avisa quando terminar.") :
                 halted ? "As peças que já passaram continuam valendo. Recomece quando quiser." :
                 runResultsList().Count > 0 ? (goResultsAfterRun ? "Analisando o resultado..." : "Veja o que foi encontrado em Resultados.") :
                 "Escolha o que verificar em Verificar peças, ou faça o check-up pelo Início.");
@@ -145,7 +145,7 @@ namespace DiagIT
                 }
                 else if (busy && i == done.Count) { it.State = 1; it.Note = "Agora"; }
                 else if (!busy) { it.State = 0; it.Note = "Não feito"; }
-                else { it.State = 0; it.Note = (next++ == 0 ? "Em seguida" : "Depois") + " · " + Math.Max(1, (int)runPlan[i][1] / 60) + " min"; }
+                else { it.State = 0; it.Note = (next++ == 0 ? "Em seguida" : "Depois") + " · " + Minutes((int)runPlan[i][1]); }
                 runStepper.Items.Add(it);
             }
 
@@ -161,8 +161,8 @@ namespace DiagIT
                 runCard.Text_ = KindExplain(r.Kind) + (c.Errors > 0 ? " Atenção: " + c.Errors + (c.Errors == 1 ? " erro encontrado" : " erros encontrados") + " até agora." : "");
                 runCard.Progress = c.Progress;
                 runCard.ErrorState = c.Errors > 0;
-                runCard.TimeLeft = "Faltam cerca de " + Math.Max(1, (int)Math.Ceiling(leftStep / 60.0)) + " min nesta etapa";
-                runCard.Total = testQueue.Count > 0 ? "cerca de " + Math.Max(1, (int)Math.Ceiling(leftAll / 60.0)) + " min no total" : "";
+                runCard.TimeLeft = "Faltam cerca de " + Minutes(leftStep) + " nesta etapa";
+                runCard.Total = testQueue.Count > 0 ? "cerca de " + Minutes(leftAll) + " no total" : "";
             }
             else if (stopped)
             {
@@ -246,5 +246,13 @@ namespace DiagIT
         }
 
         List<TestResult> runResultsList() { return runResults; }
+
+        /// <summary>"12 min", "1 h 20 min".</summary>
+        static string Minutes(int secs)
+        {
+            int m = Math.Max(1, (int)Math.Ceiling(secs / 60.0));
+            if (m < 60) return m + " min";
+            return (m / 60) + " h" + (m % 60 > 0 ? " " + (m % 60) + " min" : "");
+        }
     }
 }

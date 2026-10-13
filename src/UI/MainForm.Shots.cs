@@ -23,7 +23,15 @@ namespace DiagIT
                 if (step == 0 && lastDiag == null) return;   // espera a análise inicial
                 switch (step)
                 {
-                    case 0: Navigate(P_HOME); break;
+                    case 0:
+                        // só para a imagem: exemplos de "Suas correções" (nada é gravado)
+                        if (lastDiag.Fixes.Count == 0)
+                        {
+                            lastDiag.Fixes.Add(SampleFix(1, "Reinstalei o driver de vídeo do jeito certo", "Resolvido", "Nenhum registro de travamentos de vídeo em 12 dias desde a correção. Antes: 3 em 6 dias.", 12));
+                            lastDiag.Fixes.Add(SampleFix(0, "Tirei a memória virtual do HD", "Acompanhando", "Nenhum registro de congelamentos e engasgos desde 11/10. Antes: 2 em 4 dias. Mais 4 dias sem problemas para confirmar.", 3));
+                        }
+                        RefreshHome();
+                        Navigate(P_HOME); break;
                     case 1: Shot(dir, "1-inicio"); OpenProblem(); break;
                     case 2: Shot(dir, "2-problema"); OpenPlan(symGrid.Selected >= 0 ? symGrid.Selected : 0, null); break;
                     case 3:
@@ -37,6 +45,14 @@ namespace DiagIT
                     case 9: Shot(dir, "9-hardware"); Navigate(P_SET); break;
                     case 10:
                         Shot(dir, "10-configuracoes");
+                        homeFlow.AutoScrollPosition = new Point(0, 0);
+                        Navigate(P_HOME);
+                        homeFlow.AutoScrollPosition = new Point(0, homeFlow.AutoScrollMinSize.Height);
+                        break;
+                    case 11: Shot(dir, "11-inicio-correcoes"); OpenGuide("driver-video-limpo", null); guideDone[0] = true; guideDone[1] = true; guideStep = 2; LayoutGuide(); break;
+                    case 12:
+                        Shot(dir, "12-guia");
+                        curGuide = null; ClearGuideProgress();
                         if (!withRun) { t.Stop(); ExitApp(); return; }
                         // verificação real e curta (processador, 60 s) só para fotografar a tela "Verificando"
                         runPlan.Clear(); runPlan.AddRange(QuickPlan(new System.Collections.Generic.List<TestKind> { TestKind.Cpu, TestKind.Gpu }));
@@ -44,16 +60,24 @@ namespace DiagIT
                         testQueue.Clear(); testQueue.Enqueue(runPlan[1]);
                         if (StartTest(TestKind.Cpu, 60, runPlan[0][2], false)) Navigate(P_RUN);
                         break;
-                    case 11: case 12: case 13: case 14: case 15: case 16: break;   // deixa o teste andar
-                    case 17: Shot(dir, "11-verificando-ativo"); runTechToggle.Open = true; runTech.Visible = true; runLayoutKey = ""; RefreshRun(); break;
-                    case 18: Shot(dir, "12-verificando-tecnico"); testQueue.Clear(); runner.Stop(); break;
-                    case 19: case 20: case 21: break;
-                    case 22: Shot(dir, "13-apos-parar"); break;
+                    case 13: case 14: case 15: case 16: case 17: case 18: break;   // deixa o teste andar
+                    case 19: Shot(dir, "13-verificando-ativo"); runTechToggle.Open = true; runTech.Visible = true; runLayoutKey = ""; RefreshRun(); break;
+                    case 20: Shot(dir, "14-verificando-tecnico"); testQueue.Clear(); runner.Stop(); break;
+                    case 21: case 22: case 23: break;
+                    case 24: Shot(dir, "15-apos-parar"); break;
                     default: t.Stop(); ExitApp(); return;
                 }
                 step++;
             };
             t.Start();
+        }
+
+        static FixStatus SampleFix(int state, string title, string head, string text, int daysAgo)
+        {
+            FixStatus st = new FixStatus();
+            st.Fix = new FixEntry(); st.Fix.Title = title; st.Fix.When = DateTime.Now.AddDays(-daysAgo); st.Fix.Id = "amostra" + daysAgo;
+            st.State = state; st.Headline = head; st.Text = text;
+            return st;
         }
 
         void Shot(string dir, string name)

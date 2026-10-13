@@ -678,6 +678,7 @@ namespace DiagIT
     public class FindingList : Panel
     {
         readonly List<FindingCard> cards = new List<FindingCard>();
+        public event Action<Finding, string> CardAction;
 
         public FindingList()
         {
@@ -696,6 +697,7 @@ namespace DiagIT
             {
                 FindingCard c = new FindingCard(f);
                 c.ToggledDetails += delegate { Relayout(); };
+                c.ActionClicked += delegate(Finding ff, string a) { if (CardAction != null) CardAction(ff, a); };
                 cards.Add(c);
                 Controls.Add(c);
             }
@@ -746,9 +748,11 @@ namespace DiagIT
         readonly Finding f;
         const TextFormatFlags WB = TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left;
         int hTitle, hAdv, hTech;
-        Rectangle toggleRect = Rectangle.Empty;
+        Rectangle toggleRect = Rectangle.Empty, guideRect = Rectangle.Empty, fixRect = Rectangle.Empty;
         public bool Highlight, Expanded;
         public event EventHandler ToggledDetails;
+        public event Action<Finding, string> ActionClicked;
+        bool HasActions { get { return f.Advice.Length > 0 && (f.Sev == Sev.Crit || f.Sev == Sev.Warn); } }
 
         public FindingCard(Finding f) { this.f = f; AccessibleName = f.Plain; AccessibleDescription = f.Advice; }
         public Finding Finding { get { return f; } }
@@ -795,19 +799,22 @@ namespace DiagIT
             hTech = Expanded && HasTech ? TextRenderer.MeasureText(Tech, Theme.Font(9f), new Size(iw, 0), WB).Height : 0;
             return Theme.S(16) + Theme.S(20) + Theme.S(10) + hTitle
                 + (hAdv > 0 ? Theme.S(14) + Theme.S(18) + hAdv : 0)
+                + (HasActions ? Theme.S(12) + Theme.S(34) : 0)
                 + (HasTech ? Theme.S(14) + Theme.S(40) + (hTech > 0 ? hTech + Theme.S(4) : 0) : Theme.S(4))
                 + Theme.S(12);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            Cursor = toggleRect.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
+            Cursor = toggleRect.Contains(e.Location) || guideRect.Contains(e.Location) || fixRect.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
             base.OnMouseMove(e);
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
         {
-            if (toggleRect.Contains(e.Location))
+            if (guideRect.Contains(e.Location) && ActionClicked != null) ActionClicked(f, "guide");
+            else if (fixRect.Contains(e.Location) && ActionClicked != null) ActionClicked(f, "fix");
+            else if (toggleRect.Contains(e.Location))
             {
                 Expanded = !Expanded;
                 if (ToggledDetails != null) ToggledDetails(this, EventArgs.Empty);
@@ -846,6 +853,30 @@ namespace DiagIT
                 y += Theme.S(18);
                 TextRenderer.DrawText(g, f.Advice, Theme.Font(9.5f), new Rectangle(x, y, iw, hAdv), Theme.Soft, WB);
                 y += hAdv;
+            }
+            guideRect = fixRect = Rectangle.Empty;
+            if (HasActions)
+            {
+                y += Theme.S(12);
+                int bx = x, bh = Theme.S(34);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                if (f.Guide != null)
+                {
+                    string gl = "Resolver passo a passo";
+                    int gw = TextRenderer.MeasureText(gl, Theme.Font(9f, FontStyle.Bold)).Width + Theme.S(28);
+                    guideRect = new Rectangle(bx, y, gw, bh);
+                    using (GraphicsPath p = Theme.Round(guideRect, Theme.S(9)))
+                    using (SolidBrush b = new SolidBrush(Theme.Accent)) g.FillPath(b, p);
+                    Theme.Text_(g, gl, Theme.Font(9f, FontStyle.Bold), Theme.AccentInk, guideRect, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    bx = guideRect.Right + Theme.S(10);
+                }
+                string fl = "Já fiz isso";
+                int fw = TextRenderer.MeasureText(fl, Theme.Font(9f, FontStyle.Bold)).Width + Theme.S(28);
+                fixRect = new Rectangle(bx, y, fw, bh);
+                using (GraphicsPath p = Theme.Round(fixRect, Theme.S(9)))
+                using (Pen pen = new Pen(Theme.Border2)) g.DrawPath(pen, p);
+                Theme.Text_(g, fl, Theme.Font(9f, FontStyle.Bold), Theme.Text, fixRect, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                y += bh;
             }
             if (HasTech)
             {

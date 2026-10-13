@@ -1,0 +1,92 @@
+{
+  "_sobre": "Soluções guiadas: passo a passo dentro do DiagIT. Ao concluir, a correção entra no acompanhamento 'corrigiu?' com o 'escopo' indicado (telas-azuis, video, desligamentos, engasgos, geral). Ações: 'abrir' abre um site ou programa do Windows; 'diagit' executa algo do próprio DiagIT (bloquear-wu, tirar-hd, reiniciar-avancado, reiniciar-bios, teste-gpu, teste-memoria). 'achados' liga cada guia aos achados pelo começo do título técnico. Textos aceitam {painel_video}, {site_driver}, {nome_ddu}, {perfil_memoria}, {ajustes_cpu}.",
+  "guias": [
+    {
+      "id": "driver-video-limpo",
+      "titulo": "Reinstalar o driver de vídeo do jeito certo",
+      "resumo": "Remove o driver atual por completo e instala a versão do fabricante. Resolve a maioria dos travamentos e telas azuis de vídeo. Leva uns 20 minutos e reinicia o PC duas vezes.",
+      "feito": "Reinstalei o driver de vídeo do jeito certo",
+      "escopo": "video",
+      "passos": [
+        { "titulo": "Baixe o driver novo", "texto": "Baixe a versão mais recente do driver da sua placa no site do fabricante. Escolha o modelo da placa manualmente em vez de usar o detector automático. Só baixe; ainda não instale.",
+          "acoes": [ { "rotulo": "Abrir o site do driver", "tipo": "abrir", "alvo": "{site_driver}" } ] },
+        { "titulo": "Baixe o DDU", "texto": "O DDU (Display Driver Uninstaller) remove o driver antigo por completo, sem deixar restos. Baixe na página oficial e extraia numa pasta fácil de achar, como a Área de Trabalho.",
+          "acoes": [ { "rotulo": "Abrir a página do DDU", "tipo": "abrir", "alvo": "https://www.wagnardsoft.com/display-driver-uninstaller-ddu-" } ] },
+        { "titulo": "Impeça o Windows de trocar o driver", "texto": "Sem isso, o Windows Update pode instalar outro driver por cima do seu logo depois.",
+          "acoes": [ { "rotulo": "Impedir agora", "tipo": "diagit", "alvo": "bloquear-wu" } ] },
+        { "titulo": "Desconecte a internet", "texto": "Tire o cabo de rede ou desligue o Wi-Fi. Assim o Windows não instala nenhum driver sozinho enquanto você troca o seu.", "acoes": [] },
+        { "titulo": "Reinicie em modo de segurança", "texto": "Clique no botão abaixo: o PC reinicia numa tela de opções. Escolha Solução de problemas → Opções avançadas → Configurações de Inicialização → Reiniciar, e depois aperte a tecla 4. O DiagIT guarda em que passo você está.",
+          "acoes": [ { "rotulo": "Reiniciar nas opções avançadas", "tipo": "diagit", "alvo": "reiniciar-avancado" } ] },
+        { "titulo": "Remova o driver com o DDU", "texto": "No modo de segurança, abra o DDU da pasta onde você extraiu. Escolha o tipo 'GPU' e '{nome_ddu}' e clique em 'Limpar e reiniciar'.", "acoes": [] },
+        { "titulo": "Instale o driver baixado", "texto": "Depois que o PC reiniciar, instale o driver que você baixou no passo 1. Quando terminar, reconecte a internet.", "acoes": [] },
+        { "titulo": "Confirme com o teste", "texto": "Rode o teste da placa de vídeo (3 minutos). Depois, o DiagIT acompanha se os travamentos voltam.",
+          "acoes": [ { "rotulo": "Testar a placa de vídeo", "tipo": "diagit", "alvo": "teste-gpu" } ] }
+      ]
+    },
+    {
+      "id": "bios-padrao",
+      "titulo": "Voltar a BIOS para as configurações de fábrica",
+      "resumo": "Desliga ajustes de memória e processador que deixam o PC instável. É a causa mais comum de telas azuis quando as peças passam nos testes. Leva 5 minutos; os jogos podem ficar um pouco mais lentos até você reativar os ajustes.",
+      "feito": "Voltei a BIOS para as configurações de fábrica",
+      "escopo": "telas-azuis",
+      "passos": [
+        { "titulo": "Entre na BIOS", "texto": "Clique no botão abaixo para reiniciar direto na BIOS. Se não funcionar no seu PC, reinicie e aperte Delete (ou F2) várias vezes logo que ele ligar.",
+          "acoes": [ { "rotulo": "Reiniciar direto na BIOS", "tipo": "diagit", "alvo": "reiniciar-bios" } ] },
+        { "titulo": "Carregue os padrões", "texto": "Procure a opção 'Load Optimized Defaults' ou 'Load Default Settings' (em muitas placas é a tecla F7 ou F9). Isso desliga {perfil_memoria}, {ajustes_cpu} e qualquer overclock.", "acoes": [] },
+        { "titulo": "Salve e saia", "texto": "Aperte F10 e confirme. O PC reinicia normalmente.", "acoes": [] },
+        { "titulo": "Use por alguns dias", "texto": "Jogue normalmente por 3 ou 4 dias. Se as telas azuis pararem, a causa era um desses ajustes. Depois você pode reativar um de cada vez para descobrir qual era. O DiagIT acompanha e avisa.", "acoes": [] }
+      ]
+    },
+    {
+      "id": "paginacao-hd",
+      "titulo": "Tirar a memória virtual do HD",
+      "resumo": "Faz o Windows usar só o SSD quando a memória enche. Acaba com as travadinhas que vêm do HD lento. Leva 1 minuto e precisa reiniciar.",
+      "feito": "Tirei a memória virtual do HD",
+      "escopo": "engasgos",
+      "passos": [
+        { "titulo": "Mova a memória virtual", "texto": "O DiagIT remove o arquivo de paginação do HD e deixa um no SSD, com tamanho gerenciado pelo Windows.",
+          "acoes": [ { "rotulo": "Tirar do HD agora", "tipo": "diagit", "alvo": "tirar-hd" } ] },
+        { "titulo": "Reinicie o PC", "texto": "A mudança só vale depois de reiniciar.", "acoes": [] }
+      ]
+    },
+    {
+      "id": "realtek-desativar",
+      "titulo": "Testar sem a placa de rede Realtek 2.5GbE",
+      "resumo": "Essa placa de rede é conhecida por causar travadinhas e estalos no áudio, mesmo sem cabo. O teste é desativá-la por alguns dias e usar o Wi-Fi.",
+      "feito": "Desativei a placa de rede Realtek 2.5GbE",
+      "escopo": "engasgos",
+      "passos": [
+        { "titulo": "Abra o Gerenciador de Dispositivos", "texto": "Expanda 'Adaptadores de rede', clique com o botão direito em 'Realtek ... 2.5GbE' e escolha 'Desabilitar dispositivo'. Use o Wi-Fi nesse período.",
+          "acoes": [ { "rotulo": "Abrir o Gerenciador de Dispositivos", "tipo": "abrir", "alvo": "devmgmt.msc" } ] },
+        { "titulo": "Jogue por alguns dias", "texto": "Se as travadinhas sumirem, a placa era a causa: deixe desativada ou instale o driver 10.54.1111.2021, indicado pela comunidade, e impeça o Windows de trocá-lo.", "acoes": [] }
+      ]
+    },
+    {
+      "id": "limitar-clock-amd",
+      "titulo": "Limitar a placa de vídeo ao clock oficial",
+      "resumo": "Placas Radeon passam do clock anunciado por conta própria; em algumas unidades isso trava o driver. O teste é limitar ao valor oficial por alguns dias.",
+      "feito": "Limitei a placa de vídeo ao clock oficial",
+      "escopo": "video",
+      "passos": [
+        { "titulo": "Abra o AMD Software", "texto": "Clique com o botão direito na Área de Trabalho e abra o AMD Software (Adrenalin). Vá em Desempenho → Ajuste.", "acoes": [] },
+        { "titulo": "Limite a frequência máxima", "texto": "Escolha Ajuste manual, ligue Ajuste da GPU e Controle avançado e coloque a frequência máxima no valor oficial que o DiagIT mostrou no achado. Desligue também o HYPR-RX, inclusive nos perfis de cada jogo.", "acoes": [] },
+        { "titulo": "Jogue por alguns dias", "texto": "Se os travamentos pararem, a causa era o clock. Se continuarem, volte ao padrão: o DiagIT acompanha e mostra o próximo passo.", "acoes": [] }
+      ]
+    }
+  ],
+  "achados": [
+    { "inicio_do_titulo": "O driver de vídeo parou de responder", "guia": "driver-video-limpo" },
+    { "inicio_do_titulo": "Travamentos de GPU registrados", "guia": "driver-video-limpo" },
+    { "inicio_do_titulo": "Jogos/apps travaram dentro do driver de vídeo", "guia": "driver-video-limpo" },
+    { "inicio_do_titulo": "Os travamentos de vídeo começaram depois", "guia": "driver-video-limpo" },
+    { "inicio_do_titulo": "O Windows Update instalou o driver de vídeo", "guia": "driver-video-limpo" },
+    { "inicio_do_titulo": "REPRODUZIDO: o watchdog do kernel", "guia": "driver-video-limpo" },
+    { "inicio_do_titulo": "Erros FATAIS de hardware", "guia": "bios-padrao" },
+    { "inicio_do_titulo": "Erros de hardware corrigidos", "guia": "bios-padrao" },
+    { "inicio_do_titulo": "Processador ERRA CÁLCULOS", "guia": "bios-padrao" },
+    { "inicio_do_titulo": "Memória virtual também no HD", "guia": "paginacao-hd" },
+    { "inicio_do_titulo": "Placa de rede ", "guia": "realtek-desativar" },
+    { "inicio_do_titulo": "A GPU trabalha acima do clock oficial", "guia": "limitar-clock-amd" }
+  ],
+  "_telas_azuis": "Telas azuis: com driver de vídeo culpado → driver-video-limpo; ligadas à memória ou de erro de hardware, sem driver culpado → bios-padrao (regra no código, Analyzer.AssignGuides)."
+}

@@ -25,6 +25,9 @@ namespace DiagIT
     public class PlainRule { public string Prefix = "", Simple = ""; }
     public class DriverType { public string Key = "", Phrase = "", Advice = ""; public Dictionary<Comp, double> W = new Dictionary<Comp, double>(); }
     public class DriverRule { public string File = "", Name = "", Type = ""; public bool Core; }
+    public class GuideAction { public string Label = "", Type = "", Target = ""; }
+    public class GuideStep { public string Title = "", Text = ""; public List<GuideAction> Actions = new List<GuideAction>(); }
+    public class Guide { public string Id = "", Title = "", Summary = "", Done = "", Scope = ""; public List<GuideStep> Steps = new List<GuideStep>(); }
 
     /// <summary>
     /// Regras de conhecimento em dados (pasta data/ do repositório, embutidas no executável).
@@ -49,8 +52,10 @@ namespace DiagIT
         public static readonly List<PlainRule> Plain = new List<PlainRule>();
         public static readonly List<DriverRule> Drivers = new List<DriverRule>();
         public static readonly Dictionary<string, DriverType> DriverTypes = new Dictionary<string, DriverType>();
+        public static readonly List<Guide> Guides = new List<Guide>();
+        public static readonly List<KeyValuePair<string, string>> GuideLinks = new List<KeyValuePair<string, string>>();   // começo do título → guia
 
-        public static readonly string[] Files = { "telas-azuis", "fabricantes", "placas-de-video", "programas", "linguagem-simples", "drivers" };
+        public static readonly string[] Files = { "telas-azuis", "fabricantes", "placas-de-video", "programas", "linguagem-simples", "drivers", "guias" };
 
         // ------------------------------------------------------------------ leitura
         static string ReadText(string name)
@@ -189,6 +194,34 @@ namespace DiagIT
                         DriverRule r = new DriverRule(); r.File = Str(x, "arquivo").ToLowerInvariant(); r.Name = Str(x, "nome"); r.Type = Str(x, "tipo"); r.Core = Bool(x, "nucleo");
                         Drivers.Add(r);
                     }
+
+                    cur = "guias";
+                    Dictionary<string, object> gd = Obj(js.DeserializeObject(ReadText(cur)));
+                    foreach (object o in List(gd["guias"]))
+                    {
+                        Dictionary<string, object> x = Obj(o);
+                        Guide gu = new Guide();
+                        gu.Id = Str(x, "id"); gu.Title = Str(x, "titulo"); gu.Summary = Str(x, "resumo"); gu.Done = Str(x, "feito"); gu.Scope = Str(x, "escopo");
+                        foreach (object so in List(x["passos"]))
+                        {
+                            Dictionary<string, object> sx = Obj(so);
+                            GuideStep st = new GuideStep(); st.Title = Str(sx, "titulo"); st.Text = Str(sx, "texto");
+                            if (sx.ContainsKey("acoes"))
+                                foreach (object ao in List(sx["acoes"]))
+                                {
+                                    Dictionary<string, object> ax = Obj(ao);
+                                    GuideAction ga = new GuideAction(); ga.Label = Str(ax, "rotulo"); ga.Type = Str(ax, "tipo"); ga.Target = Str(ax, "alvo");
+                                    st.Actions.Add(ga);
+                                }
+                            gu.Steps.Add(st);
+                        }
+                        Guides.Add(gu);
+                    }
+                    foreach (object o in List(gd["achados"]))
+                    {
+                        Dictionary<string, object> x = Obj(o);
+                        GuideLinks.Add(new KeyValuePair<string, string>(Str(x, "inicio_do_titulo"), Str(x, "guia")));
+                    }
                 }
                 catch (Exception e)
                 {
@@ -243,6 +276,12 @@ namespace DiagIT
         {
             DriverType t;
             return r != null && DriverTypes.TryGetValue(r.Type, out t) ? t : null;
+        }
+
+        public static Guide GuideById(string id)
+        {
+            Ensure();
+            return Guides.Find(delegate(Guide g) { return g.Id == id; });
         }
 
         public static BgProgram ProgramByName(string name)
