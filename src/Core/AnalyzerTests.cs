@@ -69,6 +69,16 @@ namespace DiagIT
             }
         }
 
+        /// <summary>Potência de fonte recomendada a partir do que o próprio teste mediu (CPU + GPU + resto do PC, com folga de 50%).</summary>
+        public static string PsuAdvice(TestResult t)
+        {
+            double cpu = t.Get("t_cpu_power_max"), gpu = t.Get("t_gpu_power_max");
+            if (double.IsNaN(cpu) || double.IsNaN(gpu) || cpu + gpu < 30)
+                return "Confira se a fonte tem potência e qualidade adequadas: some o consumo da placa de vídeo e do processador (está no site de cada fabricante), mais uns 80 W do resto do PC, e use uma fonte de boa marca com pelo menos 50% de folga.";
+            int need = (int)(Math.Ceiling((cpu + gpu + 80) * 1.5 / 50.0) * 50);
+            return "O teste mediu até " + N0(cpu + gpu) + " W só no processador e na placa de vídeo; para esse conjunto, use uma fonte de boa marca com pelo menos " + need + " W reais.";
+        }
+
         static Finding FailureFinding(TestResult t, int count)
         {
             double cpuT = t.Get("t_cpu_temp_max"), gpuT = t.Get("t_gpu_temp_max"), hot = t.Get("t_gpu_hot_max");
@@ -90,18 +100,18 @@ namespace DiagIT
                     case TestKind.Combined:
                         return New(Sev.Crit, "O PC DESLIGOU/REINICIOU com CPU e GPU em carga máxima" + times, ev,
                             "Com temperaturas normais no momento da queda, isso é o comportamento típico de fonte que não entrega a potência (ou com proteção disparando). " +
-                            "Confira se a fonte tem potência e qualidade adequadas (para RX 7600 + Ryzen 5 5500, uma boa fonte de 500–550 W reais), se os cabos PCIe estão firmes e, se possível, teste com outra fonte.",
+                            PsuAdvice(t) + " Confira também se os cabos de energia da placa de vídeo estão firmes (um cabo por conector, sem divisor) e, se possível, teste com outra fonte.",
                             true, Comp.Psu);
                     case TestKind.Ram:
                         return New(Sev.Crit, "O PC travou/reiniciou durante o teste de memória" + times, ev,
-                            "Uma queda do sistema enquanto a RAM é exercitada aponta para pente defeituoso ou instável. Teste um pente por vez e desative XMP/EXPO.", true, Comp.Ram);
+                            "Uma queda do sistema enquanto a RAM é exercitada aponta para pente defeituoso ou instável. Teste um pente por vez e desative {perfil_memoria}.", true, Comp.Ram);
                     case TestKind.Gpu:
                         return New(Sev.Crit, "O PC travou/reiniciou durante o teste da placa de vídeo" + times, ev,
                             "Queda completa com a GPU em carga: fonte (picos de consumo da GPU), a própria GPU ou o slot. Teste com o driver reinstalado (DDU) e, se repetir, com outra fonte.",
                             true, Comp.Gpu);
                     case TestKind.Cpu:
                         return New(Sev.Crit, "O PC travou/reiniciou durante o teste do processador" + times, ev,
-                            "Remova overclock/PBO/Curve Optimizer, carregue os padrões da BIOS e repita. Persistindo, suspeite de fonte ou dos reguladores de tensão da placa-mãe.",
+                            "Remova overclock e {ajustes_cpu}, carregue os padrões da BIOS e repita. Persistindo, suspeite de fonte ou dos reguladores de tensão da placa-mãe.",
                             true, Comp.Cpu);
                     default:
                         return New(Sev.Crit, "O PC travou durante o teste de armazenamento" + times, ev, "Verifique o disco e os cabos; faça backup.", true, Comp.Disk);
@@ -111,16 +121,16 @@ namespace DiagIT
             {
                 case TestKind.Cpu:
                     return New(Sev.Crit, "Processador ERRA CÁLCULOS sob carga" + times, ev,
-                        "CPU estável nunca erra. Carregue os padrões da BIOS (sem PBO/Curve Optimizer/overclock), atualize a BIOS e repita. Se continuar errando com tudo padrão, a CPU (ou a placa-mãe) está com defeito.",
+                        "CPU estável nunca erra. Carregue os padrões da BIOS (sem overclock e sem {ajustes_cpu}), atualize a BIOS e repita. Se continuar errando com tudo padrão, a CPU (ou a placa-mãe) está com defeito.",
                         true, Comp.Cpu);
                 case TestKind.Ram:
                     return New(Sev.Crit, "Memória RAM com ERROS confirmados" + times, ev,
-                        "Teste cada pente sozinho (e em cada slot) para achar o defeituoso; desative XMP/EXPO. Pente com erro precisa ser trocado (geralmente coberto pela garantia).",
+                        "Teste cada pente sozinho (e em cada slot) para achar o defeituoso; desative {perfil_memoria}. Pente com erro precisa ser trocado (geralmente coberto pela garantia).",
                         true, Comp.Ram);
                 case TestKind.Gpu:
                     if (t.Get("device_removed") == 1)
                         return New(Sev.Crit, "A placa de vídeo TRAVA sob carga (o Windows precisou reiniciá-la)" + times, ev,
-                            "Mesmo tipo de falha dos travamentos em jogo. 1) Reinstale o driver limpo com DDU; 2) remova overclock/undervolt no Adrenalin; 3) confira cabos de energia da GPU. " +
+                            "Mesmo tipo de falha dos travamentos em jogo. 1) Reinstale o driver limpo com DDU; 2) remova overclock/undervolt no {painel_video}; 3) confira cabos de energia da GPU. " +
                             "Se travar de novo com driver limpo e temperatura normal, a placa está com defeito (acione a garantia).", true, Comp.Gpu);
                     return New(Sev.Crit, "Placa de vídeo com ERROS de cálculo/VRAM" + times, ev,
                         "Remova overclock/undervolt e repita. Erros com tudo no padrão indicam GPU ou memória de vídeo com defeito.", true, Comp.Gpu);
@@ -157,7 +167,7 @@ namespace DiagIT
             if ((t.Kind == TestKind.Gpu || t.Kind == TestKind.Combined) && !double.IsNaN(hot) && hot >= 85 && !double.IsNaN(gpuFanMax) && gpuFanMax < 100)
                 d.Findings.Add(New(Sev.Crit, "Ventoinhas da GPU NÃO giraram com a placa quente" + where,
                     "Hotspot chegou a " + N0(hot) + " °C e a ventoinha ficou em " + N0(gpuFanMax) + " RPM.",
-                    "Ventoinha travada/defeituosa ou curva de ventoinha zerada no Adrenalin. Verifique visualmente e restaure a curva padrão.", true, Comp.Cooling));
+                    "Ventoinha travada/defeituosa ou curva de ventoinha zerada no {painel_video}. Verifique visualmente e restaure a curva padrão.", true, Comp.Cooling));
 
             double cpuFanMin = t.Get("t_cpu_fan_min");
             if ((t.Kind == TestKind.Cpu || t.Kind == TestKind.Combined) && !double.IsNaN(cpuFanMin) && cpuFanMin < 150 && !double.IsNaN(cpuT) && cpuT >= 75)
@@ -517,7 +527,7 @@ namespace DiagIT
                 sw.Cause = unexplained;
                 sw.Headline = "Sem defeito de hardware nos testes: " + unexplained.Title;
                 sw.Detail = "As peças apontadas passaram nos testes, então o próximo suspeito é driver, BIOS ou ajuste instável. " +
-                    "Volte a BIOS para o padrão (sem EXPO/XMP, PBO, Curve Optimizer ou undervolt) por alguns dias; se parar, reative um ajuste por vez. " +
+                    "Volte a BIOS para o padrão (sem {perfil_memoria}, {ajustes_cpu} ou undervolt) por alguns dias; se parar, reative um ajuste por vez. " +
                     "Reinstale o driver de vídeo limpo (DDU), atualize chipset e BIOS. " + unexplained.Advice;
             }
 

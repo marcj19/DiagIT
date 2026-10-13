@@ -1,0 +1,273 @@
+{
+  "_sobre": "Títulos técnicos (pelo começo do texto) e a versão em linguagem simples mostrada primeiro na interface. A primeira regra que combina vence, então as mais específicas vêm antes. '({n})' vira o número de ocorrências, por exemplo '(3×)'.",
+  "titulos": [
+    {
+      "inicio_do_titulo": "Erros FATAIS de hardware",
+      "simples": "O próprio hardware registrou erros graves"
+    },
+    {
+      "inicio_do_titulo": "Erros de hardware corrigidos",
+      "simples": "O hardware corrigiu erros sozinho várias vezes (sinal de instabilidade)"
+    },
+    {
+      "inicio_do_titulo": "O driver de vídeo parou de responder",
+      "simples": "A tela travou ou ficou preta e voltou ({n}): o driver de vídeo reiniciou"
+    },
+    {
+      "inicio_do_titulo": "Travamentos de GPU registrados",
+      "simples": "A placa de vídeo parou de responder ({n})"
+    },
+    {
+      "inicio_do_titulo": "Watchdog do kernel disparou",
+      "simples": "O Windows ficou travado por alguns segundos"
+    },
+    {
+      "inicio_do_titulo": "O PC desligou/reiniciou sem aviso",
+      "simples": "O PC desligou ou reiniciou sozinho ({n}), sem tela azul"
+    },
+    {
+      "inicio_do_titulo": "A BIOS/firmware limitou a velocidade da CPU",
+      "simples": "O processador foi freado para não esquentar ou gastar energia demais"
+    },
+    {
+      "inicio_do_titulo": "O diagnóstico de memória do Windows encontrou ERROS",
+      "simples": "O teste de memória do Windows encontrou defeito na RAM"
+    },
+    {
+      "inicio_do_titulo": "Teste de memória do Windows sem erros",
+      "simples": "O teste de memória do Windows não achou problemas"
+    },
+    {
+      "inicio_do_titulo": "Vários programas diferentes travaram com erro de memória",
+      "simples": "Vários programas fecharam sozinhos com erro de memória"
+    },
+    {
+      "inicio_do_titulo": "Jogos/apps travaram dentro do driver de vídeo",
+      "simples": "Jogos fecharam por erro no driver de vídeo ({n})"
+    },
+    {
+      "inicio_do_titulo": "Memória virtual (commit) quase",
+      "simples": "A memória do PC está quase cheia"
+    },
+    {
+      "inicio_do_titulo": "Pouca memória RAM livre durante o jogo",
+      "simples": "Falta memória RAM durante os jogos"
+    },
+    {
+      "inicio_do_titulo": "Erros de armazenamento registrados",
+      "simples": "O Windows teve erros ao ler ou gravar no disco"
+    },
+    {
+      "inicio_do_titulo": "Disco com problemas registrados por ele mesmo",
+      "simples": "Um disco está começando a falhar"
+    },
+    {
+      "inicio_do_titulo": "Disco com problemas",
+      "simples": "Um disco está com problemas"
+    },
+    {
+      "inicio_do_titulo": "Discos reportam estado saudável",
+      "simples": "Os discos estão saudáveis"
+    },
+    {
+      "inicio_do_titulo": "Discos saudáveis",
+      "simples": "Os discos estão saudáveis"
+    },
+    {
+      "inicio_do_titulo": "Sem leitura de temperatura",
+      "simples": "O DiagIT não consegue ler a temperatura"
+    },
+    {
+      "inicio_do_titulo": "CPU chegou ao limite térmico",
+      "simples": "O processador esquentou demais"
+    },
+    {
+      "inicio_do_titulo": "CPU muito quente em jogo",
+      "simples": "O processador fica muito quente nos jogos"
+    },
+    {
+      "inicio_do_titulo": "CPU passa ",
+      "simples": "O processador fica muito quente nos jogos"
+    },
+    {
+      "inicio_do_titulo": "Temperatura da CPU normal",
+      "simples": "A temperatura do processador está normal"
+    },
+    {
+      "inicio_do_titulo": "GPU em temperatura crítica",
+      "simples": "A placa de vídeo esquentou demais"
+    },
+    {
+      "inicio_do_titulo": "GPU muito quente",
+      "simples": "A placa de vídeo fica muito quente"
+    },
+    {
+      "inicio_do_titulo": "GPU quente, mas dentro do limite",
+      "simples": "A placa de vídeo esquenta, mas dentro do limite"
+    },
+    {
+      "inicio_do_titulo": "Temperatura da GPU normal",
+      "simples": "A temperatura da placa de vídeo está normal"
+    },
+    {
+      "inicio_do_titulo": "Ventoinha da GPU parada",
+      "simples": "A ventoinha da placa de vídeo não está girando"
+    },
+    {
+      "inicio_do_titulo": "Ventoinhas da GPU NÃO giraram",
+      "simples": "A ventoinha da placa de vídeo não girou no teste"
+    },
+    {
+      "inicio_do_titulo": "Ventoinha da CPU parada",
+      "simples": "A ventoinha do processador parece parada"
+    },
+    {
+      "inicio_do_titulo": "A CPU perde desempenho",
+      "simples": "O processador fica mais lento quando esquenta"
+    },
+    {
+      "inicio_do_titulo": "CPU reduz a velocidade por temperatura",
+      "simples": "O processador fica mais lento quando esquenta"
+    },
+    {
+      "inicio_do_titulo": "CPU chegou a ",
+      "simples": "O processador chegou perto do limite de temperatura no teste"
+    },
+    {
+      "inicio_do_titulo": "O clock da GPU cai",
+      "simples": "A placa de vídeo fica mais lenta com o tempo de jogo"
+    },
+    {
+      "inicio_do_titulo": "Tensão de +12 V caiu",
+      "simples": "A fonte não mantém a energia estável"
+    },
+    {
+      "inicio_do_titulo": "Tensão de +12 V fora",
+      "simples": "A fonte não mantém a energia estável"
+    },
+    {
+      "inicio_do_titulo": "Tensão de +12 V estável",
+      "simples": "A fonte entrega energia estável"
+    },
+    {
+      "inicio_do_titulo": "+12 V estável",
+      "simples": "A fonte entregou energia estável no máximo do PC"
+    },
+    {
+      "inicio_do_titulo": "O sistema 'congelou'",
+      "simples": "O PC congelou por alguns segundos durante os jogos"
+    },
+    {
+      "inicio_do_titulo": "O sistema congelou",
+      "simples": "O PC congelou por alguns segundos durante o teste"
+    },
+    {
+      "inicio_do_titulo": "Tempo excessivo em drivers",
+      "simples": "Algum driver está atrasando o PC (causa travadinhas)"
+    },
+    {
+      "inicio_do_titulo": "Muita leitura de disco por falta de memória",
+      "simples": "Falta memória e o PC usa o disco no lugar (causa travadinhas)"
+    },
+    {
+      "inicio_do_titulo": "Disco com picos de latência",
+      "simples": "O disco às vezes demora para responder (causa travadinhas)"
+    },
+    {
+      "inicio_do_titulo": "SSD/HD quente",
+      "simples": "O disco está esquentando"
+    },
+    {
+      "inicio_do_titulo": "VRAM da GPU quase cheia",
+      "simples": "A memória da placa de vídeo fica cheia (baixe a qualidade das texturas)"
+    },
+    {
+      "inicio_do_titulo": "Gargalo de CPU",
+      "simples": "O processador limita o FPS nos jogos (não é defeito)"
+    },
+    {
+      "inicio_do_titulo": "Partida interrompida abruptamente",
+      "simples": "Uma partida terminou de repente"
+    },
+    {
+      "inicio_do_titulo": "O PC DESLIGOU/REINICIOU com CPU e GPU",
+      "simples": "O PC desligou no teste de energia: a fonte é a principal suspeita"
+    },
+    {
+      "inicio_do_titulo": "Processador ERRA CÁLCULOS",
+      "simples": "O processador errou cálculos no teste"
+    },
+    {
+      "inicio_do_titulo": "Memória RAM com ERROS",
+      "simples": "A memória RAM errou no teste: defeito comprovado"
+    },
+    {
+      "inicio_do_titulo": "A placa de vídeo TRAVA sob carga",
+      "simples": "A placa de vídeo travou no teste"
+    },
+    {
+      "inicio_do_titulo": "Placa de vídeo com ERROS",
+      "simples": "A placa de vídeo errou cálculos no teste"
+    },
+    {
+      "inicio_do_titulo": "Armazenamento com problemas confirmados",
+      "simples": "O disco falhou no teste"
+    },
+    {
+      "inicio_do_titulo": "Falha sob carga máxima",
+      "simples": "O PC falhou com tudo no máximo"
+    },
+    {
+      "inicio_do_titulo": "GPU conectada com menos pistas",
+      "simples": "A placa de vídeo está mal encaixada ou o slot tem problema"
+    },
+    {
+      "inicio_do_titulo": "Placa de vídeo usando x",
+      "simples": "A placa de vídeo está mal encaixada ou o slot tem problema"
+    },
+    {
+      "inicio_do_titulo": "Banda PCIe da placa de vídeo abaixo",
+      "simples": "A conexão da placa de vídeo está mais lenta que o normal"
+    },
+    {
+      "inicio_do_titulo": "Banda PCIe normal",
+      "simples": "A conexão da placa de vídeo está normal"
+    },
+    {
+      "inicio_do_titulo": "REPRODUZIDO: o watchdog",
+      "simples": "O travamento se repetiu no teste sem erro de hardware: o driver é o suspeito"
+    },
+    {
+      "inicio_do_titulo": "O hardware reportou erro (WHEA) durante o teste",
+      "simples": "O hardware registrou erro durante o teste"
+    },
+    {
+      "inicio_do_titulo": "Erros de comunicação no cabo",
+      "simples": "O cabo do disco está com mau contato"
+    },
+    {
+      "inicio_do_titulo": "Memória em single channel",
+      "simples": "A memória está instalada de um jeito que deixa os jogos mais lentos"
+    },
+    {
+      "inicio_do_titulo": "Os travamentos de vídeo começaram depois",
+      "simples": "Os travamentos começaram depois que o Windows Update trocou o driver de vídeo"
+    },
+    {
+      "inicio_do_titulo": "O Windows Update instalou o driver de vídeo",
+      "simples": "O driver de vídeo em uso foi instalado pelo Windows Update"
+    },
+    {
+      "inicio_do_titulo": "A GPU trabalha acima do clock oficial",
+      "simples": "A placa de vídeo trabalha acima da velocidade oficial"
+    },
+    {
+      "inicio_do_titulo": "Placa de rede ",
+      "simples": "A placa de rede Realtek pode estar causando travadinhas"
+    },
+    {
+      "inicio_do_titulo": "Memória virtual também no HD",
+      "simples": "Parte da memória virtual está no HD, que é lento"
+    }
+  ]
+}

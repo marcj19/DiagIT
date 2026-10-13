@@ -169,6 +169,50 @@ namespace DiagIT
                 hw.PagefileFiles.RemoveAt(1);
                 d = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), hw);
                 Check(d.Findings.Find(delegate(Finding f) { return f.Title.StartsWith("Memória virtual também no HD"); }) == null, "só no SSD: nada a apontar");
+
+                Say("== 8. Regras em dados (data/*.json, fonte: " + Rules.Source + ")");
+                Rules.Ensure();
+                Say("  " + Rules.Bugs.Count + " códigos de tela azul, " + Rules.Video.Count + " marcas de vídeo, " + Rules.Cpus.Count + " de processador, " +
+                    Rules.Boosts.Count + " placas, " + Rules.Programs.Count + " programas, " + Rules.Plain.Count + " frases simples");
+                Check(Rules.Bugs.Count >= 20 && Rules.Plain.Count >= 60 && Rules.Boosts.Count >= 20 && Rules.Programs.Count >= 10 && Rules.Video.Count >= 3, "todas as regras carregadas");
+                bool pesosOk = true, codigosUnicos = true;
+                List<int> vistos = new List<int>();
+                foreach (BugRule b in Rules.Bugs)
+                {
+                    foreach (double v in b.W.Values) if (v <= 0 || v > 1) pesosOk = false;
+                    if (b.Codes.Length == 0 || b.Name.Length == 0 || b.Advice.Length == 0) pesosOk = false;
+                    foreach (int c in b.Codes) { if (vistos.Contains(c)) codigosUnicos = false; vistos.Add(c); }
+                    foreach (int a in b.AddrParams) if (a < 1 || a > 4) pesosOk = false;
+                }
+                Check(pesosOk, "telas azuis: todo código tem nome, conselho, pesos entre 0 e 1 e parâmetros de 1 a 4");
+                Check(codigosUnicos, "telas azuis: nenhum código repetido");
+                bool tiposOk = true;
+                foreach (BgProgram bp in Rules.Programs) if (!Rules.BgTypes.ContainsKey(bp.Type)) tiposOk = false;
+                Check(tiposOk, "programas: todo programa aponta para um tipo existente");
+                bool marcadores = true;
+                foreach (BugRule b in Rules.Bugs) if (Rules.Fill(b.Advice).Contains("{")) marcadores = false;
+                Check(marcadores, "nenhum {marcador} desconhecido nos conselhos");
+
+                Say("== 9. Textos conforme a marca do PC");
+                Func<string, string, string> advice124 = delegate(string gpuN, string cpuN)
+                {
+                    HwSnapshot h = new HwSnapshot(); h.GpuName = gpuN; h.CpuName = cpuN;
+                    WinEvent e = new WinEvent(); e.Provider = "Microsoft-Windows-WER-SystemErrorReporting"; e.Id = 1001; e.Time = DateTime.Now.AddDays(-1); e.P = new string[] { "0x00000124" };
+                    Diagnosis dd = Analyzer.Run(new List<SessionData>(), new List<WinEvent> { e }, new List<DiskHealth>(), 30, new List<TestResult>(), h);
+                    Finding f124 = dd.Findings.Find(delegate(Finding f) { return f.BugCode == 0x124; });
+                    return f124 == null ? "" : f124.Advice;
+                };
+                string aAmd = advice124("AMD Radeon RX 7600", "AMD Ryzen 5 5500 6-Core Processor"), aIntel = advice124("NVIDIA GeForce RTX 4060", "13th Gen Intel(R) Core(TM) i5-13400F");
+                Say("  AMD: " + aAmd);
+                Say("  Intel/NVIDIA: " + aIntel);
+                Check(aAmd.Contains("EXPO") && aAmd.Contains("PBO"), "PC AMD: fala de EXPO e PBO");
+                Check(aIntel.Contains("XMP") && !aIntel.Contains("EXPO") && !aIntel.Contains("PBO"), "PC Intel: fala de XMP, sem EXPO/PBO");
+                Check(Rules.VideoFor("NVIDIA GeForce GTX 750 Ti").Brand == "NVIDIA" && Rules.VideoFor("AMD Radeon RX 7600").Brand == "AMD" &&
+                      Rules.VideoFor("Intel(R) Arc(TM) A770").Brand == "Intel" && Rules.VideoFor("Microsoft Basic Display Adapter").Brand == "", "marca da placa de vídeo pelo nome");
+                TestResult psu = new TestResult(); psu.Set("t_cpu_power_max", 70); psu.Set("t_gpu_power_max", 160);
+                string pa = Analyzer.PsuAdvice(psu);
+                Say("  Fonte: " + pa);
+                Check(pa.Contains("500 W"), "fonte recomendada a partir do consumo medido (230 W → 500 W)");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;

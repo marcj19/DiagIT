@@ -211,24 +211,30 @@ namespace DiagIT
                 });
 
             y = FixCard(scroll, y, "Driver de vídeo",
-                "Driver corrompido é a causa mais comum de \"o driver de vídeo parou de responder\". Instalação limpa: baixe o driver no site da AMD, use o DDU (Display Driver Uninstaller) em modo de segurança para remover o atual e instale o novo.",
-                out lblFixDriver, new string[] { "Abrir página de drivers AMD", "Passo a passo da instalação limpa" },
+                "Driver corrompido é a causa mais comum de \"o driver de vídeo parou de responder\". Instalação limpa: baixe o driver no site do fabricante da sua placa, use o DDU (Display Driver Uninstaller) em modo de segurança para remover o atual e instale o novo.",
+                out lblFixDriver, new string[] { "Abrir página de drivers", "Passo a passo da instalação limpa" },
                 new EventHandler[]
                 {
-                    delegate { try { Process.Start("https://www.amd.com/pt/support/download/drivers.html"); } catch { } },
                     delegate
                     {
+                        VideoVendor v = Rules.VideoFor(machine != null ? machine.Gpu : hw != null ? hw.GpuName : "");
+                        try { Process.Start(v.DriverSite.Length > 0 ? v.DriverSite : "ms-settings:windowsupdate-optionalupdates"); } catch { }
+                    },
+                    delegate
+                    {
+                        VideoVendor v = Rules.VideoFor(machine != null ? machine.Gpu : hw != null ? hw.GpuName : "");
+                        string brand = v.Brand.Length > 0 ? v.Brand : "do fabricante da sua placa";
                         Console_("INSTALAÇÃO LIMPA DO DRIVER DE VÍDEO\r\n" +
-                            "1) Baixe o driver mais recente da AMD (botão ao lado) e o DDU em guru3d.com (Display Driver Uninstaller).\r\n" +
+                            "1) Baixe o driver mais recente " + (v.Brand.Length > 0 ? "da " : "") + brand + " (botão ao lado) e o DDU em guru3d.com (Display Driver Uninstaller).\r\n" +
                             "2) Desconecte a internet (evita que o Windows instale um driver sozinho).\r\n" +
-                            "3) Reinicie em Modo de Segurança, abra o DDU, escolha GPU / AMD e clique em \"Limpar e reiniciar\".\r\n" +
+                            "3) Reinicie em Modo de Segurança, abra o DDU, escolha GPU / " + v.DduName + " e clique em \"Limpar e reiniciar\".\r\n" +
                             "4) Instale o driver baixado, reconecte a internet.\r\n" +
                             "5) Rode o teste de Placa de vídeo no DiagIT para confirmar.");
                     }
                 });
 
             y = FixCard(scroll, y, "Impedir o Windows Update de trocar drivers",
-                "Evita que o Windows Update troque o driver de vídeo que você instalou (causa travamentos e erro de versão no Adrenalin). " +
+                "Evita que o Windows Update troque o driver de vídeo que você instalou (causa travamentos e erro de versão no painel do driver). " +
                 "Depois disso, atualize os drivers pelo site do fabricante.",
                 out lblFixWu, new string[] { "Impedir trocas de driver", "Permitir de novo" },
                 new EventHandler[]
@@ -383,7 +389,9 @@ namespace DiagIT
                         string n = Convert.ToString(o["Name"]);
                         if (n.IndexOf("Basic", StringComparison.OrdinalIgnoreCase) >= 0) continue;
                         DateTime d = System.Management.ManagementDateTimeConverter.ToDateTime(Convert.ToString(o["DriverDate"]));
-                        drv = n + " — driver " + o["DriverVersion"] + " de " + d.ToString("dd/MM/yyyy") + " (" + (int)(DateTime.Now - d).TotalDays + " dias)";
+                        VideoVendor vv = Rules.VideoFor(n);
+                        drv = n + " — driver " + o["DriverVersion"] + " de " + d.ToString("dd/MM/yyyy") + " (" + (int)(DateTime.Now - d).TotalDays + " dias)" +
+                            (vv.Brand.Length > 0 ? ". O botão abre o site da " + vv.Brand + "." : ". Marca não reconhecida: o botão abre as atualizações opcionais do Windows.");
                         break;
                     }
                 }

@@ -48,7 +48,7 @@ namespace DiagIT
         public DateTime WindowsInstalled = DateTime.MinValue;
         public string WindowsOld;
         public DateTime WindowsOldCreated;
-        public string GpuName = "";
+        public string GpuName = "", CpuName = "";
         /// <summary>Arquivos de paginação em uso agora (ex.: "C:\pagefile.sys").</summary>
         public List<string> PagefileFiles = new List<string>();
         /// <summary>Programas conhecidos por causar engasgos abertos no momento da coleta.</summary>
@@ -144,6 +144,7 @@ namespace DiagIT
             // ---------- CPU
             foreach (ManagementObject o in Q("SELECT Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed FROM Win32_Processor"))
             {
+                h.CpuName = S(o, "Name");
                 f.Add(new Fact("Processador", "Modelo", S(o, "Name"), -1, S(o, "NumberOfCores") + " núcleos / " + S(o, "NumberOfLogicalProcessors") + " threads"));
                 break;
             }

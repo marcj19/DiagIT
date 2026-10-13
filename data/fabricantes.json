@@ -1,0 +1,27 @@
+{
+  "_sobre": "Textos que mudam conforme a marca da placa de vídeo e do processador. 'detectar' = trechos do nome da peça que identificam a marca. Os campos são usados nos textos como {painel_video}, {site_driver}, {perfil_memoria}, {ajustes_cpu}.",
+  "video": [
+    { "marca": "NVIDIA", "detectar": ["NVIDIA", "GeForce", "RTX", "GTX", "Quadro"],
+      "painel_video": "NVIDIA App (ou Painel de Controle NVIDIA)",
+      "site_driver": "https://www.nvidia.com/pt-br/drivers/",
+      "nome_ddu": "NVIDIA" },
+    { "marca": "AMD", "detectar": ["Radeon", "AMD"],
+      "painel_video": "AMD Software (Adrenalin)",
+      "site_driver": "https://www.amd.com/pt/support/download/drivers.html",
+      "nome_ddu": "AMD" },
+    { "marca": "Intel", "detectar": ["Intel", "Arc", "Iris", "UHD Graphics"],
+      "painel_video": "Intel Graphics Software",
+      "site_driver": "https://www.intel.com.br/content/www/br/pt/support/detect.html",
+      "nome_ddu": "Intel" }
+  ],
+  "video_padrao": { "marca": "", "painel_video": "painel do driver de vídeo", "site_driver": "", "nome_ddu": "o fabricante da sua placa" },
+  "processador": [
+    { "marca": "AMD", "detectar": ["AMD", "Ryzen", "Athlon"],
+      "perfil_memoria": "o perfil de memória (XMP/EXPO/DOCP)",
+      "ajustes_cpu": "PBO/Curve Optimizer" },
+    { "marca": "Intel", "detectar": ["Intel", "Core", "Pentium", "Celeron", "Xeon"],
+      "perfil_memoria": "o perfil de memória (XMP)",
+      "ajustes_cpu": "MCE/limites de energia elevados" }
+  ],
+  "processador_padrao": { "marca": "", "perfil_memoria": "o perfil de memória (XMP/EXPO)", "ajustes_cpu": "overclock/undervolt" }
+}

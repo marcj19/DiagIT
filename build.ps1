@@ -18,12 +18,14 @@ $out = Join-Path $dist 'DiagIT.exe'
 $manifest = Join-Path $root 'assets\app.manifest'
 
 $vendor = Join-Path $root 'vendor\lhm'
-$refs = @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Management.dll',
+$refs = @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Management.dll','System.Web.Extensions.dll',
           (Join-Path $vendor 'System.Numerics.Vectors.dll'))
 $cscArgs = @('/nologo','/target:winexe','/platform:x64','/optimize+','/codepage:65001','/warn:3','/unsafe',
              "/out:$out", "/win32manifest:$manifest")
 $cscArgs += ($refs | ForEach-Object { "/reference:$_" })
 $cscArgs += $iconArg
+# regras de conhecimento (data\*.json) embutidas no executavel
+$cscArgs += (Get-ChildItem (Join-Path $root 'data') -Filter *.json | ForEach-Object { "/resource:$($_.FullName),DiagIT.data.$($_.Name)" })
 $cscArgs += $src
 
 & $csc $cscArgs

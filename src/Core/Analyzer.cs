@@ -150,6 +150,7 @@ namespace DiagIT
         {
             Diagnosis d = new Diagnosis();
             d.Hw = hw;
+            Rules.SetContext(hw != null ? hw.GpuName : null, hw != null ? hw.CpuName : null);   // textos conforme a marca do PC
             if (tests != null) d.Tests = tests;
             bool nativeSmart = false;
             if (hw != null) foreach (DriveHealth dh in hw.Drives) if (dh.Read) nativeSmart = true;
@@ -173,6 +174,11 @@ namespace DiagIT
             FactRules(d);
             GamingRules(d, sessions, events);
             PlainTitles(d);
+            foreach (Finding f in d.Findings)
+            {
+                f.Title = Rules.Fill(f.Title); f.Simple = Rules.Fill(f.Simple);
+                f.Evidence = Rules.Fill(f.Evidence); f.Advice = Rules.Fill(f.Advice);
+            }
             Finish(d);
             BuildStates(d);
             return d;
@@ -236,7 +242,7 @@ namespace DiagIT
                     f.Evidence = "Último em " + D(fatal[0].Time) + ". " + breakdown + "\n" + Recent(fatal, 4) +
                         (fatal[0].Msg.Length > 0 ? "\nTrecho: " + Trunc(fatal[0].Msg, 220) : "");
                     f.Advice = "Erro WHEA fatal é o próprio hardware avisando que algo falhou (CPU, memória, PCIe ou alimentação). " +
-                        "Remova qualquer overclock/EXPO/XMP e Curve Optimizer, atualize a BIOS e teste a RAM (MemTest86) e a fonte.";
+                        "Remova qualquer overclock, desative {perfil_memoria} e {ajustes_cpu}, atualize a BIOS e teste a RAM e a fonte.";
                     f.Weigh(Comp.Cpu, 0.40 * w).Weigh(Comp.Ram, 0.30 * w).Weigh(Comp.Board, 0.20 * w).Weigh(Comp.Psu, 0.20 * w);
                     if (pcie.Count > 0) f.Weigh(Comp.Gpu, 0.30 * w);
                     d.Findings.Add(f);
@@ -271,8 +277,8 @@ namespace DiagIT
                 f.Title = "O driver de vídeo parou de responder e foi reiniciado — " + tdr.Count + "×";
                 f.Evidence = "Último em " + D(tdr[0].Time) + ". Cada ocorrência costuma aparecer como tela preta/congelada por alguns segundos.\n" + Recent(tdr, 5);
                 f.Advice = "Causas comuns: driver corrompido (reinstale com DDU em modo seguro), GPU superaquecendo, " +
-                    "undervolt/overclock instável, cabos PCIe mal encaixados ou fonte sem folga. Em AMD, desative também o " +
-                    "overclock automático/ajustes de desempenho no Adrenalin para testar.";
+                    "undervolt/overclock instável, cabos PCIe mal encaixados ou fonte sem folga. Desative também o " +
+                    "overclock automático e os ajustes de desempenho no {painel_video} para testar.";
                 f.Last = tdr[0].Time;
                 f.Weigh(Comp.Gpu, 0.35 * w).Weigh(Comp.Software, 0.30 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.12 * w);
                 d.Findings.Add(f);
@@ -337,7 +343,7 @@ namespace DiagIT
                         "mas também a driver de Wi-Fi e a overclock/XMP instável. O dump fica em C:\\Windows\\LiveKernelReports\\WATCHDOG." +
                         (instEp > 0 ? " Episódios durante a instalação de drivers são esperados (o driver de vídeo reinicia a tela ao ser instalado) e pesam pouco." : "") + "\n" + Recent(soft, 4);
                     f.Advice = "Costumam aparecer junto de congelamentos ou telas pretas. Atualize/reinstale o driver de vídeo (DDU) e o de Wi-Fi, " +
-                        "desative XMP/EXPO para testar e anote o horário exato quando o problema acontecer para cruzar com as evidências do DiagIT.";
+                        "desative {perfil_memoria} para testar e anote o horário exato quando o problema acontecer para cruzar com as evidências do DiagIT.";
                     f.Last = soft[0].Time;
                     f.Weigh(Comp.Gpu, 0.22 * w).Weigh(Comp.Software, 0.28 * w).Weigh(Comp.Ram, 0.10 * w);
                     d.Findings.Add(f);
@@ -460,7 +466,7 @@ namespace DiagIT
                     f.Title = "Vários programas diferentes travaram com erro de memória — " + perApp.Count + " apps";
                     f.Evidence = "Falhas de acesso à memória (c0000005/c0000409) em: " + string.Join(", ", top.GetRange(0, Math.Min(8, top.Count)).ToArray()) + ".";
                     f.Advice = "Um único programa travando é bug dele; vários programas diferentes travando assim sugere memória RAM instável " +
-                        "(ou overclock/EXPO mal estável). Rode MemTest86 e teste com o perfil de memória desativado.";
+                        "(ou {perfil_memoria} instável). Rode o teste de memória e teste com o perfil desativado.";
                     f.Last = crashes[0].Time;
                     f.Weigh(Comp.Ram, 0.32 * w).Weigh(Comp.Cpu, 0.15 * w).Weigh(Comp.Software, 0.10 * w);
                     d.Findings.Add(f);
@@ -499,76 +505,13 @@ namespace DiagIT
             catch { return 0; }
         }
 
+        /// <summary>Nome, conselho e pesos de um código de tela azul (regras em data/telas-azuis.json).</summary>
         static void Bugcheck(int code, out string name, out string advice, out Dictionary<Comp, double> w)
         {
-            w = new Dictionary<Comp, double>();
-            advice = "Procure o código no site da Microsoft e atualize drivers/BIOS; se repetir, analise o dump com WinDbg ou BlueScreenView.";
-            switch (code)
-            {
-                case 0x116: case 0x117: case 0x119: case 0x141:
-                    name = "falha de vídeo / TDR";
-                    advice = "A GPU ou o driver de vídeo travou de forma irrecuperável. Driver limpo (DDU), checar temperatura, cabos PCIe/fonte e estabilidade da GPU.";
-                    w[Comp.Gpu] = 0.45; w[Comp.Software] = 0.25; w[Comp.Psu] = 0.10; w[Comp.Cooling] = 0.10; break;
-                case 0x10E:
-                    name = "VIDEO_MEMORY_MANAGEMENT_INTERNAL";
-                    w[Comp.Gpu] = 0.40; w[Comp.Software] = 0.20; break;
-                case 0x124:
-                    name = "WHEA_UNCORRECTABLE_ERROR";
-                    advice = "Erro de hardware não corrigível. Remova overclock/EXPO/Curve Optimizer, atualize BIOS, teste RAM e fonte.";
-                    w[Comp.Cpu] = 0.35; w[Comp.Ram] = 0.20; w[Comp.Board] = 0.15; w[Comp.Psu] = 0.15; break;
-                case 0x9C:
-                    name = "MACHINE_CHECK_EXCEPTION";
-                    w[Comp.Cpu] = 0.40; w[Comp.Ram] = 0.15; w[Comp.Psu] = 0.15; w[Comp.Cooling] = 0.10; break;
-                case 0x1A:
-                    name = "MEMORY_MANAGEMENT";
-                    advice = "Quase sempre RAM defeituosa/instável ou driver corrompendo memória. Rode MemTest86 e teste os pentes separadamente.";
-                    w[Comp.Ram] = 0.45; w[Comp.Software] = 0.15; w[Comp.Disk] = 0.10; break;
-                case 0x4E:
-                    name = "PFN_LIST_CORRUPT";
-                    w[Comp.Ram] = 0.40; w[Comp.Software] = 0.20; break;
-                case 0x50:
-                    name = "PAGE_FAULT_IN_NONPAGED_AREA";
-                    w[Comp.Ram] = 0.35; w[Comp.Software] = 0.25; w[Comp.Disk] = 0.10; break;
-                case 0x7A:
-                    name = "KERNEL_DATA_INPAGE_ERROR";
-                    advice = "O Windows não conseguiu ler dados do disco. Verifique cabos/porta, SMART do SSD/HD e o estado de saúde do disco.";
-                    w[Comp.Disk] = 0.50; w[Comp.Ram] = 0.15; w[Comp.Board] = 0.10; break;
-                case 0x7B:
-                    name = "INACCESSIBLE_BOOT_DEVICE";
-                    w[Comp.Disk] = 0.50; w[Comp.Software] = 0.15; break;
-                case 0xF4:
-                    name = "CRITICAL_OBJECT_TERMINATION";
-                    w[Comp.Disk] = 0.40; w[Comp.Software] = 0.15; w[Comp.Ram] = 0.10; break;
-                case 0x101:
-                    name = "CLOCK_WATCHDOG_TIMEOUT";
-                    advice = "Um núcleo da CPU parou de responder. Remova overclock/undervolt/Curve Optimizer, atualize BIOS; verifique temperatura e energia.";
-                    w[Comp.Cpu] = 0.40; w[Comp.Board] = 0.10; w[Comp.Psu] = 0.10; w[Comp.Cooling] = 0.10; break;
-                case 0x133:
-                    name = "DPC_WATCHDOG_VIOLATION";
-                    advice = "Normalmente driver (chipset, armazenamento, rede, áudio) travando. Atualize BIOS, chipset e firmware do SSD.";
-                    w[Comp.Software] = 0.40; w[Comp.Disk] = 0.20; break;
-                case 0x1E: case 0x3B: case 0x7E:
-                    name = code == 0x3B ? "SYSTEM_SERVICE_EXCEPTION" : code == 0x1E ? "KMODE_EXCEPTION_NOT_HANDLED" : "SYSTEM_THREAD_EXCEPTION_NOT_HANDLED";
-                    w[Comp.Software] = 0.30; w[Comp.Ram] = 0.15; w[Comp.Cpu] = 0.10; break;
-                case 0xA: case 0xD1: case 0xC5:
-                    name = code == 0xA ? "IRQL_NOT_LESS_OR_EQUAL" : code == 0xD1 ? "DRIVER_IRQL_NOT_LESS_OR_EQUAL" : "DRIVER_CORRUPTED_EXPOOL";
-                    w[Comp.Software] = 0.35; w[Comp.Ram] = 0.20; break;
-                case 0x139:
-                    name = "KERNEL_SECURITY_CHECK_FAILURE";
-                    w[Comp.Software] = 0.25; w[Comp.Ram] = 0.20; w[Comp.Disk] = 0.10; break;
-                case 0xEF:
-                    name = "CRITICAL_PROCESS_DIED";
-                    w[Comp.Software] = 0.20; w[Comp.Disk] = 0.25; w[Comp.Ram] = 0.10; break;
-                case 0xC2:
-                    name = "BAD_POOL_CALLER";
-                    w[Comp.Software] = 0.30; w[Comp.Ram] = 0.20; break;
-                case 0x7F:
-                    name = "UNEXPECTED_KERNEL_MODE_TRAP";
-                    w[Comp.Ram] = 0.30; w[Comp.Cpu] = 0.20; w[Comp.Cooling] = 0.10; w[Comp.Psu] = 0.10; break;
-                default:
-                    name = "código desconhecido";
-                    w[Comp.Software] = 0.20; w[Comp.Ram] = 0.10; break;
-            }
+            BugRule b = Rules.Bug(code);
+            name = b.Name;
+            advice = b.Advice;
+            w = new Dictionary<Comp, double>(b.W);
         }
 
         // ================================================================ ESTADO ATUAL DO SISTEMA
@@ -703,7 +646,7 @@ namespace DiagIT
                 Finding f = new Finding();
                 f.Sev = Sev.Warn; f.Source = "Telemetria";
                 f.Title = "Sem leitura de temperatura — a análise térmica está cega";
-                f.Evidence = "O Windows não expõe temperatura de CPU/GPU AMD sem um leitor de sensores. Superaquecimento é uma das causas mais comuns de travamentos em jogos.";
+                f.Evidence = "O Windows não expõe a temperatura do processador (e de algumas placas de vídeo) sem um leitor de sensores. Superaquecimento é uma das causas mais comuns de travamentos em jogos.";
                 f.Advice = "Instale o HWiNFO64 (modo 'sensors only') e ative 'Shared Memory Support' em Settings; o DiagIT passa a ler tudo automaticamente. " +
                     "Alternativa: colocar LibreHardwareMonitorLib.dll na pasta 'sensores' ao lado do app e rodar como administrador.";
                 d.Findings.Add(f);

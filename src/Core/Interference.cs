@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Management;
@@ -11,40 +11,20 @@ namespace DiagIT
     /// </summary>
     public static class Interference
     {
-        // prefixo do nome do processo (minúsculo, sem .exe) -> rótulo mostrado
-        static readonly string[][] Known =
-        {
-            new string[] { "wallpaper32", "Wallpaper Engine" },
-            new string[] { "wallpaper64", "Wallpaper Engine" },
-            new string[] { "amddvr", "Gravação do Adrenalin (ReLive / Instant Replay)" },
-            new string[] { "icue", "Corsair iCUE (RGB)" },
-            new string[] { "corsair.service", "Corsair iCUE (RGB)" },
-            new string[] { "signalrgb", "SignalRGB (RGB)" },
-            new string[] { "openrgb", "OpenRGB (RGB)" },
-            new string[] { "l-connect", "Lian Li L-Connect (RGB)" },
-            new string[] { "armourycrate", "ASUS Armoury Crate / Aura (RGB)" },
-            new string[] { "lightingservice", "ASUS Armoury Crate / Aura (RGB)" },
-            new string[] { "msi.centralserver", "MSI Center / Mystic Light (RGB)" },
-            new string[] { "mysticlight", "MSI Center / Mystic Light (RGB)" },
-            new string[] { "razer synapse", "Razer Synapse (RGB)" },
-            new string[] { "razerappengine", "Razer Synapse (RGB)" },
-            new string[] { "nzxt cam", "NZXT CAM (RGB)" },
-            new string[] { "rgbfusion", "Gigabyte RGB Fusion (RGB)" },
-        };
-
         /// <summary>Rótulos dos programas conhecidos abertos agora (sem repetição).</summary>
         public static List<string> Running()
         {
             List<string> r = new List<string>();
             try
             {
+                Rules.Ensure();
                 foreach (Process p in Process.GetProcesses())
                 {
                     string n;
                     try { n = p.ProcessName.ToLowerInvariant(); } catch { n = ""; }
                     p.Dispose();
-                    foreach (string[] k in Known)
-                        if (n.StartsWith(k[0], StringComparison.Ordinal) && !r.Contains(k[1])) r.Add(k[1]);
+                    foreach (BgProgram k in Rules.Programs)   // data/programas.json
+                        if (n.StartsWith(k.Process, StringComparison.Ordinal) && !r.Contains(k.Name)) r.Add(k.Name);
                 }
             }
             catch (Exception e) { Log.Write("Interference: " + e.Message); }

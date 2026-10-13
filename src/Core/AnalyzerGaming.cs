@@ -96,7 +96,7 @@ namespace DiagIT
             f.Source = "Eventos do Windows";
             f.Title = "O Windows Update instalou o driver de vídeo em uso (" + vendor + " " + ver + ", " + D(t) + ")";
             StringBuilder evd = new StringBuilder();
-            evd.Append("O driver ativo veio do Windows Update, não do instalador do fabricante (o painel do Adrenalin pode reclamar de versão diferente ou perder recursos). ");
+            evd.Append("O driver ativo veio do Windows Update, não do instalador do fabricante (o {painel_video} pode reclamar de versão diferente ou perder recursos). ");
             evd.Append("Travamentos de vídeo: " + after + " depois da troca, " + before + " no mesmo período antes dela.");
             if (blocked) evd.Append(" A política que impede o Windows Update de trocar drivers já está ativa.");
             f.Evidence = evd.ToString();
@@ -119,24 +119,14 @@ namespace DiagIT
         }
 
         // ================================================================ 2. GPU acima do clock oficial
-        // boost oficial (MHz) dos modelos de referência AMD; placas com overclock de fábrica passam disso por projeto
-        static readonly string[][] AmdBoost =
-        {
-            new string[] { "RX 6400", "2321" }, new string[] { "RX 6500 XT", "2815" }, new string[] { "RX 6600", "2491" }, new string[] { "RX 6600 XT", "2589" },
-            new string[] { "RX 6650 XT", "2635" }, new string[] { "RX 6700", "2450" }, new string[] { "RX 6700 XT", "2581" }, new string[] { "RX 6750 XT", "2600" },
-            new string[] { "RX 6800", "2105" }, new string[] { "RX 6800 XT", "2250" }, new string[] { "RX 6900 XT", "2250" }, new string[] { "RX 6950 XT", "2310" },
-            new string[] { "RX 7600", "2655" }, new string[] { "RX 7600 XT", "2755" }, new string[] { "RX 7700 XT", "2544" }, new string[] { "RX 7800 XT", "2430" },
-            new string[] { "RX 7900 GRE", "2245" }, new string[] { "RX 7900 XT", "2400" }, new string[] { "RX 7900 XTX", "2500" },
-            new string[] { "RX 9060 XT", "3130" }, new string[] { "RX 9070", "2520" }, new string[] { "RX 9070 GRE", "2790" }, new string[] { "RX 9070 XT", "2970" },
-        };
-
         /// <summary>Boost oficial pelo nome da placa (a chave mais longa contida no nome vence: "RX 7600 XT" antes de "RX 7600").</summary>
         public static int OfficialBoost(string gpuName, out string model)
         {
+            Rules.Ensure();
             model = ""; int boost = 0;
             string n = " " + Regex.Replace((gpuName ?? "").ToUpperInvariant(), @"\s+", " ") + " ";
-            foreach (string[] k in AmdBoost)
-                if (n.Contains(" " + k[0] + " ") && k[0].Length > model.Length) { model = k[0]; boost = int.Parse(k[1]); }
+            foreach (GpuBoost k in Rules.Boosts)
+                if (n.Contains(" " + k.Model + " ") && k.Model.Length > model.Length) { model = k.Model; boost = k.Boost; }
             return boost;
         }
 
@@ -164,7 +154,8 @@ namespace DiagIT
             }
             if (double.IsNaN(measured) || measured <= boost + 30) return;
 
-            bool rdna4 = model.StartsWith("RX 9", StringComparison.Ordinal);
+            GpuBoost rule = Rules.Boosts.Find(delegate(GpuBoost b) { return b.Model == model; });
+            bool offset = rule != null && rule.Offset;
             bool problems = crashes.Count > 0 || deviceRemoved;
             Finding f = new Finding();
             f.Source = "Medição da placa de vídeo";
@@ -173,10 +164,8 @@ namespace DiagIT
             f.Evidence = "Clock sustentado (95% do tempo abaixo disso) com a GPU acima de 80% de uso, " + where + ". " +
                 "O ajuste automático do driver (e o overclock de fábrica) leva placas Radeon além do boost anunciado; em algumas unidades isso não é estável." +
                 (problems ? " Travamentos de vídeo registrados: " + crashes.Count + (deviceRemoved ? ", incluindo travamento da GPU no teste do DiagIT" : "") + "." : "");
-            f.Advice = "No Adrenalin: Desempenho → Ajuste → Ajuste manual → Ajuste da GPU + Controle avançado, " +
-                (rdna4 ? "aplique um deslocamento negativo na frequência máxima até o clock em jogo ficar em ~" + boost + " MHz"
-                       : "coloque a frequência máxima em " + boost + " MHz") +
-                ". Desligue o HYPR-RX (inclusive nos perfis de cada jogo, que sobrepõem o ajuste global). " +
+            f.Advice = (offset ? Rules.BoostAdjustOffset : Rules.BoostAdjust).Replace("{boost}", boost.ToString()) +
+                " Desligue o HYPR-RX (inclusive nos perfis de cada jogo, que sobrepõem o ajuste global). " +
                 (problems ? "Use assim por alguns dias: se os travamentos pararem, a causa era o clock; se continuarem, volte ao padrão."
                           : "Sem travamentos, não é preciso mexer: isso é o comportamento normal do driver.");
             if (problems)
@@ -234,14 +223,12 @@ namespace DiagIT
                     f.Title = contrast
                         ? "Partidas com " + label + " aberto tiveram mais problemas (" + withBad.Count + " de " + with.Count + ", contra " + withoutBad + " de " + without.Count + " sem ele)"
                         : label + " estava aberto em todas as partidas gravadas (" + withBad.Count + " de " + with.Count + " com problema)";
-                    f.Evidence = "Problema = o PC caiu, o jogo fechou com erro ou o sistema congelou. A comunidade relata " +
-                        (label.StartsWith("Wallpaper", StringComparison.Ordinal) ? "engasgos e quedas de FPS com o Wallpaper Engine rodando, mesmo pausado."
-                         : label.StartsWith("Gravação do Adrenalin", StringComparison.Ordinal) ? "que o Instant Replay do Adrenalin causa engasgos, quedas de FPS e travamentos do driver."
-                         : "que softwares de RGB causam engasgos (1% low), quedas de FPS e travamentos, mesmo em PCs topo de linha.") +
+                    BgProgram prog = Rules.ProgramByName(label);
+                    BgType kind;
+                    if (prog == null || !Rules.BgTypes.TryGetValue(prog.Type, out kind)) { kind = new BgType(); kind.Report = "que esse programa causa engasgos."; kind.Advice = "Feche ou desinstale e jogue alguns dias sem ele para comparar."; }
+                    f.Evidence = "Problema = o PC caiu, o jogo fechou com erro ou o sistema congelou. A comunidade relata " + kind.Report +
                         (contrast ? "" : " Sem partidas sem ele não dá para comparar.");
-                    f.Advice = label.StartsWith("Wallpaper", StringComparison.Ordinal) ? "Feche o Wallpaper Engine pela bandeja (Sair) antes de jogar e confira no Gerenciador de Tarefas que ele não ficou aberto."
-                        : label.StartsWith("Gravação do Adrenalin", StringComparison.Ordinal) ? "No Adrenalin, aba Gravar e transmitir: desligue Instant Replay e as demais gravações; em Configurações → Sistema, desligue também a Detecção de problemas."
-                        : "Desinstale (fechar nem sempre basta, o serviço continua rodando) e jogue alguns dias sem ele para comparar.";
+                    f.Advice = kind.Advice;
                     f.Last = withBad[0].Info.Start;
                     foreach (SessionData s in withBad) if (s.Info.Start > f.Last) f.Last = s.Info.Start;
                     if (contrast) f.Weigh(Comp.Software, 0.30); else f.Weigh(Comp.Software, 0.08);

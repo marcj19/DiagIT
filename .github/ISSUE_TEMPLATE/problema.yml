@@ -1,0 +1,23 @@
+﻿name: Problema no DiagIT
+description: O DiagIT errou, travou ou mostrou algo confuso
+labels: ["bug"]
+body:
+  - type: textarea
+    id: oque
+    attributes:
+      label: O que aconteceu?
+      description: O que você esperava e o que o DiagIT fez (ou deixou de fazer).
+    validations:
+      required: true
+  - type: textarea
+    id: pc
+    attributes:
+      label: Seu PC
+      description: Processador, placa de vídeo, versão do Windows e versão do DiagIT (aparece na barra de título da janela).
+    validations:
+      required: true
+  - type: textarea
+    id: relatorio
+    attributes:
+      label: Relatório ou imagens
+      description: Anexe o relatório HTML (Resultados → Exportar relatório HTML) e/ou uma captura da tela. Revise antes; ele mostra o modelo das peças e os nomes dos jogos.

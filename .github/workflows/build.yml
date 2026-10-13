@@ -1,0 +1,30 @@
+name: Compilar e testar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File build.ps1 -OutDir build\ci
+
+      - name: Cenários do diagnóstico (--diag-test)
+        shell: powershell
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'diag.txt'
+          $p = Start-Process -FilePath build\ci\DiagIT.exe -ArgumentList "--diag-test `"$out`"" -Wait -PassThru
+          Get-Content $out -Encoding UTF8
+          if ($p.ExitCode -ne 0) { throw "diag-test falhou (código $($p.ExitCode))" }
+
+      - name: Guardar o executável
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiagIT-build
+          path: build/ci

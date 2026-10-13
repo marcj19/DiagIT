@@ -10,8 +10,6 @@ namespace DiagIT
     /// </summary>
     public static partial class Analyzer
     {
-        static readonly int[] MemCodes = { 0x1A, 0x4E, 0x50 }, CpuCodes = { 0x124, 0x9C, 0x101, 0x7F },
-            DiskCodes = { 0x7A, 0x7B, 0xF4, 0xEF }, DrvCodes = { 0xA, 0xD1, 0xC5, 0x133, 0x3B, 0x1E, 0x7E, 0xC2, 0x139 };
 
         static string Times(int n, string one, string many) { return n == 1 ? "1 " + one : n + " " + many; }
 
@@ -26,87 +24,7 @@ namespace DiagIT
         }
 
         /// <summary>Do que a tela azul costuma ser, dito para leigo.</summary>
-        public static string BsodFamily(int code)
-        {
-            if (Array.IndexOf(VideoBugchecks, code) >= 0) return "ligada à placa de vídeo";
-            if (Array.IndexOf(MemCodes, code) >= 0) return "ligada à memória";
-            if (Array.IndexOf(CpuCodes, code) >= 0) return "de erro de hardware";
-            if (Array.IndexOf(DiskCodes, code) >= 0) return "ligada ao disco";
-            if (Array.IndexOf(DrvCodes, code) >= 0) return "causada por um driver";
-            return "";
-        }
-
-        // prefixo do título técnico -> título simples ({n} = número de ocorrências no título)
-        static readonly string[][] PlainMap =
-        {
-            new string[] { "Erros FATAIS de hardware", "O próprio hardware registrou erros graves" },
-            new string[] { "Erros de hardware corrigidos", "O hardware corrigiu erros sozinho várias vezes (sinal de instabilidade)" },
-            new string[] { "O driver de vídeo parou de responder", "A tela travou ou ficou preta e voltou ({n}): o driver de vídeo reiniciou" },
-            new string[] { "Travamentos de GPU registrados", "A placa de vídeo parou de responder ({n})" },
-            new string[] { "Watchdog do kernel disparou", "O Windows ficou travado por alguns segundos" },
-            new string[] { "O PC desligou/reiniciou sem aviso", "O PC desligou ou reiniciou sozinho ({n}), sem tela azul" },
-            new string[] { "A BIOS/firmware limitou a velocidade da CPU", "O processador foi freado para não esquentar ou gastar energia demais" },
-            new string[] { "O diagnóstico de memória do Windows encontrou ERROS", "O teste de memória do Windows encontrou defeito na RAM" },
-            new string[] { "Teste de memória do Windows sem erros", "O teste de memória do Windows não achou problemas" },
-            new string[] { "Vários programas diferentes travaram com erro de memória", "Vários programas fecharam sozinhos com erro de memória" },
-            new string[] { "Jogos/apps travaram dentro do driver de vídeo", "Jogos fecharam por erro no driver de vídeo ({n})" },
-            new string[] { "Memória virtual (commit) quase", "A memória do PC está quase cheia" },
-            new string[] { "Pouca memória RAM livre durante o jogo", "Falta memória RAM durante os jogos" },
-            new string[] { "Erros de armazenamento registrados", "O Windows teve erros ao ler ou gravar no disco" },
-            new string[] { "Disco com problemas registrados por ele mesmo", "Um disco está começando a falhar" },
-            new string[] { "Disco com problemas", "Um disco está com problemas" },
-            new string[] { "Discos reportam estado saudável", "Os discos estão saudáveis" },
-            new string[] { "Discos saudáveis", "Os discos estão saudáveis" },
-            new string[] { "Sem leitura de temperatura", "O DiagIT não consegue ler a temperatura" },
-            new string[] { "CPU chegou ao limite térmico", "O processador esquentou demais" },
-            new string[] { "CPU muito quente em jogo", "O processador fica muito quente nos jogos" },
-            new string[] { "CPU passa ", "O processador fica muito quente nos jogos" },
-            new string[] { "Temperatura da CPU normal", "A temperatura do processador está normal" },
-            new string[] { "GPU em temperatura crítica", "A placa de vídeo esquentou demais" },
-            new string[] { "GPU muito quente", "A placa de vídeo fica muito quente" },
-            new string[] { "GPU quente, mas dentro do limite", "A placa de vídeo esquenta, mas dentro do limite" },
-            new string[] { "Temperatura da GPU normal", "A temperatura da placa de vídeo está normal" },
-            new string[] { "Ventoinha da GPU parada", "A ventoinha da placa de vídeo não está girando" },
-            new string[] { "Ventoinhas da GPU NÃO giraram", "A ventoinha da placa de vídeo não girou no teste" },
-            new string[] { "Ventoinha da CPU parada", "A ventoinha do processador parece parada" },
-            new string[] { "A CPU perde desempenho", "O processador fica mais lento quando esquenta" },
-            new string[] { "CPU reduz a velocidade por temperatura", "O processador fica mais lento quando esquenta" },
-            new string[] { "CPU chegou a ", "O processador chegou perto do limite de temperatura no teste" },
-            new string[] { "O clock da GPU cai", "A placa de vídeo fica mais lenta com o tempo de jogo" },
-            new string[] { "Tensão de +12 V caiu", "A fonte não mantém a energia estável" },
-            new string[] { "Tensão de +12 V fora", "A fonte não mantém a energia estável" },
-            new string[] { "Tensão de +12 V estável", "A fonte entrega energia estável" },
-            new string[] { "+12 V estável", "A fonte entregou energia estável no máximo do PC" },
-            new string[] { "O sistema 'congelou'", "O PC congelou por alguns segundos durante os jogos" },
-            new string[] { "O sistema congelou", "O PC congelou por alguns segundos durante o teste" },
-            new string[] { "Tempo excessivo em drivers", "Algum driver está atrasando o PC (causa travadinhas)" },
-            new string[] { "Muita leitura de disco por falta de memória", "Falta memória e o PC usa o disco no lugar (causa travadinhas)" },
-            new string[] { "Disco com picos de latência", "O disco às vezes demora para responder (causa travadinhas)" },
-            new string[] { "SSD/HD quente", "O disco está esquentando" },
-            new string[] { "VRAM da GPU quase cheia", "A memória da placa de vídeo fica cheia (baixe a qualidade das texturas)" },
-            new string[] { "Gargalo de CPU", "O processador limita o FPS nos jogos (não é defeito)" },
-            new string[] { "Partida interrompida abruptamente", "Uma partida terminou de repente" },
-            new string[] { "O PC DESLIGOU/REINICIOU com CPU e GPU", "O PC desligou no teste de energia: a fonte é a principal suspeita" },
-            new string[] { "Processador ERRA CÁLCULOS", "O processador errou cálculos no teste" },
-            new string[] { "Memória RAM com ERROS", "A memória RAM errou no teste: defeito comprovado" },
-            new string[] { "A placa de vídeo TRAVA sob carga", "A placa de vídeo travou no teste" },
-            new string[] { "Placa de vídeo com ERROS", "A placa de vídeo errou cálculos no teste" },
-            new string[] { "Armazenamento com problemas confirmados", "O disco falhou no teste" },
-            new string[] { "Falha sob carga máxima", "O PC falhou com tudo no máximo" },
-            new string[] { "GPU conectada com menos pistas", "A placa de vídeo está mal encaixada ou o slot tem problema" },
-            new string[] { "Placa de vídeo usando x", "A placa de vídeo está mal encaixada ou o slot tem problema" },
-            new string[] { "Banda PCIe da placa de vídeo abaixo", "A conexão da placa de vídeo está mais lenta que o normal" },
-            new string[] { "Banda PCIe normal", "A conexão da placa de vídeo está normal" },
-            new string[] { "REPRODUZIDO: o watchdog", "O travamento se repetiu no teste sem erro de hardware: o driver é o suspeito" },
-            new string[] { "O hardware reportou erro (WHEA) durante o teste", "O hardware registrou erro durante o teste" },
-            new string[] { "Erros de comunicação no cabo", "O cabo do disco está com mau contato" },
-            new string[] { "Memória em single channel", "A memória está instalada de um jeito que deixa os jogos mais lentos" },
-            new string[] { "Os travamentos de vídeo começaram depois", "Os travamentos começaram depois que o Windows Update trocou o driver de vídeo" },
-            new string[] { "O Windows Update instalou o driver de vídeo", "O driver de vídeo em uso foi instalado pelo Windows Update" },
-            new string[] { "A GPU trabalha acima do clock oficial", "A placa de vídeo trabalha acima da velocidade oficial" },
-            new string[] { "Placa de rede ", "A placa de rede Realtek pode estar causando travadinhas" },
-            new string[] { "Memória virtual também no HD", "Parte da memória virtual está no HD, que é lento" },
-        };
+        public static string BsodFamily(int code) { return Rules.Bug(code).Family; }
 
         static void PlainTitles(Diagnosis d)
         {
@@ -126,11 +44,11 @@ namespace DiagIT
                     Match m = Regex.Match(f.Title, @"^Teste de (.+) APROVADO \((.+)\)$");
                     if (m.Success) { f.Simple = m.Groups[1].Value + " passou no teste (" + m.Groups[2].Value + ")"; continue; }
                 }
-                foreach (string[] p in PlainMap)
+                foreach (PlainRule p in Rules.Plain)   // data/linguagem-simples.json
                 {
-                    if (!f.Title.StartsWith(p[0], StringComparison.Ordinal)) continue;
+                    if (!f.Title.StartsWith(p.Prefix, StringComparison.Ordinal)) continue;
                     int n = CountIn(f.Title);
-                    f.Simple = p[1].Replace("({n})", n > 0 ? "(" + n + "×)" : "").Replace("  ", " ").Replace(" :", ":").Trim();
+                    f.Simple = p.Simple.Replace("({n})", n > 0 ? "(" + n + "×)" : "").Replace("  ", " ").Replace(" :", ":").Trim();
                     break;
                 }
             }

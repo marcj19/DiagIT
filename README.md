@@ -64,16 +64,29 @@ Gera `dist\DiagIT.exe` e copia as bibliotecas de sensores para `dist\sensores`. 
 substituir o executável que estiver aberto. Testes sem interface: `DiagIT.exe --selftest saida.txt` e
 `DiagIT.exe --run-test cpu|ram|gpu|disk|combined segundos saida.txt`. Cenários do diagnóstico com dados sintéticos: `DiagIT.exe --diag-test saida.txt`. Imagens de todas as telas (para revisar o visual): `DiagIT.exe --multi --offscreen --no-elevate --screenshots pasta` (com `--with-run` também fotografa um teste rodando, o que grava esse teste no histórico).
 
+## Regras em dados (contribua sem programar)
+
+O conhecimento do diagnóstico fica em [`data/`](data): códigos de tela azul, textos por fabricante (AMD, NVIDIA, Intel), clock oficial das
+placas, programas que causam engasgos e a tradução para linguagem simples. Os arquivos são embutidos no executável; uma pasta `data` ao lado
+do `DiagIT.exe` substitui as regras embutidas, para testar uma edição sem compilar. Veja [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Aviso do Windows ao abrir
+
+O `DiagIT.exe` não tem assinatura digital paga, então o Windows pode mostrar *"O Windows protegeu o computador"* na primeira vez.
+Clique em **Mais informações → Executar assim mesmo**. O código está todo aqui e o executável das Releases é compilado a partir dele.
+
 ## Dados e privacidade
 
 Tudo fica em `%LOCALAPPDATA%\DiagIT` (sessões, testes, relatórios, log). Nada é enviado para a internet.
 
 ## Limitações honestas
 
-- O teste de RAM cobre a memória livre, não a usada pelo Windows; para 100% use o teste do Windows (aba Correções).
+- O teste de RAM cobre a memória livre, não a usada pelo Windows; para 100% use o teste de memória do Windows (Resolver).
 - A tensão +12 V vem do sensor da placa-mãe (precisão de alguns %): queda é indício forte, mas confirme com multímetro.
 - Sem administrador, temperatura da CPU, tensões, SMART e arquivos de tela azul ficam indisponíveis.
-- O teste de CPU gera carga comparável a um Cinebench (no Ryzen 5 5500: ~56 W), não ao extremo de um Prime95 com FMA.
+- O teste de CPU gera carga comparável a um Cinebench, não ao extremo de um Prime95 com FMA.
 - Não mede FPS/frametime.
 
-Componentes de terceiros: veja `THIRD_PARTY_NOTICES.md`.
+## Licença
+
+[GPL-3.0](LICENSE). Componentes de terceiros e suas licenças: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -1,0 +1,28 @@
+name: Nova regra ou correção de diagnóstico
+description: Um problema que o DiagIT deveria identificar, ou um conselho que está errado
+labels: ["regra"]
+body:
+  - type: textarea
+    id: situacao
+    attributes:
+      label: Qual problema e como ele aparece?
+      description: Sintoma, código de tela azul, evento do Windows, medição... O que dá para medir no PC.
+    validations:
+      required: true
+  - type: textarea
+    id: prova
+    attributes:
+      label: Como provar que é isso?
+      description: O DiagIT só aponta o que tem evidência. Que medição, teste ou registro confirma a causa?
+    validations:
+      required: true
+  - type: textarea
+    id: solucao
+    attributes:
+      label: O que fazer para resolver
+      description: Passo a passo, em linguagem simples.
+  - type: input
+    id: fonte
+    attributes:
+      label: Fonte
+      description: Link para documentação da Microsoft, do fabricante ou relato com evidência.

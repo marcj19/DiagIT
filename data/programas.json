@@ -1,0 +1,40 @@
+{
+  "_sobre": "Programas em segundo plano que a comunidade associa a engasgos e travamentos. 'processo' = começo do nome do processo (minúsculo, sem .exe). Cada partida grava quais estavam abertos e o diagnóstico só aponta um programa se as partidas com ele tiverem mais problemas do que as sem ele.",
+  "tipos": {
+    "wallpaper": {
+      "relato": "engasgos e quedas de FPS com o Wallpaper Engine rodando, mesmo pausado.",
+      "conselho": "Feche o Wallpaper Engine pela bandeja (Sair) antes de jogar e confira no Gerenciador de Tarefas que ele não ficou aberto."
+    },
+    "gravacao": {
+      "relato": "que o Instant Replay do Adrenalin causa engasgos, quedas de FPS e travamentos do driver.",
+      "conselho": "No AMD Software (Adrenalin), aba Gravar e transmitir: desligue Instant Replay e as demais gravações; em Configurações → Sistema, desligue também a Detecção de problemas."
+    },
+    "gravacao_nvidia": {
+      "relato": "que a sobreposição e o Instant Replay do NVIDIA App causam engasgos e quedas de FPS.",
+      "conselho": "No NVIDIA App, Configurações → Recursos: desligue a Sobreposição do NVIDIA (e com ela o Instant Replay) e os Filtros de jogo."
+    },
+    "rgb": {
+      "relato": "que softwares de RGB causam engasgos (1% low), quedas de FPS e travamentos, mesmo em PCs topo de linha.",
+      "conselho": "Desinstale (fechar nem sempre basta, o serviço continua rodando) e jogue alguns dias sem ele para comparar."
+    }
+  },
+  "programas": [
+    { "processo": "wallpaper32", "nome": "Wallpaper Engine", "tipo": "wallpaper" },
+    { "processo": "wallpaper64", "nome": "Wallpaper Engine", "tipo": "wallpaper" },
+    { "processo": "amddvr", "nome": "Gravação do Adrenalin (ReLive / Instant Replay)", "tipo": "gravacao" },
+    { "processo": "nvidia share", "nome": "Sobreposição do NVIDIA App (Instant Replay)", "tipo": "gravacao_nvidia" },
+    { "processo": "icue", "nome": "Corsair iCUE (RGB)", "tipo": "rgb" },
+    { "processo": "corsair.service", "nome": "Corsair iCUE (RGB)", "tipo": "rgb" },
+    { "processo": "signalrgb", "nome": "SignalRGB (RGB)", "tipo": "rgb" },
+    { "processo": "openrgb", "nome": "OpenRGB (RGB)", "tipo": "rgb" },
+    { "processo": "l-connect", "nome": "Lian Li L-Connect (RGB)", "tipo": "rgb" },
+    { "processo": "armourycrate", "nome": "ASUS Armoury Crate / Aura (RGB)", "tipo": "rgb" },
+    { "processo": "lightingservice", "nome": "ASUS Armoury Crate / Aura (RGB)", "tipo": "rgb" },
+    { "processo": "msi.centralserver", "nome": "MSI Center / Mystic Light (RGB)", "tipo": "rgb" },
+    { "processo": "mysticlight", "nome": "MSI Center / Mystic Light (RGB)", "tipo": "rgb" },
+    { "processo": "razer synapse", "nome": "Razer Synapse (RGB)", "tipo": "rgb" },
+    { "processo": "razerappengine", "nome": "Razer Synapse (RGB)", "tipo": "rgb" },
+    { "processo": "nzxt cam", "nome": "NZXT CAM (RGB)", "tipo": "rgb" },
+    { "processo": "rgbfusion", "nome": "Gigabyte RGB Fusion (RGB)", "tipo": "rgb" }
+  ]
+}

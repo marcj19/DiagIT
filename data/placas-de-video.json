@@ -1,0 +1,19 @@
+{
+  "_sobre": "Clock de boost oficial (MHz) dos modelos de referência. Usado para avisar quando a placa trabalha acima do oficial E há travamentos de vídeo. 'modelo' é procurado no nome da placa (o mais longo vence: 'RX 7600 XT' antes de 'RX 7600'). 'ajuste' = como limitar no painel do fabricante; {boost} vira o valor oficial. Hoje só Radeon: placas NVIDIA passam do boost anunciado por projeto (GPU Boost).",
+  "placas": [
+    { "modelo": "RX 6400", "boost_mhz": 2321 }, { "modelo": "RX 6500 XT", "boost_mhz": 2815 },
+    { "modelo": "RX 6600", "boost_mhz": 2491 }, { "modelo": "RX 6600 XT", "boost_mhz": 2589 },
+    { "modelo": "RX 6650 XT", "boost_mhz": 2635 }, { "modelo": "RX 6700", "boost_mhz": 2450 },
+    { "modelo": "RX 6700 XT", "boost_mhz": 2581 }, { "modelo": "RX 6750 XT", "boost_mhz": 2600 },
+    { "modelo": "RX 6800", "boost_mhz": 2105 }, { "modelo": "RX 6800 XT", "boost_mhz": 2250 },
+    { "modelo": "RX 6900 XT", "boost_mhz": 2250 }, { "modelo": "RX 6950 XT", "boost_mhz": 2310 },
+    { "modelo": "RX 7600", "boost_mhz": 2655 }, { "modelo": "RX 7600 XT", "boost_mhz": 2755 },
+    { "modelo": "RX 7700 XT", "boost_mhz": 2544 }, { "modelo": "RX 7800 XT", "boost_mhz": 2430 },
+    { "modelo": "RX 7900 GRE", "boost_mhz": 2245 }, { "modelo": "RX 7900 XT", "boost_mhz": 2400 },
+    { "modelo": "RX 7900 XTX", "boost_mhz": 2500 },
+    { "modelo": "RX 9060 XT", "boost_mhz": 3130, "deslocamento": true }, { "modelo": "RX 9070", "boost_mhz": 2520, "deslocamento": true },
+    { "modelo": "RX 9070 GRE", "boost_mhz": 2790, "deslocamento": true }, { "modelo": "RX 9070 XT", "boost_mhz": 2970, "deslocamento": true }
+  ],
+  "ajuste": "No AMD Software (Adrenalin): Desempenho → Ajuste → Ajuste manual → Ajuste da GPU + Controle avançado, coloque a frequência máxima em {boost} MHz.",
+  "ajuste_deslocamento": "No AMD Software (Adrenalin): Desempenho → Ajuste → Ajuste manual → Ajuste da GPU + Controle avançado, aplique um deslocamento negativo na frequência máxima até o clock em jogo ficar em ~{boost} MHz."
+}

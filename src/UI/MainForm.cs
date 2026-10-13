@@ -46,7 +46,7 @@ namespace DiagIT
             allowVisible = !startHidden;
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "DiagIT — check-up do seu PC";
+            Text = "DiagIT " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + " — check-up do seu PC";
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
             Font = Theme.Font(9f);
