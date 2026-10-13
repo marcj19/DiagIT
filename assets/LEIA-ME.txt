@@ -1,4 +1,4 @@
-﻿DiagIT v1.2.0 - check-up do seu PC, com testes comprovados
+﻿DiagIT v1.2.1 - check-up do seu PC, com testes comprovados
 ================================================================
 
 COMO USAR
@@ -6,12 +6,15 @@ COMO USAR
 2. Abra DiagIT.exe e aceite a permissao de administrador.
    (necessaria para temperatura da CPU, tensoes da fonte, SMART dos discos, arquivos de tela azul e FPS)
 3. Jogue normalmente: o DiagIT fica na bandeja, detecta o jogo e grava a partida sozinho,
-   com FPS, 1% low e engasgos. O painel no jogo aparece sozinho; Ctrl+Shift+F mostra/esconde.
+   com FPS, 1% low e engasgos. O painel no jogo aparece sozinho; Ctrl+Shift+F mostra/esconde
+   (fora de um jogo detectado, ele mede o programa em primeiro plano, ex.: jogo no navegador).
 4. Abra o DiagIT: a tela Inicio mostra a saude do PC e o que fazer agora.
    Com algum problema? Clique em "Estou com um problema", escolha o que acontece
    e o DiagIT monta a verificacao certa (feche os jogos antes).
 5. Veja o resultado em Resultados. Use "Resolver passo a passo" ou "Ja fiz isso":
    o DiagIT acompanha em "Suas correcoes" (Inicio) se o problema voltou ou foi resolvido.
+6. Vai levar a um tecnico? Em Resultados, "Relatorio" abre um relatorio para imprimir e
+   "Pacote para o tecnico" gera um .zip com o relatorio e os dados brutos (sem arquivos pessoais).
 
 REQUISITOS
 - Windows 10 ou 11, 64 bits (o .NET Framework 4.8 ja vem no Windows).
