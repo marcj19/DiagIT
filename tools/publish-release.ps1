@@ -15,8 +15,24 @@ $git = (Get-Command git -ErrorAction SilentlyContinue)
 $gitExe = if ($git) { $git.Source } else { 'C:\Program Files\Git\cmd\git.exe' }
 
 # credencial guardada pelo Git (mesma usada no git push)
-$cred = "protocol=https`nhost=github.com`n`n" | & $gitExe credential fill
-$line = $cred | Where-Object { $_ -like 'password=*' } | Select-Object -First 1
+# Sem BOM na entrada do git: com o console em UTF-8 "com BOM" o Windows PowerShell poe EF BB BF antes do
+# texto e o git recusa a linha "protocol=" ("credential missing protocol field").
+$prevIn = [Console]::InputEncoding
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+$psi = New-Object System.Diagnostics.ProcessStartInfo $gitExe, 'credential fill'
+$psi.UseShellExecute = $false
+$psi.RedirectStandardInput = $true
+$psi.RedirectStandardOutput = $true
+$psi.CreateNoWindow = $true
+$psi.EnvironmentVariables['GIT_TERMINAL_PROMPT'] = '0'
+$proc = [Diagnostics.Process]::Start($psi)
+$req = [Text.Encoding]::ASCII.GetBytes("protocol=https`nhost=github.com`n`n")
+$proc.StandardInput.BaseStream.Write($req, 0, $req.Length)
+$proc.StandardInput.Close()
+$cred = $proc.StandardOutput.ReadToEnd() -split "`r?`n"
+$proc.WaitForExit()
+[Console]::InputEncoding = $prevIn
+$line =$cred | Where-Object { $_ -like 'password=*' } | Select-Object -First 1
 if (-not $line) { throw "Nenhum login do GitHub guardado. Rode um 'git push' antes." }
 $token = $line.Substring(9)
 
