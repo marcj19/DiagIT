@@ -191,7 +191,14 @@ namespace DiagIT
                 double.NaN, double.IsNaN(v12) ? -1 : (v12 < 11.4 || v12 > 12.6) ? 2 : 0);
 
             if (cur != null)
-                cGame.Set(Trim(cur.Game, 18), "GPU do jogo " + N(s[F.GameGpu], "0") + "%  •  CPU do jogo " + N(s[F.GameCpu], "0") + "%", double.NaN, 0);
+            {
+                double fps, low;
+                w.Frames.Peek(out fps, out low);
+                if (!double.IsNaN(fps))
+                    cGame.Set(fps.ToString("0") + " FPS", Trim(cur.Game, 18) + "  •  1% low " + N(low, "0") + "  •  GPU do jogo " + N(s[F.GameGpu], "0") + "%", double.NaN, 0);
+                else
+                    cGame.Set(Trim(cur.Game, 18), (w.Frames.Error.Length > 0 ? w.Frames.Error + "  •  " : "") + "GPU do jogo " + N(s[F.GameGpu], "0") + "%  •  CPU do jogo " + N(s[F.GameCpu], "0") + "%", double.NaN, 0);
+            }
             else if (w.TopApp.Length > 0)
                 cGame.Set("Nenhum", "Maior uso de GPU: " + Trim(w.TopApp, 16) + " (" + w.TopScore.ToString("0") + "%)", double.NaN, -1);
             else

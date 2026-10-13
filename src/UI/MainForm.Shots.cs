@@ -53,6 +53,12 @@ namespace DiagIT
                     case 12:
                         Shot(dir, "12-guia");
                         curGuide = null; ClearGuideProgress();
+                        // painel no jogo com quadros de exemplo (~144 FPS com dois engasgos)
+                        System.Collections.Generic.List<double> ft = new System.Collections.Generic.List<double>();
+                        Random rnd = new Random(7);
+                        for (int i = 0; i < 700; i++) ft.Add(i == 300 ? 58 : i == 520 ? 71 : 6.2 + rnd.NextDouble() * 1.6);
+                        w.Frames.InjectPreview(ft);
+                        try { overlay.SavePreview(System.IO.Path.Combine(dir, "16-painel-no-jogo.png")); } catch (Exception e) { Log.Write("Prévia do painel: " + e.Message); }
                         if (!withRun) { t.Stop(); ExitApp(); return; }
                         // verificação real e curta (processador, 60 s) só para fotografar a tela "Verificando"
                         runPlan.Clear(); runPlan.AddRange(QuickPlan(new System.Collections.Generic.List<TestKind> { TestKind.Cpu, TestKind.Gpu }));

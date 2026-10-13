@@ -54,6 +54,8 @@ namespace DiagIT
                 foreach (SessionData sd in sessions)
                 {
                     if (!GameSession(sd)) continue;
+                    double sph = StuttersPerHour(sd.Info);
+                    if (!double.IsNaN(sph) && sph >= 30) { r.Add(sd.Info.Start); continue; }
                     foreach (Sample s in sd.S) { double g = s.V[F.Gap]; if (!double.IsNaN(g) && g > 6 && g < 120) { r.Add(s.Time); break; } }
                 }
             if (all)
@@ -77,6 +79,32 @@ namespace DiagIT
                 t.StartsWith("Disco com picos", StringComparison.Ordinal) || t.StartsWith("Memória virtual também no HD", StringComparison.Ordinal) ||
                 t.StartsWith("Partidas com", StringComparison.Ordinal) || t.StartsWith("Placa de rede", StringComparison.Ordinal)) return "engasgos";
             return "geral";
+        }
+
+        /// <summary>FPS medido no mesmo jogo antes e depois da correção (" 1% low em CS2: 41 → 58 (+41%).").</summary>
+        static string PerfChange(List<SessionData> sessions, DateTime when)
+        {
+            Dictionary<string, double[]> acc = new Dictionary<string, double[]>(StringComparer.OrdinalIgnoreCase);   // jogo → [lowAntes, framesAntes, lowDepois, framesDepois]
+            foreach (SessionData sd in sessions)
+            {
+                SessionInfo si = sd.Info;
+                if (!GameSession(sd) || si.Frames < 600 || double.IsNaN(si.FpsLow)) continue;
+                double[] a;
+                if (!acc.TryGetValue(si.Game, out a)) { a = new double[4]; acc[si.Game] = a; }
+                int k = si.Start < when ? 0 : 2;
+                a[k] += si.FpsLow * si.Frames; a[k + 1] += si.Frames;
+            }
+            string best = ""; double bestFrames = 0;
+            foreach (KeyValuePair<string, double[]> kv in acc)
+            {
+                double[] a = kv.Value;
+                if (a[1] == 0 || a[3] == 0 || a[1] + a[3] <= bestFrames) continue;
+                double before = a[0] / a[1], after = a[2] / a[3];
+                double pct = (after - before) / before * 100;
+                best = " FPS mínimo (1% low) em " + kv.Key + ": " + N0(before) + " → " + N0(after) + " (" + (pct >= 0 ? "+" : "") + N0(pct) + "%).";
+                bestFrames = a[1] + a[3];
+            }
+            return best;
         }
 
         static void FixRules(Diagnosis d, List<WinEvent> ev, List<SessionData> sessions, List<FixEntry> fixes)
@@ -132,6 +160,7 @@ namespace DiagIT
                             " Mais " + left + (left == 1 ? " dia" : " dias") + " sem problemas para confirmar.";
                     }
                 }
+                st.Text += PerfChange(sessions, fx.When);
                 d.Fixes.Add(st);
 
                 // correção que resolveu: os indícios de antes dela pesam bem menos (o problema daquela época foi tratado)

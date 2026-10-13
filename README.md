@@ -38,6 +38,16 @@ com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver de
 Durante todos os testes são registradas temperaturas, consumo, clocks, tensões (+12/+5/+3,3 V), ventoinhas e link PCIe. O teste para
 sozinho se a temperatura ficar crítica (e isso já é o resultado: refrigeração insuficiente). **O DiagIT recusa iniciar testes com jogo aberto.**
 
+## FPS e painel no jogo
+
+Durante as partidas, o DiagIT mede **FPS, 1% low (o FPS dos quadros mais lentos) e engasgos** com o
+[PresentMon](https://github.com/GameTechDev/PresentMon) da Intel, que lê os eventos de quadros do próprio Windows sem tocar no jogo.
+Cada partida guarda o resumo; o diagnóstico aponta jogos que engasgam e o acompanhamento das correções mostra o antes e depois
+(*"FPS mínimo em cs2: 42 → 59"*).
+
+O **painel no jogo** (como o do MSI Afterburner) mostra FPS, 1% low, o gráfico do tempo de quadro (engasgos aparecem como picos) e uso e
+temperatura de GPU e CPU. Liga sozinho nas partidas (Configurações) e **Ctrl+Shift+F** mostra/esconde a qualquer momento.
+
 ## O que mais ele lê
 
 - **Sensores embutidos**: GPU pelo próprio driver de vídeo (AMD ADL / NVIDIA NVML); CPU e placa-mãe pelo LibreHardwareMonitor embutido + driver PawnIO.
@@ -92,7 +102,9 @@ Tudo fica em `%LOCALAPPDATA%\DiagIT` (sessões, testes, relatórios, log). Nada 
 - A tensão +12 V vem do sensor da placa-mãe (precisão de alguns %): queda é indício forte, mas confirme com multímetro.
 - Sem administrador, temperatura da CPU, tensões, SMART e arquivos de tela azul ficam indisponíveis.
 - O teste de CPU gera carga comparável a um Cinebench, não ao extremo de um Prime95 com FMA.
-- Não mede FPS/frametime.
+- O painel no jogo é uma janela por cima do jogo (não injeta nada, seguro com anti-cheat): aparece em tela cheia sem bordas ou em janela;
+  em tela cheia exclusiva o Windows pode escondê-lo.
+- Medir FPS precisa do DiagIT aberto como administrador (o PresentMon lê eventos do Windows que exigem isso).
 
 ## Licença
 

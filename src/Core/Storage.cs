@@ -76,6 +76,8 @@ namespace DiagIT
         public bool StartMinimized = false;
         public bool Notify = true;
         public bool AlwaysAdmin = true;
+        public bool Overlay = true;          // painel no jogo (FPS, temperaturas) durante as partidas
+        public int OverlayCorner = 0;        // 0 sup. esquerdo, 1 sup. direito, 2 inf. esquerdo, 3 inf. direito
         public string IgnoreList =
             "dwm,explorer,chrome,msedge,msedgewebview2,firefox,brave,opera,vivaldi,steamwebhelper,discord,spotify," +
             "vlc,obs64,obs-browser-page,taskmgr,searchhost,startmenuexperiencehost,shellexperiencehost," +
@@ -159,6 +161,8 @@ namespace DiagIT
                         case "startminimized": s.StartMinimized = v == "1"; break;
                         case "notify": s.Notify = v == "1"; break;
                         case "admin": s.AlwaysAdmin = v == "1"; break;
+                        case "overlay": s.Overlay = v == "1"; break;
+                        case "overlay_corner": int oc; if (int.TryParse(v, out oc)) s.OverlayCorner = Math.Max(0, Math.Min(3, oc)); break;
                         case "ignore": if (v.Length > 0) s.IgnoreList = v; break;
                         case "games": if (v.Length > 0) s.GameList = v; break;
                     }
@@ -188,6 +192,8 @@ namespace DiagIT
                     "startminimized=" + (StartMinimized ? "1" : "0"),
                     "notify=" + (Notify ? "1" : "0"),
                     "admin=" + (AlwaysAdmin ? "1" : "0"),
+                    "overlay=" + (Overlay ? "1" : "0"),
+                    "overlay_corner=" + OverlayCorner,
                     "games=" + GameList,
                     "ignore=" + IgnoreList
                 };
@@ -208,6 +214,9 @@ namespace DiagIT
         public string Note = "";
         /// <summary>Programas em segundo plano que a comunidade associa a engasgos/travamentos, abertos durante a partida.</summary>
         public List<string> Bg = new List<string>();
+        /// <summary>Desempenho medido pelo PresentMon (NaN/0 = não medido).</summary>
+        public double FpsAvg = double.NaN, FpsLow = double.NaN;
+        public int Stutters, Frames;
         public int GamePid = -1;           // não persistido
 
         public string MetaPath { get { return Path.Combine(Paths.Sessions, Id + ".meta"); } }
@@ -252,6 +261,13 @@ namespace DiagIT
             l.Add("status=" + Status);
             l.Add("note=" + Note.Replace('\n', ' ').Replace('\r', ' '));
             if (Bg.Count > 0) l.Add("bg=" + string.Join("|", Bg.ToArray()));
+            if (Frames > 0)
+            {
+                l.Add("fps_avg=" + FpsAvg.ToString("0.0", CultureInfo.InvariantCulture));
+                l.Add("fps_low1=" + FpsLow.ToString("0.0", CultureInfo.InvariantCulture));
+                l.Add("stutters=" + Stutters);
+                l.Add("frames=" + Frames);
+            }
             File.WriteAllLines(MetaPath, l.ToArray(), Encoding.UTF8);
         }
 
@@ -277,6 +293,10 @@ namespace DiagIT
                         case "status": s.Status = v; break;
                         case "note": s.Note = v; break;
                         case "bg": s.Bg = new List<string>(v.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries)); break;
+                        case "fps_avg": if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out d)) s.FpsAvg = d; break;
+                        case "fps_low1": if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out d)) s.FpsLow = d; break;
+                        case "stutters": int.TryParse(v, out s.Stutters); break;
+                        case "frames": int.TryParse(v, out s.Frames); break;
                     }
                 }
                 if (string.IsNullOrEmpty(s.Id)) return null;

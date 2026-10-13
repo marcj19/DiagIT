@@ -42,6 +42,7 @@ Sempre cite a fonte de uma regra nova no pull request (documentação da Microso
 - **Testes de lógica:** `build\dev\DiagIT.exe --diag-test saida.txt` precisa terminar com `TUDO OK`. Ao mudar o diagnóstico, adicione um
   cenário em `src/SelfTest.cs` (método `DiagScenarios`).
 - **Arquivos de tela azul:** `DiagIT.exe --dump-info C:\Windows\Minidump saida.txt` (como administrador) mostra o código, o driver culpado e a pilha que o DiagIT extrai de cada arquivo.
+- **FPS:** `DiagIT.exe --fps-test <processo ou PID> <segundos> saida.txt` (como administrador) mede um processo com o PresentMon embutido.
 - **Revisar o visual:** `build\dev\DiagIT.exe --multi --offscreen --no-elevate --screenshots pasta` salva uma imagem de cada tela.
 - **Estilo:** C# 5 (o compilador do Windows não aceita recursos mais novos: sem `$"..."`, `?.`, `=>` em membros), textos da interface em
   português do Brasil, comentários curtos explicando o porquê.

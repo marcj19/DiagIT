@@ -46,4 +46,8 @@ $sens = Join-Path $dist 'sensores'
 New-Item -ItemType Directory -Force $sens | Out-Null
 Copy-Item (Join-Path $vendor '*.dll') $sens -Force
 Copy-Item (Join-Path $vendor 'System.Numerics.Vectors.dll') $dist -Force
+# PresentMon (Intel, MIT) para medir FPS
+$pm = Join-Path $dist 'PresentMon'
+New-Item -ItemType Directory -Force $pm | Out-Null
+Copy-Item (Join-Path $root 'vendor\presentmon\*') $pm -Force
 Write-Host "OK -> $out" -ForegroundColor Green

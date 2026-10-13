@@ -68,6 +68,7 @@ namespace DiagIT
             BuildRun();
             BuildGuide();
             BuildTray();
+            overlay = new GameOverlay(w, cfg);
             runner.Finished += delegate(TestResult r) { Post(delegate { OnTestFinished(r); }); };
 
             Navigate(P_HOME);
@@ -155,9 +156,38 @@ namespace DiagIT
                 return;
             }
             ui.Stop();
+            try { UnregisterHotKey(Handle, HOTKEY_OVERLAY); } catch { }
+            try { if (overlay != null) { overlay.SetShown(false); overlay.Dispose(); } } catch { }
             try { tray.Visible = false; tray.Dispose(); } catch { }
             w.Stop();
             base.OnFormClosing(e);
+        }
+
+        // ------------------------------------------------------------------ painel no jogo
+        GameOverlay overlay;
+        int overlayManual;   // 0 automático, 1 forçado visível, -1 forçado escondido (atalho Ctrl+Shift+F)
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr h, int id, uint mods, uint vk);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr h, int id);
+        const int WM_HOTKEY = 0x0312, HOTKEY_OVERLAY = 1;
+
+        bool InGame { get { SessionInfo c = w.Current; return c != null && c.Note != "teste" && !c.Game.StartsWith("[Teste]") && !runner.Busy; } }
+
+        void UpdateOverlay()
+        {
+            if (overlay == null) return;
+            bool show = overlayManual == 1 || (overlayManual == 0 && cfg.Overlay && InGame);
+            if (!InGame && overlayManual == -1) overlayManual = 0;   // próxima partida volta ao automático
+            overlay.SetShown(show);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == HOTKEY_OVERLAY)
+            {
+                overlayManual = overlay != null && overlay.Visible ? -1 : 1;
+                UpdateOverlay();
+            }
+            base.WndProc(ref m);
         }
 
         [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
@@ -167,6 +197,7 @@ namespace DiagIT
         {
             base.OnHandleCreated(e);
             try { int on = 1; DwmSetWindowAttribute(Handle, 20, ref on, 4); } catch { }   // barra de título escura
+            try { RegisterHotKey(Handle, HOTKEY_OVERLAY, 0x0002 | 0x0004 | 0x4000, (uint)Keys.F); } catch { }   // Ctrl+Shift+F (sem repetir)
         }
 
         protected override void OnResize(EventArgs e)
@@ -468,6 +499,7 @@ namespace DiagIT
             else
                 sideStatus.Set(Theme.Good, "Monitorando suas partidas", "O DiagIT grava sozinho quando você joga.");
             tray.Text = w.Current != null ? "DiagIT — gravando " + Trim(w.Current.Game, 40) : "DiagIT — monitorando";
+            UpdateOverlay();
 
             if (!Visible || WindowState == FormWindowState.Minimized) return;
             if (curPage == P_LIVE) RefreshLive();

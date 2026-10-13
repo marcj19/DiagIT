@@ -89,7 +89,8 @@ namespace DiagIT
     {
         NumericUpDown numInterval, numMinGpu, numDelay;
         TextBox txtGames;
-        CheckBox chkAuto, chkTray, chkMin, chkNotify, chkAdmin;
+        CheckBox chkAuto, chkTray, chkMin, chkNotify, chkAdmin, chkOverlay;
+        Segmented segCorner;
         TextBox txtIgnore, txtSensors;
         Label lblSensorSrc, lblAdmin, lblPerf;
         FlatButton btnAutostart;
@@ -143,7 +144,16 @@ namespace DiagIT
             chkTray = Chk(scroll, "Ao fechar a janela, continuar em segundo plano (bandeja do sistema)", cfg.CloseToTray, ref y);
             chkMin = Chk(scroll, "Iniciar minimizado (sem abrir a janela)", cfg.StartMinimized, ref y);
             chkNotify = Chk(scroll, "Mostrar notificações (jogo detectado, resumo ao fim da partida)", cfg.Notify, ref y);
-            chkAdmin = Chk(scroll, "Sempre abrir como administrador (necessário para CPU, placa-mãe, SMART e telas azuis)", cfg.AlwaysAdmin, ref y);
+            chkAdmin = Chk(scroll, "Sempre abrir como administrador (necessário para CPU, placa-mãe, SMART, telas azuis e FPS)", cfg.AlwaysAdmin, ref y);
+            chkOverlay = Chk(scroll, "Mostrar o painel no jogo durante as partidas (FPS, 1% low, tempo de quadro, temperaturas)", cfg.Overlay, ref y);
+            Label ovHint = Body("Atalho Ctrl+Shift+F mostra ou esconde a qualquer momento. Não mexe no jogo (seguro com anti-cheat); aparece em jogos em tela cheia sem bordas ou em janela.", true);
+            ovHint.SetBounds(Theme.S(28), y - Theme.S(4), Theme.S(760), Theme.S(36));
+            scroll.Controls.Add(ovHint);
+            y += Theme.S(36);
+            segCorner = new Segmented(new string[] { "Canto superior esquerdo", "Superior direito", "Inferior esquerdo", "Inferior direito" }, cfg.OverlayCorner);
+            segCorner.Location = new Point(Theme.S(28), y);
+            scroll.Controls.Add(segCorner);
+            y += segCorner.Height + Theme.S(12);
 
             btnAutostart = new FlatButton("", false);
             btnAutostart.Location = new Point(0, y);
@@ -274,6 +284,8 @@ namespace DiagIT
             cfg.StartMinimized = chkMin.Checked;
             cfg.Notify = chkNotify.Checked;
             cfg.AlwaysAdmin = chkAdmin.Checked;
+            cfg.Overlay = chkOverlay.Checked;
+            cfg.OverlayCorner = segCorner.SelectedIndex;
             cfg.IgnoreList = txtIgnore.Text.Replace("\r\n", ",").Replace("\n", ",");
             cfg.GameList = txtGames.Text.Replace("\r\n", ",").Replace("\n", ",");
             cfg.ResetCache();

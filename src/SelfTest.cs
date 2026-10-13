@@ -329,9 +329,65 @@ namespace DiagIT
                 Check(d.Fixes[0].State == 2 && d.Fixes[0].After == 1, "voltou depois da correção: não resolveu");
                 d = runFix(new int[] { }, 5);
                 Check(d.Fixes[0].State == 3, "nada registrado antes: sem como comparar");
+
+                Say("== 13. Desempenho medido (FPS)");
+                Func<int, double, double, int, SessionData> game = delegate(int daysAgo, double fps, double low, int stutters)
+                {
+                    SessionData sd = new SessionData(); sd.Info = new SessionInfo(); sd.Info.Id = "g" + daysAgo; sd.Info.Game = "cs2";
+                    sd.Info.Start = DateTime.Now.AddDays(-daysAgo); sd.Info.End = sd.Info.Start.AddHours(1); sd.Info.Status = "ok";
+                    sd.Info.FpsAvg = fps; sd.Info.FpsLow = low; sd.Info.Stutters = stutters; sd.Info.Frames = (int)(fps * 3600);
+                    return sd;
+                };
+                List<SessionData> perf = new List<SessionData> { game(9, 140, 41, 80), game(8, 138, 43, 70), game(2, 150, 58, 5), game(1, 152, 60, 4) };
+                FixEntry pf = new FixEntry(); pf.Id = "pf"; pf.When = DateTime.Now.AddDays(-5); pf.Title = "Desliguei o Instant Replay"; pf.Scope = "engasgos";
+                d = Analyzer.Run(perf, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { pf });
+                Finding fps1 = d.Findings.Find(delegate(Finding f) { return f.Source.StartsWith("Medição de FPS"); });
+                Say("  " + (fps1 == null ? "-" : fps1.Plain + " | " + fps1.Evidence.Split('\n')[0]));
+                Say("  " + d.Fixes[0].Headline + ": " + d.Fixes[0].Text);
+                Check(fps1 != null && fps1.Sev == Sev.Ok, "achado reflete as partidas recentes (depois da correção: sem engasgos)");
+                Diagnosis dBad = Analyzer.Run(new List<SessionData> { game(3, 140, 41, 80), game(2, 138, 43, 70) }, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fps2 = dBad.Findings.Find(delegate(Finding f) { return f.Source.StartsWith("Medição de FPS"); });
+                Say("  " + (fps2 == null ? "-" : fps2.Plain));
+                Check(fps2 != null && fps2.Sev == Sev.Warn && fps2.Title.Contains("75 engasgos por hora") && fps2.W[Comp.Software] > 0, "engasgos medidos frequentes viram achado");
+                Check(d.Fixes[0].State == 2 || d.Fixes[0].State == 0 || d.Fixes[0].State == 1, "acompanhamento de engasgos usa as partidas medidas");
+                Check(d.Fixes[0].Text.Contains("1% low) em cs2: 42 → 59"), "correção mostra o FPS mínimo antes e depois no mesmo jogo");
+                Check(double.IsNaN(Analyzer.StuttersPerHour(new SessionInfo())), "partida sem medição de FPS não conta");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;
+            }
+            catch (Exception e) { Say("EXCEÇÃO: " + e); return 2; }
+            finally { o.Close(); }
+        }
+
+        /// <summary>Mede o FPS de um processo (nome ou PID) por alguns segundos com o PresentMon embutido. Precisa de administrador.</summary>
+        public static int FpsTest(string target, int seconds, string outFile)
+        {
+            o = new StreamWriter(outFile, false, new UTF8Encoding(false));
+            try
+            {
+                int pid;
+                if (!int.TryParse(target, out pid))
+                {
+                    Process[] ps = Process.GetProcessesByName(target);
+                    if (ps.Length == 0) { Say("Processo não encontrado: " + target); return 1; }
+                    pid = ps[0].Id;
+                }
+                Say("PresentMon: " + FrameMonitor.ExePath + " (existe: " + FrameMonitor.Available + ")  administrador: " + SysUtil.IsAdmin());
+                FrameMonitor fm = new FrameMonitor();
+                if (!fm.Start(pid)) { Say("FALHOU ao iniciar: " + fm.Error); return 1; }
+                for (int i = 0; i < seconds; i++)
+                {
+                    Thread.Sleep(1000);
+                    double fps, low, ms; int st;
+                    fm.Snapshot(out fps, out low, out ms, out st);
+                    Say(string.Format(System.Globalization.CultureInfo.InvariantCulture, "  {0,2}s  FPS {1,6:0.0}  1% low {2,6:0.0}  quadro {3,6:0.00} ms  engasgos {4}", i + 1, fps, low, ms, st));
+                }
+                double avg, l1; int stt, fr;
+                fm.Summary(out avg, out l1, out stt, out fr);
+                fm.Stop();
+                Say(string.Format(System.Globalization.CultureInfo.InvariantCulture, "Resumo: {0} quadros, FPS médio {1:0.0}, 1% low {2:0.0}, {3} engasgos. Erro: {4}", fr, avg, l1, stt, fm.Error.Length > 0 ? fm.Error : "nenhum"));
+                return fr > 0 ? 0 : 1;
             }
             catch (Exception e) { Say("EXCEÇÃO: " + e); return 2; }
             finally { o.Close(); }

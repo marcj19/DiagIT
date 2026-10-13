@@ -50,6 +50,10 @@ namespace DiagIT
             Perf = new PerfCollector();
         }
 
+        /// <summary>FPS do jogo (PresentMon), ligado durante as partidas.</summary>
+        public readonly FrameMonitor Frames = new FrameMonitor();
+        int fpsTriedPid = -1;
+
         public void Start()
         {
             th = new Thread(Run);
@@ -65,6 +69,7 @@ namespace DiagIT
             wake.Set();
             if (th != null) th.Join(3000);
             EndSession("Aplicativo encerrado durante a sessão");
+            Frames.Stop();
             Sensors.Close();
             Perf.Dispose();
         }
@@ -161,6 +166,15 @@ namespace DiagIT
             else if (gamePid > 0 && !Current.Manual)
             {
                 if (!Alive(gamePid)) ended = Current;
+            }
+            // FPS do jogo: o PresentMon acompanha só o processo do jogo, enquanto a partida durar
+            if (Current != null && gamePid > 0 && Current.Note != "teste")
+            {
+                if (fpsTriedPid != gamePid) { fpsTriedPid = gamePid; Frames.Start(gamePid); }
+                double fps, low, fms; int st;
+                Frames.Snapshot(out fps, out low, out fms, out st);
+                s.V[F.Fps] = fps; s.V[F.FpsLow] = low; s.V[F.FrameMs] = fms;
+                if (Frames.Running) s.V[F.Stutter] = st;
             }
             // métricas do processo do jogo
             if (Current != null && gamePid > 0)
@@ -278,6 +292,13 @@ namespace DiagIT
             gamePid = -1;
             si.End = DateTime.Now;
             si.Status = "ok";
+            if (fpsTriedPid >= 0)
+            {
+                double avg, low; int st, fr;
+                Frames.Summary(out avg, out low, out st, out fr);
+                si.FpsAvg = avg; si.FpsLow = low; si.Stutters = st; si.Frames = fr;
+                Frames.Stop(); fpsTriedPid = -1;
+            }
             if (!string.IsNullOrEmpty(note)) si.Note = note;
             try { si.Save(); } catch (Exception e) { Log.Write("Salvar sessão: " + e.Message); }
             Log.Write("Sessão encerrada: " + si.Id);

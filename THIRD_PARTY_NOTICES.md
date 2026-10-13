@@ -11,3 +11,9 @@
 - Projeto: https://pawnio.eu/ e https://github.com/namazso/PawnIO.Setup
 - Driver de kernel assinado usado pelo LibreHardwareMonitor para acesso de baixo nível (temperatura da CPU, chip da placa-mãe).
 - Não é distribuído junto com o DiagIT; instale com:  winget install namazso.PawnIO
+
+## PresentMon 2.5.1 (pasta PresentMon)
+- Projeto: https://github.com/GameTechDev/PresentMon (Intel Corporation)
+- Licença: MIT (texto completo em `vendor/presentmon/LICENSE.txt`, copiado para a pasta `PresentMon` do pacote)
+- Executável oficial da release, assinado pela Intel, usado sem modificações para medir FPS, 1% low e engasgos dos jogos.
+  Ele lê os eventos de apresentação de quadros do Windows (ETW); não injeta nada no jogo.

@@ -12,9 +12,10 @@ namespace DiagIT
             Ram = 17, Avail = 18, Hard = 19, Commit = 20,
             DiskLat = 21, DiskQ = 22, DiskBusy = 23, DiskTemp = 24,
             GameCpu = 25, GameGpu = 26, V12 = 27, Gap = 28,
-            GpuMemTemp = 29, CpuFan = 30, V5 = 31, V33 = 32, Vcore = 33, BoardTemp = 34, PcieGen = 35, PcieLanes = 36, GpuVolt = 37;
+            GpuMemTemp = 29, CpuFan = 30, V5 = 31, V33 = 32, Vcore = 33, BoardTemp = 34, PcieGen = 35, PcieLanes = 36, GpuVolt = 37,
+            Fps = 38, FpsLow = 39, FrameMs = 40, Stutter = 41;
 
-        public const int Count = 38;
+        public const int Count = 42;
 
         public static readonly string[] Names =
         {
@@ -24,7 +25,8 @@ namespace DiagIT
             "ram", "avail_mb", "hard_faults", "commit",
             "disk_lat_ms", "disk_queue", "disk_busy", "disk_temp",
             "game_cpu", "game_gpu", "v12", "gap_s",
-            "gpu_mem_temp", "cpu_fan", "v5", "v33", "vcore", "board_temp", "pcie_gen", "pcie_lanes", "gpu_vcore"
+            "gpu_mem_temp", "cpu_fan", "v5", "v33", "vcore", "board_temp", "pcie_gen", "pcie_lanes", "gpu_vcore",
+            "fps", "fps_low1", "frame_ms", "stutters"
         };
 
         public static readonly string[] Labels =
@@ -35,7 +37,8 @@ namespace DiagIT
             "RAM", "RAM livre", "Falhas de página", "Memória comprometida",
             "Latência do disco", "Fila do disco", "Disco ocupado", "Temp. disco",
             "CPU do jogo", "GPU do jogo", "Rail +12V", "Intervalo da amostra",
-            "Temp. VRAM", "Ventoinha CPU", "Rail +5V", "Rail +3,3V", "Tensão do núcleo (Vcore)", "Temp. placa-mãe (máx)", "PCIe (geração)", "PCIe (pistas)", "Tensão GPU"
+            "Temp. VRAM", "Ventoinha CPU", "Rail +5V", "Rail +3,3V", "Tensão do núcleo (Vcore)", "Temp. placa-mãe (máx)", "PCIe (geração)", "PCIe (pistas)", "Tensão GPU",
+            "FPS", "FPS 1% low", "Tempo de quadro", "Engasgos"
         };
 
         public static readonly string[] Units =
@@ -46,7 +49,8 @@ namespace DiagIT
             "%", "MB", "/s", "%",
             "ms", "", "%", "°C",
             "%", "%", "V", "s",
-            "°C", "RPM", "V", "V", "V", "°C", "", "", "V"
+            "°C", "RPM", "V", "V", "V", "°C", "", "", "V",
+            "", "", "ms", ""
         };
     }
 

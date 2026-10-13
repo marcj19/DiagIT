@@ -17,6 +17,7 @@ namespace DiagIT
             WuDriverRule(d, ev, gpuCrashes);
             GpuClockRule(d, sessions, gpuCrashes);
             BackgroundAppRules(d, sessions, ev, gpuCrashes);
+            PerformanceRules(d, sessions);
             PagefileRule(d);
         }
 
@@ -188,10 +189,74 @@ namespace DiagIT
             return n;
         }
 
-        /// <summary>Partida com problema concreto: PC caiu, jogo fechou com erro ou o sistema congelou.</summary>
+        /// <summary>Engasgos por hora medidos pelo PresentMon (NaN = partida sem medição de FPS).</summary>
+        public static double StuttersPerHour(SessionInfo si)
+        {
+            if (si.Frames < 600 || double.IsNaN(si.FpsAvg) || si.FpsAvg <= 0) return double.NaN;
+            double hours = si.Frames / si.FpsAvg / 3600.0;
+            return hours < 0.05 ? double.NaN : si.Stutters / hours;
+        }
+
+        /// <summary>Partida com problema concreto: PC caiu, jogo fechou com erro, o sistema congelou ou o jogo engasgou muito (medido).</summary>
         static bool BadSession(SessionData sd)
         {
-            return sd.Info.Status == "interrupted" || sd.Info.Note.StartsWith("O jogo fechou com erro", StringComparison.Ordinal) || Stalls(sd) > 0;
+            double sph = StuttersPerHour(sd.Info);
+            return sd.Info.Status == "interrupted" || sd.Info.Note.StartsWith("O jogo fechou com erro", StringComparison.Ordinal) || Stalls(sd) > 0 ||
+                (!double.IsNaN(sph) && sph >= 30);
+        }
+
+        // ================================================================ 5. Desempenho medido (FPS, 1% low, engasgos)
+        static void PerformanceRules(Diagnosis d, List<SessionData> sessions)
+        {
+            Dictionary<string, List<SessionInfo>> byGame = new Dictionary<string, List<SessionInfo>>(StringComparer.OrdinalIgnoreCase);
+            foreach (SessionData sd in sessions)
+            {
+                if (!GameSession(sd) || double.IsNaN(StuttersPerHour(sd.Info))) continue;
+                List<SessionInfo> l;
+                if (!byGame.TryGetValue(sd.Info.Game, out l)) { l = new List<SessionInfo>(); byGame[sd.Info.Game] = l; }
+                l.Add(sd.Info);
+            }
+            if (byGame.Count == 0) return;
+            // o estado atual: as 3 partidas mais recentes de cada jogo (correções antigas não se misturam com o agora)
+            foreach (List<SessionInfo> l in byGame.Values)
+            {
+                l.Sort(delegate(SessionInfo a, SessionInfo b) { return b.Start.CompareTo(a.Start); });
+                if (l.Count > 3) l.RemoveRange(3, l.Count - 3);
+            }
+            List<string> lines = new List<string>();
+            double worst = 0; string worstGame = "";
+            foreach (KeyValuePair<string, List<SessionInfo>> kv in byGame)
+            {
+                double fps = 0, low = 0, frames = 0, st = 0, hours = 0;
+                foreach (SessionInfo si in kv.Value)
+                {
+                    fps += si.FpsAvg * si.Frames; low += si.FpsLow * si.Frames; frames += si.Frames;
+                    st += si.Stutters; hours += si.Frames / si.FpsAvg / 3600.0;
+                }
+                double sph = st / Math.Max(0.05, hours);
+                if (sph > worst) { worst = sph; worstGame = kv.Key; }
+                lines.Add("• " + kv.Key + ": " + N0(fps / frames) + " FPS em média, 1% low " + N0(low / frames) + ", " + N0(sph) + " engasgos por hora (" +
+                    (kv.Value.Count == 1 ? "última partida)" : kv.Value.Count + " últimas partidas)"));
+            }
+            Finding f = new Finding();
+            f.Source = "Medição de FPS (PresentMon)";
+            f.Evidence = string.Join("\n", lines.ToArray()) + "\nEngasgo = quadro mais de 2,5× mais lento que o ritmo do momento e acima de 50 ms (o que se sente como travadinha).";
+            if (worst >= 30)
+            {
+                f.Sev = Sev.Warn;
+                f.Title = "Os jogos engasgam: " + N0(worst) + " engasgos por hora em " + worstGame + " (medido)";
+                f.Simple = "O jogo trava por instantes com frequência (" + N0(worst) + " vezes por hora em " + worstGame + ")";
+                f.Advice = "Veja os outros achados sobre programas abertos, memória virtual e drivers: os Resultados comparam as partidas com e sem cada um. " +
+                    "Depois de cada ajuste, jogue de novo: o DiagIT compara o FPS e os engasgos antes e depois em \"Suas correções\".";
+                f.Weigh(Comp.Software, 0.15);
+            }
+            else
+            {
+                f.Sev = Sev.Ok;
+                f.Title = "Desempenho medido nos jogos";
+                f.Simple = "Os jogos rodam sem travadinhas frequentes";
+            }
+            d.Findings.Add(f);
         }
 
         static void BackgroundAppRules(Diagnosis d, List<SessionData> sessions, List<WinEvent> ev, List<DateTime> crashes)
