@@ -36,6 +36,8 @@ namespace DiagIT
                     int n = f.Count > 0 ? f.Count : Math.Max(1, CountIn(f.Title));
                     string fam = BsodFamily(f.BugCode);
                     if (n > 1) fam = fam.Replace("ligada", "ligadas").Replace("causada", "causadas");
+                    string who = CulpritPhrase(f);
+                    if (who != null) fam = (n > 1 ? "causadas pelo " : "causada pelo ") + who;
                     f.Simple = "O PC teve " + Times(n, "tela azul", "telas azuis") + (fam.Length > 0 ? " " + fam : "");
                     continue;
                 }
@@ -98,6 +100,11 @@ namespace DiagIT
                 int top = suspect[0];
                 foreach (int i in suspect) if (d.Score[i] > d.Score[top]) top = i;
                 string cause = CauseNames[top];
+                // driver apontado pelo próprio Windows na maioria das telas azuis: é a evidência mais forte que existe
+                Finding byDriver = null;
+                foreach (Finding f in d.Findings)
+                    if (f.BugCode >= 0 && CulpritPhrase(f) != null && (byDriver == null || f.Count > byDriver.Count)) byDriver = f;
+                if (byDriver != null && byDriver.CulpritCount * 2 >= bsod) cause = "o " + CulpritPhrase(byDriver) + " (" + byDriver.Culprit + "), apontado pelo próprio Windows";
                 if (bsod > 0) title = "Seu PC teve " + Times(bsod, "tela azul", "telas azuis") + (ok > 0 ? ", mas as peças testadas estão boas" : "");
                 else title = suspect.Count == 1 ? "Há 1 ponto para verificar no seu PC" : "Há " + suspect.Count + " pontos para verificar no seu PC";
                 sub = "A causa mais provável é " + cause + ".";

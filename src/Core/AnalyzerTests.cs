@@ -287,7 +287,9 @@ namespace DiagIT
                 DateTime last = DateTime.MinValue;
                 foreach (CrashDump cd in kv.Value)
                 {
-                    lines.Add("  • " + cd.Time.ToString("dd/MM/yyyy HH:mm", Pt) + " — parâmetros 0x" + cd.P[0].ToString("X") + ", 0x" + cd.P[1].ToString("X"));
+                    lines.Add("  • " + cd.Time.ToString("dd/MM/yyyy HH:mm", Pt) + " — parâmetros 0x" + cd.P[0].ToString("X") + ", 0x" + cd.P[1].ToString("X") +
+                        (cd.Culprit != null ? " — culpado: " + cd.Culprit + " (" + cd.CulpritHow + ")" : "") +
+                        (cd.StackModules.Count > 0 ? "\n    pilha: " + string.Join(" → ", cd.StackModules.ToArray()) : ""));
                     if (cd.Time > last) last = cd.Time;
                 }
                 // a mesma tela azul já apareceu no registro do Windows: só acrescenta a prova do arquivo, sem somar o peso de novo
@@ -297,6 +299,12 @@ namespace DiagIT
                     ev.Source = "Eventos do Windows + arquivos de tela azul";
                     ev.Evidence += "\nConfirmado nos arquivos de despejo (Minidump):\n" + string.Join("\n", lines.ToArray());
                     if (last > ev.Last) ev.Last = last;
+                    if (ev.Culprit == null)
+                    {
+                        List<string> fromDumps = new List<string>();
+                        foreach (CrashDump cd in kv.Value) if (cd.Culprit != null) fromDumps.Add(cd.Culprit);
+                        ApplyCulprit(ev, fromDumps, Math.Max(ev.Count, kv.Value.Count), Math.Min(1, (ev.Count + 1) / 4.0), "arquivo da tela azul");
+                    }
                     continue;
                 }
                 double s = Math.Min(1, (kv.Value.Count + 1) / 4.0);
@@ -307,6 +315,9 @@ namespace DiagIT
                 f.Advice = advice;
                 f.Last = last; f.BugCode = code; f.Count = kv.Value.Count;
                 foreach (KeyValuePair<Comp, double> c in w) f.Weigh(c.Key, c.Value * s);
+                List<string> culprits = new List<string>();
+                foreach (CrashDump cd in kv.Value) if (cd.Culprit != null) culprits.Add(cd.Culprit);
+                ApplyCulprit(f, culprits, kv.Value.Count, s, "arquivo da tela azul");
                 d.Findings.Add(f);
             }
             if (!h.CrashDumpEnabled)

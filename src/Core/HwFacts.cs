@@ -22,6 +22,9 @@ namespace DiagIT
         public uint Code;
         public ulong[] P = new ulong[4];
         public bool Live;   // LiveKernelReports (travamento recuperado, sem tela azul)
+        public string Culprit, CulpritHow;                       // driver culpado lido do próprio arquivo (null = não identificado)
+        public List<string> StackModules = new List<string>();   // drivers na pilha da falha, na ordem
+        public int ModulesRead;
         public string CodeHex { get { return "0x" + Code.ToString("X"); } }
     }
 
@@ -395,6 +398,22 @@ namespace DiagIT
                 {
                     d.Code = BitConverter.ToUInt32(b, 0x38);
                     for (int i = 0; i < 4; i++) d.P[i] = BitConverter.ToUInt64(b, 0x40 + i * 8);
+                    // minidump (alguns MB): lê inteiro para achar o driver culpado; MEMORY.DMP completo é grande demais
+                    try
+                    {
+                        if (new FileInfo(path).Length < 32L * 1024 * 1024)
+                        {
+                            byte[] all;
+                            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                            {
+                                all = new byte[fs.Length];
+                                int got = 0, n;
+                                while (got < all.Length && (n = fs.Read(all, got, all.Length - got)) > 0) got += n;
+                            }
+                            Minidump.Analyze(d, all);
+                        }
+                    }
+                    catch (Exception e) { Log.Write("Minidump " + Path.GetFileName(path) + ": " + e.Message); }
                 }
                 else if (sig == "PAGEDUMP")
                 {

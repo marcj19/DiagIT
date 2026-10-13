@@ -1,0 +1,139 @@
+{
+  "_sobre": "Drivers que aparecem como culpados de telas azuis (evento 1019 do Windows ou o próprio arquivo da tela azul). 'arquivo' = começo do nome do arquivo (minúsculo). 'tipo' escolhe o conselho em 'tipos'. 'nucleo': true = é o próprio Windows; nesse caso o culpado real costuma ser memória, hardware ou outro driver, e o diagnóstico não tira peso do hardware.",
+  "tipos": {
+    "video": {
+      "frase": "o driver de vídeo",
+      "conselho": "Reinstale o driver de vídeo do jeito certo: baixe a versão mais recente no site do fabricante, remova o atual com o DDU em modo de segurança e instale o baixado (Resolver → Driver de vídeo). Se as telas azuis começaram depois de uma atualização, instale a versão anterior. Remova overclock/undervolt no {painel_video}. Se continuar com o driver limpo, rode o teste da placa de vídeo.",
+      "pesos": { "Software": 0.45, "Gpu": 0.20 }
+    },
+    "rede": {
+      "frase": "o driver de rede",
+      "conselho": "Atualize o driver da placa de rede pelo site do fabricante da placa-mãe ou do adaptador (não pelo Windows Update). Para testar, desative o adaptador no Gerenciador de Dispositivos e use outro (cabo ou Wi-Fi) por alguns dias.",
+      "pesos": { "Software": 0.45 }
+    },
+    "audio": {
+      "frase": "o driver de áudio",
+      "conselho": "Atualize o driver de áudio pelo site do fabricante da placa-mãe. Desinstale programas de áudio extras (equalizadores, som virtual). Se o driver for de áudio HDMI da placa de vídeo, ele é reinstalado junto com o driver de vídeo.",
+      "pesos": { "Software": 0.45 }
+    },
+    "armazenamento": {
+      "frase": "o driver de armazenamento",
+      "conselho": "Atualize o driver de chipset/armazenamento e o firmware do SSD (programa do fabricante do SSD) e rode o teste de armazenamento. Confira o cabo e a porta do disco.",
+      "pesos": { "Software": 0.30, "Disk": 0.20 }
+    },
+    "chipset": {
+      "frase": "o driver do chipset",
+      "conselho": "Instale o driver de chipset mais recente do site do fabricante da placa-mãe (ou da AMD/Intel) e atualize a BIOS.",
+      "pesos": { "Software": 0.40, "Board": 0.10 }
+    },
+    "usb": {
+      "frase": "o driver de USB",
+      "conselho": "Desconecte hubs, adaptadores e periféricos USB não essenciais e teste por alguns dias. Atualize o driver de chipset e a BIOS; se repetir com um aparelho específico, ele é o suspeito.",
+      "pesos": { "Software": 0.35, "Board": 0.10 }
+    },
+    "anticheat": {
+      "frase": "o anti-cheat de um jogo",
+      "conselho": "Atualize o jogo e o anti-cheat (reinstale o serviço do anti-cheat pela página do jogo). Anti-cheats em nível de kernel conflitam com ferramentas de overclock, monitoramento e RGB: feche-as ao jogar.",
+      "pesos": { "Software": 0.45 }
+    },
+    "antivirus": {
+      "frase": "o antivírus",
+      "conselho": "Atualize o antivírus ou desinstale-o para testar (o Windows Defender já protege o PC). Dois antivírus instalados ao mesmo tempo causam travamentos.",
+      "pesos": { "Software": 0.45 }
+    },
+    "monitoramento": {
+      "frase": "um programa de monitoramento ou overclock",
+      "conselho": "Desinstale programas de overclock, RGB ou monitoramento que instalam driver próprio (este é um deles) e veja se as telas azuis param.",
+      "pesos": { "Software": 0.45 }
+    },
+    "virtualizacao": {
+      "frase": "um driver de virtualização",
+      "conselho": "Atualize ou desinstale o programa de máquina virtual/emulador dono deste driver e teste por alguns dias.",
+      "pesos": { "Software": 0.40 }
+    },
+    "windows": {
+      "frase": "o próprio Windows",
+      "conselho": "Quando a falha aparece dentro do próprio Windows, a causa costuma ser memória instável, hardware ou outro driver que corrompeu a memória. Rode o teste de memória e o reparo de arquivos do Windows (Resolver).",
+      "pesos": { }
+    }
+  },
+  "drivers": [
+    { "arquivo": "nvlddmkm", "nome": "driver de vídeo da NVIDIA", "tipo": "video" },
+    { "arquivo": "nvhda64v", "nome": "áudio HDMI da NVIDIA", "tipo": "audio" },
+    { "arquivo": "amdkmdag", "nome": "driver de vídeo da AMD", "tipo": "video" },
+    { "arquivo": "atikmdag", "nome": "driver de vídeo da AMD", "tipo": "video" },
+    { "arquivo": "atikmpag", "nome": "driver de vídeo da AMD", "tipo": "video" },
+    { "arquivo": "amdkmpfd", "nome": "driver de vídeo da AMD", "tipo": "video" },
+    { "arquivo": "amdwddmg", "nome": "driver de vídeo da AMD", "tipo": "video" },
+    { "arquivo": "atihdw", "nome": "áudio HDMI da AMD", "tipo": "audio" },
+    { "arquivo": "igdkmd", "nome": "driver de vídeo da Intel", "tipo": "video" },
+    { "arquivo": "igdkmdn", "nome": "driver de vídeo da Intel", "tipo": "video" },
+    { "arquivo": "dxgkrnl", "nome": "DirectX (gráficos do Windows)", "tipo": "video" },
+    { "arquivo": "dxgmms", "nome": "DirectX (gráficos do Windows)", "tipo": "video" },
+    { "arquivo": "watchdog", "nome": "vigia de travamentos de vídeo do Windows", "tipo": "video" },
+    { "arquivo": "rt640x64", "nome": "rede cabeada Realtek", "tipo": "rede" },
+    { "arquivo": "rt68cx", "nome": "rede cabeada Realtek 2.5GbE", "tipo": "rede" },
+    { "arquivo": "rtcx21", "nome": "rede cabeada Realtek 2.5GbE", "tipo": "rede" },
+    { "arquivo": "rtwlan", "nome": "Wi-Fi da Realtek", "tipo": "rede" },
+    { "arquivo": "rtkwlan", "nome": "Wi-Fi da Realtek", "tipo": "rede" },
+    { "arquivo": "netwtw", "nome": "Wi-Fi da Intel", "tipo": "rede" },
+    { "arquivo": "netwbw", "nome": "Wi-Fi da Intel", "tipo": "rede" },
+    { "arquivo": "netwaw", "nome": "Wi-Fi da Intel", "tipo": "rede" },
+    { "arquivo": "e1d", "nome": "rede cabeada Intel", "tipo": "rede" },
+    { "arquivo": "e2f", "nome": "rede cabeada Intel", "tipo": "rede" },
+    { "arquivo": "rtk", "nome": "rede da Realtek", "tipo": "rede" },
+    { "arquivo": "athw", "nome": "Wi-Fi da Qualcomm Atheros", "tipo": "rede" },
+    { "arquivo": "qcamain", "nome": "Wi-Fi da Qualcomm", "tipo": "rede" },
+    { "arquivo": "mtkwl", "nome": "Wi-Fi da MediaTek", "tipo": "rede" },
+    { "arquivo": "bcmwl", "nome": "Wi-Fi da Broadcom", "tipo": "rede" },
+    { "arquivo": "tcpip", "nome": "rede do Windows (TCP/IP)", "tipo": "rede" },
+    { "arquivo": "ndis", "nome": "rede do Windows (NDIS)", "tipo": "rede" },
+    { "arquivo": "netio", "nome": "rede do Windows (NETIO)", "tipo": "rede" },
+    { "arquivo": "rtkvhd64", "nome": "áudio Realtek", "tipo": "audio" },
+    { "arquivo": "rtkvhd", "nome": "áudio Realtek", "tipo": "audio" },
+    { "arquivo": "portcls", "nome": "áudio do Windows", "tipo": "audio" },
+    { "arquivo": "ks.sys", "nome": "áudio/vídeo do Windows (streaming)", "tipo": "audio" },
+    { "arquivo": "stornvme", "nome": "SSD NVMe (driver do Windows)", "tipo": "armazenamento" },
+    { "arquivo": "storahci", "nome": "SATA (driver do Windows)", "tipo": "armazenamento" },
+    { "arquivo": "storport", "nome": "armazenamento do Windows", "tipo": "armazenamento" },
+    { "arquivo": "iastor", "nome": "armazenamento Intel RST", "tipo": "armazenamento" },
+    { "arquivo": "rcraid", "nome": "RAID da AMD", "tipo": "armazenamento" },
+    { "arquivo": "amdsata", "nome": "SATA da AMD", "tipo": "armazenamento" },
+    { "arquivo": "ntfs", "nome": "sistema de arquivos (NTFS)", "tipo": "armazenamento" },
+    { "arquivo": "amdppm", "nome": "gerenciamento de energia da AMD", "tipo": "chipset" },
+    { "arquivo": "amdpsp", "nome": "segurança da plataforma AMD", "tipo": "chipset" },
+    { "arquivo": "amdgpio", "nome": "chipset da AMD", "tipo": "chipset" },
+    { "arquivo": "amdi2c", "nome": "chipset da AMD", "tipo": "chipset" },
+    { "arquivo": "amdpcidev", "nome": "chipset da AMD", "tipo": "chipset" },
+    { "arquivo": "intelppm", "nome": "gerenciamento de energia da Intel", "tipo": "chipset" },
+    { "arquivo": "iastorav", "nome": "armazenamento Intel", "tipo": "armazenamento" },
+    { "arquivo": "usbxhci", "nome": "controlador USB 3", "tipo": "usb" },
+    { "arquivo": "usbhub", "nome": "hub USB", "tipo": "usb" },
+    { "arquivo": "ucx01000", "nome": "controlador USB", "tipo": "usb" },
+    { "arquivo": "vgk", "nome": "Riot Vanguard (anti-cheat do Valorant/LoL)", "tipo": "anticheat" },
+    { "arquivo": "easyanticheat", "nome": "Easy Anti-Cheat", "tipo": "anticheat" },
+    { "arquivo": "bedaisy", "nome": "BattlEye (anti-cheat)", "tipo": "anticheat" },
+    { "arquivo": "faceit", "nome": "FACEIT (anti-cheat)", "tipo": "anticheat" },
+    { "arquivo": "eaanticheat", "nome": "EA Anti-Cheat", "tipo": "anticheat" },
+    { "arquivo": "wdfilter", "nome": "Windows Defender", "tipo": "antivirus" },
+    { "arquivo": "aswsp", "nome": "Avast/AVG", "tipo": "antivirus" },
+    { "arquivo": "aswarpot", "nome": "Avast/AVG", "tipo": "antivirus" },
+    { "arquivo": "klif", "nome": "Kaspersky", "tipo": "antivirus" },
+    { "arquivo": "mbam", "nome": "Malwarebytes", "tipo": "antivirus" },
+    { "arquivo": "bdselfpr", "nome": "Bitdefender", "tipo": "antivirus" },
+    { "arquivo": "mfehidk", "nome": "McAfee", "tipo": "antivirus" },
+    { "arquivo": "winring0", "nome": "WinRing0 (usado por programas de monitoramento/RGB)", "tipo": "monitoramento" },
+    { "arquivo": "amdryzenmasterdriver", "nome": "AMD Ryzen Master", "tipo": "monitoramento" },
+    { "arquivo": "rtcore64", "nome": "MSI Afterburner (RTCore)", "tipo": "monitoramento" },
+    { "arquivo": "cpuz", "nome": "CPU-Z / HWMonitor", "tipo": "monitoramento" },
+    { "arquivo": "hwinfo", "nome": "HWiNFO", "tipo": "monitoramento" },
+    { "arquivo": "gdrv", "nome": "utilitário da Gigabyte", "tipo": "monitoramento" },
+    { "arquivo": "asio", "nome": "utilitário da ASUS (AI Suite / Armoury Crate)", "tipo": "monitoramento" },
+    { "arquivo": "vboxdrv", "nome": "VirtualBox", "tipo": "virtualizacao" },
+    { "arquivo": "vmx86", "nome": "VMware", "tipo": "virtualizacao" },
+    { "arquivo": "ntoskrnl", "nome": "núcleo do Windows", "tipo": "windows", "nucleo": true },
+    { "arquivo": "ntkrnl", "nome": "núcleo do Windows", "tipo": "windows", "nucleo": true },
+    { "arquivo": "hal.dll", "nome": "núcleo do Windows (HAL)", "tipo": "windows", "nucleo": true },
+    { "arquivo": "memory_corruption", "nome": "memória corrompida", "tipo": "windows", "nucleo": true }
+  ]
+}

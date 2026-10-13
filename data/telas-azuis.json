@@ -9,7 +9,7 @@
   "codigos": [
     { "codigos": ["0x116", "0x117", "0x119", "0x141"], "nome": "falha de vídeo / TDR", "familia": "ligada à placa de vídeo",
       "conselho": "A placa de vídeo ou o driver dela travou de forma irrecuperável. Reinstale o driver limpo (DDU), confira a temperatura, os cabos de energia da placa e remova overclock/undervolt no {painel_video}.",
-      "pesos": { "Gpu": 0.45, "Software": 0.25, "Psu": 0.10, "Cooling": 0.10 } },
+      "pesos": { "Gpu": 0.45, "Software": 0.25, "Psu": 0.10, "Cooling": 0.10 }, "parametro_endereco": [2] },
     { "codigos": ["0x10E"], "nome": "VIDEO_MEMORY_MANAGEMENT_INTERNAL", "familia": "ligada à placa de vídeo",
       "conselho": "Erro no gerenciamento da memória de vídeo. Reinstale o driver de vídeo limpo (DDU) e rode o teste da placa de vídeo.",
       "pesos": { "Gpu": 0.40, "Software": 0.20 } },

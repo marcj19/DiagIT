@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -23,6 +23,8 @@ namespace DiagIT
     public class BgProgram { public string Process = "", Name = "", Type = ""; }
     public class BgType { public string Report = "", Advice = ""; }
     public class PlainRule { public string Prefix = "", Simple = ""; }
+    public class DriverType { public string Key = "", Phrase = "", Advice = ""; public Dictionary<Comp, double> W = new Dictionary<Comp, double>(); }
+    public class DriverRule { public string File = "", Name = "", Type = ""; public bool Core; }
 
     /// <summary>
     /// Regras de conhecimento em dados (pasta data/ do repositório, embutidas no executável).
@@ -45,8 +47,10 @@ namespace DiagIT
         public static readonly List<BgProgram> Programs = new List<BgProgram>();
         public static readonly Dictionary<string, BgType> BgTypes = new Dictionary<string, BgType>();
         public static readonly List<PlainRule> Plain = new List<PlainRule>();
+        public static readonly List<DriverRule> Drivers = new List<DriverRule>();
+        public static readonly Dictionary<string, DriverType> DriverTypes = new Dictionary<string, DriverType>();
 
-        public static readonly string[] Files = { "telas-azuis", "fabricantes", "placas-de-video", "programas", "linguagem-simples" };
+        public static readonly string[] Files = { "telas-azuis", "fabricantes", "placas-de-video", "programas", "linguagem-simples", "drivers" };
 
         // ------------------------------------------------------------------ leitura
         static string ReadText(string name)
@@ -168,6 +172,23 @@ namespace DiagIT
                         PlainRule pr = new PlainRule(); pr.Prefix = Str(x, "inicio_do_titulo"); pr.Simple = Str(x, "simples");
                         Plain.Add(pr);
                     }
+
+                    cur = "drivers";
+                    Dictionary<string, object> dr = Obj(js.DeserializeObject(ReadText(cur)));
+                    foreach (KeyValuePair<string, object> kv in Obj(dr["tipos"]))
+                    {
+                        Dictionary<string, object> x = Obj(kv.Value);
+                        DriverType t = new DriverType(); t.Key = kv.Key; t.Phrase = Str(x, "frase"); t.Advice = Str(x, "conselho");
+                        foreach (KeyValuePair<string, object> w in Obj(x.ContainsKey("pesos") ? x["pesos"] : null))
+                            t.W[(Comp)Enum.Parse(typeof(Comp), w.Key, false)] = Num(w.Value);
+                        DriverTypes[kv.Key] = t;
+                    }
+                    foreach (object o in List(dr["drivers"]))
+                    {
+                        Dictionary<string, object> x = Obj(o);
+                        DriverRule r = new DriverRule(); r.File = Str(x, "arquivo").ToLowerInvariant(); r.Name = Str(x, "nome"); r.Type = Str(x, "tipo"); r.Core = Bool(x, "nucleo");
+                        Drivers.Add(r);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -204,6 +225,24 @@ namespace DiagIT
             Ensure();
             foreach (CpuVendor v in Cpus) if (Matches(cpuName, v.Detect)) return v;
             return CpuDefault;
+        }
+
+        /// <summary>O que é um arquivo de driver (o prefixo mais longo vence: "rtkvhd64" antes de "rtk"). null = desconhecido.</summary>
+        public static DriverRule Driver(string file)
+        {
+            Ensure();
+            if (string.IsNullOrEmpty(file)) return null;
+            string f = file.Trim().ToLowerInvariant();
+            DriverRule best = null;
+            foreach (DriverRule r in Drivers)
+                if (f.StartsWith(r.File, StringComparison.Ordinal) && (best == null || r.File.Length > best.File.Length)) best = r;
+            return best;
+        }
+
+        public static DriverType DriverTypeOf(DriverRule r)
+        {
+            DriverType t;
+            return r != null && DriverTypes.TryGetValue(r.Type, out t) ? t : null;
         }
 
         public static BgProgram ProgramByName(string name)

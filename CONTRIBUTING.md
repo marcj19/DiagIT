@@ -1,4 +1,4 @@
-# Como contribuir com o DiagIT
+﻿# Como contribuir com o DiagIT
 
 Obrigado por querer ajudar! O DiagIT existe para que qualquer pessoa descubra **com prova** o que está errado no PC e saiba o que fazer.
 Contribuições de quem entende de hardware e de quem só passou por um problema são igualmente úteis.
@@ -23,6 +23,7 @@ O conhecimento do DiagIT fica em arquivos JSON na pasta [`data/`](data). Dá par
 | [`placas-de-video.json`](data/placas-de-video.json) | Clock de boost oficial das placas |
 | [`programas.json`](data/programas.json) | Programas em segundo plano que a comunidade associa a engasgos |
 | [`linguagem-simples.json`](data/linguagem-simples.json) | Tradução dos títulos técnicos para linguagem simples |
+| [`drivers.json`](data/drivers.json) | O que é cada driver que aparece como culpado de tela azul (`nvlddmkm.sys` → driver de vídeo da NVIDIA) e o conselho para cada tipo |
 
 Nos textos, use os marcadores, que o DiagIT troca pelo nome certo para cada PC:
 `{painel_video}`, `{site_driver}`, `{nome_ddu}`, `{perfil_memoria}`, `{ajustes_cpu}`.
@@ -39,6 +40,7 @@ Sempre cite a fonte de uma regra nova no pull request (documentação da Microso
   .NET Framework 4.8; não precisa instalar nada).
 - **Testes de lógica:** `build\dev\DiagIT.exe --diag-test saida.txt` precisa terminar com `TUDO OK`. Ao mudar o diagnóstico, adicione um
   cenário em `src/SelfTest.cs` (método `DiagScenarios`).
+- **Arquivos de tela azul:** `DiagIT.exe --dump-info C:\Windows\Minidump saida.txt` (como administrador) mostra o código, o driver culpado e a pilha que o DiagIT extrai de cada arquivo.
 - **Revisar o visual:** `build\dev\DiagIT.exe --multi --offscreen --no-elevate --screenshots pasta` salva uma imagem de cada tela.
 - **Estilo:** C# 5 (o compilador do Windows não aceita recursos mais novos: sem `$"..."`, `?.`, `=>` em membros), textos da interface em
   português do Brasil, comentários curtos explicando o porquê.

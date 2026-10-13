@@ -39,7 +39,10 @@ sozinho se a temperatura ficar crítica (e isso já é o resultado: refrigeraç�
 - **Sensores embutidos**: GPU pelo próprio driver de vídeo (AMD ADL / NVIDIA NVML); CPU e placa-mãe pelo LibreHardwareMonitor embutido + driver PawnIO.
   Em placas Gigabyte com chip ITE sem perfil, aplica os divisores de tensão padrão (+12 V = canal 3 × 6).
 - **Registros do Windows (30 dias)**: erros WHEA, travamentos do driver de vídeo, LiveKernelEvents, desligamentos sem aviso, telas azuis, erros de disco, limitação de CPU pelo firmware.
-- **Arquivos de tela azul** (Minidump e LiveKernelReports): código exato de cada falha.
+- **Arquivos de tela azul** (Minidump e LiveKernelReports): código exato de cada falha e **o driver culpado**, lido da pilha e dos parâmetros
+  da falha, junto com o driver que o próprio Windows aponta (evento 1019, disponível mesmo sem administrador). Quando o mesmo driver aparece
+  na maioria das telas azuis, o diagnóstico diz qual é (ex.: *driver de vídeo da NVIDIA*) e o que fazer; quando é o núcleo do Windows, aponta
+  memória/hardware.
 - **Configuração**: pentes de RAM (dual channel, kits misturados), memória virtual, BIOS, driver de vídeo, link PCIe.
 - **Partidas gravadas**: se o PC cair no meio do jogo, a partida fica marcada como interrompida com as últimas leituras.
   O app diferencia queda real do PC (Windows reiniciou) de o próprio DiagIT ter sido fechado.
@@ -62,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 Gera `dist\DiagIT.exe` e copia as bibliotecas de sensores para `dist\sensores`. Use `-OutDir build\dev` para compilar sem
 substituir o executável que estiver aberto. Testes sem interface: `DiagIT.exe --selftest saida.txt` e
-`DiagIT.exe --run-test cpu|ram|gpu|disk|combined segundos saida.txt`. Cenários do diagnóstico com dados sintéticos: `DiagIT.exe --diag-test saida.txt`. Imagens de todas as telas (para revisar o visual): `DiagIT.exe --multi --offscreen --no-elevate --screenshots pasta` (com `--with-run` também fotografa um teste rodando, o que grava esse teste no histórico).
+`DiagIT.exe --run-test cpu|ram|gpu|disk|combined segundos saida.txt`. Cenários do diagnóstico com dados sintéticos: `DiagIT.exe --diag-test saida.txt`. O que o DiagIT extrai de arquivos de tela azul: `DiagIT.exe --dump-info C:\Windows\Minidump saida.txt` (como administrador). Imagens de todas as telas (para revisar o visual): `DiagIT.exe --multi --offscreen --no-elevate --screenshots pasta` (com `--with-run` também fotografa um teste rodando, o que grava esse teste no histórico).
 
 ## Regras em dados (contribua sem programar)
 

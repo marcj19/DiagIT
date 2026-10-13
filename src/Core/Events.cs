@@ -57,7 +57,7 @@ namespace DiagIT
             say("Quedas de energia e telas azuis...");
             Run(r, "System", Q("(" + Prov("Microsoft-Windows-Kernel-Power") + " and " + Ids(41) + ") or (" +
                 Prov("EventLog") + " and " + Ids(6008) + ") or (" +
-                Prov("Microsoft-Windows-WER-SystemErrorReporting") + " and " + Ids(1001) + ")", days), 400, true);
+                Prov("Microsoft-Windows-WER-SystemErrorReporting") + " and " + Ids(1001, 1019) + ")", days), 400, true);   // 1019 = driver apontado pelo Windows
 
             say("Erros de disco...");
             Run(r, "System", Q(Prov("disk", "Ntfs", "Microsoft-Windows-Ntfs", "stornvme", "storahci", "volmgr", "partmgr", "iaStorA", "iaStorAC", "nvme") +

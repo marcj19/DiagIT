@@ -38,6 +38,8 @@ namespace DiagIT
                 return SelfTest.Facts(args[1]);
             if (args.Length >= 2 && args[0] == "--probe")
                 return SelfTest.Probe(args[1]);
+            if (args.Length >= 3 && args[0] == "--dump-info")
+                return SelfTest.DumpInfo(args[1], args[2]);
             if (args.Length >= 2 && args[0] == "--diag-test")
                 return SelfTest.DiagScenarios(args[1]);
             if (args.Length >= 2 && args[0] == "--report-test")

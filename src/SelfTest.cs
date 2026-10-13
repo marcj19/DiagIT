@@ -189,6 +189,9 @@ namespace DiagIT
                 bool tiposOk = true;
                 foreach (BgProgram bp in Rules.Programs) if (!Rules.BgTypes.ContainsKey(bp.Type)) tiposOk = false;
                 Check(tiposOk, "programas: todo programa aponta para um tipo existente");
+                bool drvOk = Rules.Drivers.Count >= 50;
+                foreach (DriverRule dr in Rules.Drivers) if (!Rules.DriverTypes.ContainsKey(dr.Type) || dr.File.Length < 2 || dr.Name.Length == 0) drvOk = false;
+                Check(drvOk, "drivers: todo driver tem nome e aponta para um tipo existente (" + Rules.Drivers.Count + " drivers)");
                 bool marcadores = true;
                 foreach (BugRule b in Rules.Bugs) if (Rules.Fill(b.Advice).Contains("{")) marcadores = false;
                 Check(marcadores, "nenhum {marcador} desconhecido nos conselhos");
@@ -213,9 +216,105 @@ namespace DiagIT
                 string pa = Analyzer.PsuAdvice(psu);
                 Say("  Fonte: " + pa);
                 Check(pa.Contains("500 W"), "fonte recomendada a partir do consumo medido (230 W → 500 W)");
+
+                Say("== 10. Driver culpado da tela azul (evento 1019 do Windows)");
+                Func<int, string, int, WinEvent[]> bsodWith = delegate(int code, string drv, int hoursAgo)
+                {
+                    WinEvent e = new WinEvent(); e.Provider = "Microsoft-Windows-WER-SystemErrorReporting"; e.Id = 1001; e.Time = DateTime.Now.AddHours(-hoursAgo);
+                    e.P = new string[] { "0x" + code.ToString("x8") };
+                    WinEvent r = new WinEvent(); r.Provider = "Microsoft-Windows-WER-SystemErrorReporting"; r.Id = 1019; r.Time = e.Time.AddSeconds(2); r.P = new string[] { drv };
+                    return new WinEvent[] { e, r };
+                };
+                Func<WinEvent[][], List<WinEvent>> join = delegate(WinEvent[][] parts) { List<WinEvent> l = new List<WinEvent>(); foreach (WinEvent[] x in parts) l.AddRange(x); return sorted(l); };
+                HwSnapshot nv = new HwSnapshot(); nv.GpuName = "NVIDIA GeForce GTX 750 Ti";
+                d = Analyzer.Run(new List<SessionData>(), join(new WinEvent[][] { bsodWith(0x116, "nvlddmkm.sys", 30), bsodWith(0x116, "nvlddmkm.sys", 100) }), new List<DiskHealth>(), 30, new List<TestResult>(), nv);
+                Finding fv = d.Findings.Find(delegate(Finding f) { return f.BugCode == 0x116; });
+                Say("  " + (fv == null ? "-" : fv.Plain + " | " + fv.Advice));
+                Check(fv != null && fv.Culprit == "nvlddmkm.sys" && fv.CulpritCount == 2, "pareia cada tela azul com o driver do evento 1019");
+                Check(fv != null && fv.Plain == "O PC teve 2 telas azuis causadas pelo driver de vídeo da NVIDIA", "frase simples nomeia o driver culpado");
+                Check(fv != null && fv.Advice.StartsWith("O Windows aponta o driver de vídeo da NVIDIA") && fv.Advice.Contains("NVIDIA App"), "conselho do tipo de driver, com o painel da marca");
+                Check(fv != null && fv.W[Comp.Software] > fv.W[Comp.Gpu], "driver culpado consistente: peso passa para Drivers e Windows");
+                string vt2, vs2;
+                Analyzer.PlainVerdict(d, out vt2, out vs2);
+                Say("  Veredito: " + vt2 + " | " + vs2);
+                Check(vs2.StartsWith("A causa mais provável é o driver de vídeo da NVIDIA (nvlddmkm.sys)"), "veredito do Início nomeia o driver apontado pelo Windows");
+
+                d = Analyzer.Run(new List<SessionData>(), join(new WinEvent[][] { bsodWith(0x1A, "ntoskrnl.exe", 30), bsodWith(0x1A, "ntoskrnl.exe", 60) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fk = d.Findings.Find(delegate(Finding f) { return f.BugCode == 0x1A; });
+                Check(fk != null && fk.W[Comp.Ram] > fk.W[Comp.Software] && fk.Evidence.Contains("núcleo do Windows") && fk.Plain.Contains("ligadas à memória"),
+                    "núcleo do Windows apontado: não tira peso da memória");
+
+                d = Analyzer.Run(new List<SessionData>(), join(new WinEvent[][] { bsodWith(0x3B, "rtwlane.sys", 30), bsodWith(0x3B, "vgk.sys", 60), bsodWith(0x3B, "nvlddmkm.sys", 90) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fm = d.Findings.Find(delegate(Finding f) { return f.BugCode == 0x3B; });
+                Check(fm != null && fm.Culprit != null && fm.Plain.Contains("causadas por um driver") && fm.Evidence.Contains("Outros apontados"),
+                    "um driver diferente em cada tela azul: não acusa um só (aponta memória/hardware)");
+                Check(Rules.Driver("RTKVHD64.sys") != null && Rules.Driver("RTKVHD64.sys").Type == "audio" && Rules.Driver("rtk_wifi.sys").Type == "rede" &&
+                      Rules.Driver("desconhecido123.sys") == null && Rules.Driver("ntoskrnl.exe").Core, "drivers.json: prefixo mais longo vence, desconhecido = null, núcleo marcado");
+
+                Say("== 11. Leitura do arquivo da tela azul (minidump sintético no formato do Windows 11)");
+                Func<int, ulong[], CrashDump> fakeDump = delegate(int code, ulong[] stack)
+                {
+                    byte[] b = new byte[0x8000];
+                    Encoding.ASCII.GetBytes("PAGEDU64").CopyTo(b, 0);
+                    string[] names = { "ntoskrnl.exe", "Wdf01000.sys", "foo.sys", "bar.sys" };
+                    ulong[] bases = { 0xFFFFF80000000000UL, 0xFFFFF80002000000UL, 0xFFFFF80003000000UL, 0xFFFFF80004000000UL };
+                    uint[] sizes = { 0x1000000, 0x100000, 0x10000, 0x10000 };
+                    Action<int, uint> w32 = delegate(int at, uint v) { BitConverter.GetBytes(v).CopyTo(b, at); };
+                    Action<int, ulong> w64 = delegate(int at, ulong v) { BitConverter.GetBytes(v).CopyTo(b, at); };
+                    int t = 0x2000;
+                    w32(t + 0x0C, 0x3000);                         // contexto: Rip no núcleo (ignorado)
+                    w64(0x3000 + 0xF8, bases[0] + 0x500);
+                    w32(t + 0x28, 0x4000); w32(t + 0x2C, (uint)(stack.Length * 8));
+                    for (int i = 0; i < stack.Length; i++) w64(0x4000 + i * 8, stack[i]);
+                    w32(t + 0x30, 0x5000); w32(t + 0x34, (uint)names.Length); w32(t + 0x38, 0x6000);
+                    int pool = 0x6000;
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        int e = 0x5000 + i * 0x90;
+                        w32(e, (uint)pool); w64(e + 0x38, bases[i]); w32(e + 0x48, sizes[i]);
+                        w32(pool, (uint)names[i].Length); Encoding.Unicode.GetBytes(names[i]).CopyTo(b, pool + 4);
+                        pool += 4 + names[i].Length * 2 + 2;
+                    }
+                    CrashDump cd = new CrashDump(); cd.Code = (uint)code;
+                    cd.P = new ulong[] { 0, 2, 0, 0xFFFFF80003000123UL };
+                    Minidump.Analyze(cd, b);
+                    return cd;
+                };
+                CrashDump dp = fakeDump(0xD1, new ulong[] { 0xFFFFF80000000777UL, 0x1234, 0xFFFFF80004000010UL });
+                Say("  0xD1: " + dp.Culprit + " (" + dp.CulpritHow + "), " + dp.ModulesRead + " drivers, layout " + Minidump.LastLayout);
+                Check(dp.ModulesRead == 4 && dp.Culprit == "foo.sys" && dp.CulpritHow.StartsWith("parâmetro 4"), "0xD1: culpado pelo endereço no parâmetro 4");
+                CrashDump ds = fakeDump(0x1A, new ulong[] { 0xFFFFF80000000777UL, 0xFFFFF80002000050UL, 0x1234, 0xFFFFF80004000010UL });
+                Say("  0x1A: " + ds.Culprit + " (" + ds.CulpritHow + "), pilha " + string.Join(" → ", ds.StackModules.ToArray()));
+                Check(ds.Culprit == "bar.sys" && ds.CulpritHow.StartsWith("pilha") && ds.StackModules.Count == 3, "0x1A: culpado pela pilha, pulando núcleo e Wdf01000");
+                CrashDump dk = fakeDump(0x1A, new ulong[] { 0xFFFFF80000000777UL, 0x1234 });
+                Check(dk.Culprit == "ntoskrnl.exe", "só o núcleo na pilha: aponta o núcleo (memória/hardware)");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;
+            }
+            catch (Exception e) { Say("EXCEÇÃO: " + e); return 2; }
+            finally { o.Close(); }
+        }
+
+        /// <summary>O que o DiagIT extrai de arquivos de tela azul (um .dmp ou uma pasta): código, parâmetros, driver culpado e pilha.</summary>
+        public static int DumpInfo(string input, string outFile)
+        {
+            o = new StreamWriter(outFile, false, new UTF8Encoding(false));
+            try
+            {
+                string[] files = Directory.Exists(input) ? Directory.GetFiles(input, "*.dmp") : new string[] { input };
+                foreach (string f in files)
+                {
+                    CrashDump d = HwFacts.Parse(f);
+                    if (d == null) { Say(Path.GetFileName(f) + ": formato não reconhecido"); continue; }
+                    Say(Path.GetFileName(f) + "  (" + d.Time.ToString("dd/MM/yyyy HH:mm") + ")");
+                    Say("  código " + d.CodeHex + " " + Rules.Bug((int)(d.Code & 0xFFFF)).Name + "  parâmetros 0x" + d.P[0].ToString("X") + ", 0x" + d.P[1].ToString("X") + ", 0x" + d.P[2].ToString("X") + ", 0x" + d.P[3].ToString("X"));
+                    Say("  drivers lidos: " + d.ModulesRead + " (layout: " + Minidump.LastLayout + ")");
+                    DriverRule r = Rules.Driver(d.Culprit);
+                    Say("  culpado: " + (d.Culprit ?? "não identificado") + (d.Culprit != null ? " (" + (r != null ? r.Name : "driver desconhecido") + ", por " + d.CulpritHow + ")" : ""));
+                    Say("  pilha: " + string.Join(" → ", d.StackModules.ToArray()));
+                }
+                return 0;
             }
             catch (Exception e) { Say("EXCEÇÃO: " + e); return 2; }
             finally { o.Close(); }

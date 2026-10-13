@@ -26,6 +26,9 @@ namespace DiagIT
         public int BugCode = -1;
         /// <summary>Quantas ocorrências (telas azuis do mesmo código).</summary>
         public int Count;
+        /// <summary>Driver apontado como culpado (telas azuis) e em quantas das ocorrências.</summary>
+        public string Culprit;
+        public int CulpritCount, CulpritOf;
         /// <summary>O mesmo achado em linguagem do dia a dia (camada simples da interface). Vazio = usa o Title.</summary>
         public string Simple = "";
 
@@ -399,6 +402,14 @@ namespace DiagIT
                 f.Advice = advice;
                 f.Last = kv.Value[0].Time; f.BugCode = kv.Key; f.Count = kv.Value.Count;
                 foreach (KeyValuePair<Comp, double> c in w) f.Weigh(c.Key, c.Value * s);
+                List<string> culprits = new List<string>();
+                List<string> how = new List<string>();
+                foreach (WinEvent e in kv.Value)
+                {
+                    string h1, c1 = CulpritNear(ev, d.Hw, e.Time, out h1);
+                    if (c1 != null) { culprits.Add(c1); if (!how.Contains(h1)) how.Add(h1); }
+                }
+                ApplyCulprit(f, culprits, kv.Value.Count, s, string.Join(" e ", how.ToArray()));
                 d.Findings.Add(f);
             }
 
