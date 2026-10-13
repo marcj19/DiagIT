@@ -7,3 +7,6 @@ build/
 *.log
 Thumbs.db
 desktop.ini
+
+# pacotes de release (gerados localmente)
+release/

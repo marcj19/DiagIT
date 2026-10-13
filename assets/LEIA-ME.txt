@@ -1,0 +1,24 @@
+DiagIT v1.0.0 - diagnostico de hardware com testes comprovados
+================================================================
+
+COMO USAR
+1. Extraia esta pasta para um lugar fixo (ex.: Documentos\DiagIT).
+2. Abra DiagIT.exe e aceite a permissao de administrador.
+   (necessaria para temperatura da CPU, tensoes da fonte, SMART dos discos e arquivos de tela azul)
+3. Jogue normalmente: o DiagIT fica na bandeja, detecta o jogo e grava a partida sozinho.
+4. Com os jogos FECHADOS, abra a aba Testes e rode a "Bateria completa" (~20 min).
+5. Veja o resultado na aba Diagnostico e aplique as solucoes na aba Correcoes.
+
+REQUISITOS
+- Windows 10 ou 11, 64 bits (o .NET Framework 4.8 ja vem no Windows).
+- Para ler CPU e placa-mae: driver PawnIO. Se nao estiver instalado, use
+  Correcoes > "Instalar / atualizar PawnIO" ou rode:  winget install namazso.PawnIO
+- Placa de video AMD ou NVIDIA: sensores lidos direto do driver de video (nada a instalar).
+
+IMPORTANTE
+- Os testes usam o hardware no maximo. O DiagIT recusa iniciar testes com jogo aberto.
+- Se o PC desligar durante um teste, abra o DiagIT de novo: ele registra o que aconteceu.
+- Seus dados ficam em %LOCALAPPDATA%\DiagIT. Nada e enviado para a internet.
+
+Codigo-fonte e documentacao: https://github.com/marcj19/DiagIT
+Componentes de terceiros: veja THIRD_PARTY_NOTICES.md

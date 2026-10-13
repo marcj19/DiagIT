@@ -195,7 +195,7 @@ namespace DiagIT
             logo.SetBounds(Theme.S(20), Theme.S(18), Theme.S(190), Theme.S(34));
             side.Controls.Add(logo);
             Label sub = new Label();
-            sub.Text = "Diagnóstico de hardware em jogos";
+            sub.Text = "Diagnóstico de hardware  •  v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
             sub.Font = Theme.Font(8f);
             sub.ForeColor = Theme.Muted;
             sub.SetBounds(Theme.S(22), Theme.S(50), Theme.S(190), Theme.S(18));
