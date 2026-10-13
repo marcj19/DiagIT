@@ -1,0 +1,9 @@
+# saída de compilação (gerada pelo build.ps1)
+dist/
+build/
+
+# arquivos temporários
+*.tmp
+*.log
+Thumbs.db
+desktop.ini
