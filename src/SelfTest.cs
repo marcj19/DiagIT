@@ -407,6 +407,7 @@ namespace DiagIT
                 for (int i = 0; i < seconds; i++)
                 {
                     Thread.Sleep(1000);
+                    fm.Tick();
                     double fps, low, ms; int st;
                     fm.Snapshot(out fps, out low, out ms, out st);
                     Say(string.Format(System.Globalization.CultureInfo.InvariantCulture, "  {0,2}s  FPS {1,6:0.0}  1% low {2,6:0.0}  quadro {3,6:0.00} ms  engasgos {4}", i + 1, fps, low, ms, st));

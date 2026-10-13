@@ -24,6 +24,10 @@ namespace DiagIT
         public string Error = "";
         public string TargetName = "";   // processo medido (para o painel mostrar o que está sendo medido)
         public DateTime StartedAt = DateTime.MinValue;
+        bool byName;                     // medindo pelo nome do programa (todos os processos dele)
+        int framesSeen;
+        volatile string lastStderr = "";
+        readonly object restartGate = new object();
 
         public static string ExePath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PresentMon", "PresentMon.exe"); } }
         public static bool Available { get { return File.Exists(ExePath); } }
@@ -31,28 +35,52 @@ namespace DiagIT
         public bool Running { get { Process p = proc; try { return p != null && !p.HasExited; } catch { return false; } } }
         public int Pid { get { return pid; } }
 
-        public bool Start(int targetPid)
+        public bool Start(int targetPid) { return StartInternal(targetPid, false); }
+
+        /// <summary>
+        /// Navegadores e jogos com launcher desenham os quadros num processo diferente do da janela (o Chrome usa o "processo de GPU").
+        /// Se o processo escolhido não mostrar nenhum quadro em 3 s, passa a medir pelo nome do programa, que inclui todos os processos dele.
+        /// </summary>
+        public void Tick()
+        {
+            lock (restartGate)
+            {
+                if (byName || pid < 0 || framesSeen > 0 || !Running || (DateTime.Now - StartedAt).TotalSeconds < 3 || TargetName.Length == 0) return;
+                int keep = pid;
+                Log.Write("FPS: nenhum quadro do processo " + keep + "; medindo pelo nome " + TargetName + ".exe");
+                StartInternal(keep, true);
+            }
+        }
+
+        bool StartInternal(int targetPid, bool useName)
         {
             Stop();
             Error = "";
+            byName = useName; framesSeen = 0;
             StartedAt = DateTime.Now;
-            try { using (Process t = Process.GetProcessById(targetPid)) TargetName = t.ProcessName; } catch { TargetName = "processo " + targetPid; }
+            if (!useName)
+                try { using (Process t = Process.GetProcessById(targetPid)) TargetName = t.ProcessName; } catch { TargetName = ""; }
             if (!Available) { Error = "PresentMon não encontrado ao lado do DiagIT."; return false; }
             if (!SysUtil.IsAdmin()) { Error = "Medir FPS precisa do DiagIT aberto como administrador."; return false; }
             lock (gate) { recent.Clear(); all.Clear(); stuttersTotal = stuttersSinceSnap = 0; }
             try
             {
+                string target = useName ? "--process_name \"" + TargetName + ".exe\"" : "--process_id " + targetPid;
                 ProcessStartInfo psi = new ProcessStartInfo(ExePath,
-                    "--process_id " + targetPid + " --output_stdout --no_console_stats --session_name DiagIT_FPS --stop_existing_session --terminate_on_proc_exit");
+                    target + " --output_stdout --no_console_stats --session_name DiagIT_FPS --stop_existing_session --terminate_on_proc_exit");
                 psi.UseShellExecute = false; psi.CreateNoWindow = true;
                 psi.RedirectStandardOutput = true; psi.RedirectStandardError = true;
                 proc = Process.Start(psi);
+                // lê os avisos do PresentMon em paralelo (um buffer cheio travaria o processo)
+                lastStderr = "";
+                proc.ErrorDataReceived += delegate(object o, DataReceivedEventArgs e) { if (!string.IsNullOrEmpty(e.Data)) lastStderr = e.Data; };
+                proc.BeginErrorReadLine();
                 pid = targetPid;
                 Process p = proc;
                 reader = new Thread(delegate() { Read(p); });
                 reader.IsBackground = true;
                 reader.Start();
-                Log.Write("FPS: PresentMon medindo o processo " + targetPid);
+                Log.Write("FPS: PresentMon medindo " + (useName ? TargetName + ".exe (todos os processos)" : "o processo " + targetPid + " (" + TargetName + ")"));
                 return true;
             }
             catch (Exception e) { Error = "Não foi possível iniciar o PresentMon: " + e.Message; Log.Write("FPS: " + Error); return false; }
@@ -73,7 +101,13 @@ namespace DiagIT
             {
                 StreamReader so = p.StandardOutput;
                 string header = so.ReadLine();
-                if (header == null) { Error = "PresentMon não retornou dados: " + Trim(p.StandardError.ReadToEnd()); Log.Write("FPS: " + Error); return; }
+                if (header == null)
+                {
+                    if (p != proc) return;   // foi parado de propósito (troca de alvo)
+                    Error = "PresentMon não retornou dados" + (lastStderr.Length > 0 ? ": " + Trim(lastStderr) : ".");
+                    Log.Write("FPS: " + Error);
+                    return;
+                }
                 string[] cols = header.Split(',');
                 int ix = Array.IndexOf(cols, "MsBetweenPresents");
                 if (ix < 0) ix = Array.IndexOf(cols, "FrameTime");
@@ -96,6 +130,7 @@ namespace DiagIT
                         double[] c = win.ToArray(); Array.Sort(c);
                         stutter = ms > 2.5 * c[c.Length / 2];
                     }
+                    framesSeen++;
                     lock (gate)
                     {
                         recent.Enqueue(new KeyValuePair<DateTime, double>(now, ms));
@@ -105,7 +140,7 @@ namespace DiagIT
                     }
                 }
             }
-            catch (Exception e) { Log.Write("FPS (leitura): " + e.Message); }
+            catch (Exception e) { if (p == proc) Log.Write("FPS (leitura): " + e.Message); }
         }
 
         static string Trim(string s) { s = (s ?? "").Trim(); return s.Length > 200 ? s.Substring(0, 200) : s; }

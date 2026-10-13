@@ -179,6 +179,7 @@ namespace DiagIT
             if (!InGame && overlayManual == -1) overlayManual = 0;   // próxima partida volta ao automático
             overlay.SetShown(show);
             // sem partida, o painel mede o programa em primeiro plano (como o Afterburner): um jogo ainda não detectado, o navegador...
+            if (show) w.Frames.Tick();
             if (show && !InGame)
             {
                 int fg = ForegroundPid();

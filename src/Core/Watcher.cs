@@ -182,6 +182,7 @@ namespace DiagIT
                 // começa no início da partida; se o PresentMon cair, tenta de novo a cada minuto
                 if (fpsTriedPid != gamePid || (!Frames.Running && (now - fpsTriedAt).TotalSeconds > 60))
                 { fpsTriedPid = gamePid; fpsTriedAt = now; Frames.Start(gamePid); }
+                Frames.Tick();
                 double fps, low, fms; int st;
                 Frames.Snapshot(out fps, out low, out fms, out st);
                 s.V[F.Fps] = fps; s.V[F.FpsLow] = low; s.V[F.FrameMs] = fms;
