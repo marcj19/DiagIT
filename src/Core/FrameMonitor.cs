@@ -22,6 +22,8 @@ namespace DiagIT
         readonly List<float> all = new List<float>();   // todos os quadros da partida (para 1% low da partida)
         int stuttersTotal, stuttersSinceSnap;
         public string Error = "";
+        public string TargetName = "";   // processo medido (para o painel mostrar o que está sendo medido)
+        public DateTime StartedAt = DateTime.MinValue;
 
         public static string ExePath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PresentMon", "PresentMon.exe"); } }
         public static bool Available { get { return File.Exists(ExePath); } }
@@ -33,6 +35,8 @@ namespace DiagIT
         {
             Stop();
             Error = "";
+            StartedAt = DateTime.Now;
+            try { using (Process t = Process.GetProcessById(targetPid)) TargetName = t.ProcessName; } catch { TargetName = "processo " + targetPid; }
             if (!Available) { Error = "PresentMon não encontrado ao lado do DiagIT."; return false; }
             if (!SysUtil.IsAdmin()) { Error = "Medir FPS precisa do DiagIT aberto como administrador."; return false; }
             lock (gate) { recent.Clear(); all.Clear(); stuttersTotal = stuttersSinceSnap = 0; }
@@ -69,7 +73,7 @@ namespace DiagIT
             {
                 StreamReader so = p.StandardOutput;
                 string header = so.ReadLine();
-                if (header == null) { Error = "PresentMon não retornou dados: " + Trim(p.StandardError.ReadToEnd()); return; }
+                if (header == null) { Error = "PresentMon não retornou dados: " + Trim(p.StandardError.ReadToEnd()); Log.Write("FPS: " + Error); return; }
                 string[] cols = header.Split(',');
                 int ix = Array.IndexOf(cols, "MsBetweenPresents");
                 if (ix < 0) ix = Array.IndexOf(cols, "FrameTime");

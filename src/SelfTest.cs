@@ -17,6 +17,23 @@ namespace DiagIT
         static void Say(string s) { o.WriteLine(s); o.Flush(); }
         static void Check(bool ok, string what) { Say((ok ? "[OK]   " : "[FALHA] ") + what); if (!ok) fails++; }
 
+        /// <summary>Relatório (e opcionalmente o pacote .zip) com os dados reais deste PC, sem abrir a interface.</summary>
+        public static int ReportReal(string htmlPath, string zipPath)
+        {
+            Paths.Ensure();
+            List<WinEvent> ev = EventScanner.ScanAll(30, null);
+            HwSnapshot hw = HwFacts.Collect(null);
+            List<SessionData> sds = new List<SessionData>();
+            foreach (SessionInfo si in SessionStore.ListAll())
+                if (si.Start > DateTime.Now.AddDays(-30)) { SessionData sd = new SessionData(); sd.Info = si; sd.S = SessionStore.LoadSamples(si); sds.Add(sd); }
+            Diagnosis d = Analyzer.Run(sds, ev, DiskInfo.Read(), 30, TestStore.ListAll(), hw, FixLog.Load());
+            ReportExtras x = ReportExtras.Collect(ev);
+            string html = Report.Build(d, MachineInfo.Read(double.NaN), sds, x);
+            File.WriteAllText(htmlPath, html, new UTF8Encoding(true));
+            if (zipPath != null) TechPackage.Build(zipPath, html, d, x, sds);
+            return 0;
+        }
+
         /// <summary>Gera um relatório HTML com dados sintéticos para conferir a exportação.</summary>
         public static int ReportTest(string htmlPath)
         {
@@ -352,6 +369,17 @@ namespace DiagIT
                 Check(d.Fixes[0].State == 2 || d.Fixes[0].State == 0 || d.Fixes[0].State == 1, "acompanhamento de engasgos usa as partidas medidas");
                 Check(d.Fixes[0].Text.Contains("1% low) em cs2: 42 → 59"), "correção mostra o FPS mínimo antes e depois no mesmo jogo");
                 Check(double.IsNaN(Analyzer.StuttersPerHour(new SessionInfo())), "partida sem medição de FPS não conta");
+
+                Say("== 14. Relatório para o técnico");
+                List<WinEvent> evR = join(new WinEvent[][] { bsodWith(0x116, "nvlddmkm.sys", 30), bsodWith(0x116, "nvlddmkm.sys", 100) });
+                Diagnosis dRep = Analyzer.Run(perf, evR, new List<DiskHealth>(), 30, new List<TestResult>(), nv, new List<FixEntry> { pf });
+                List<TimelineItem> tlr = Analyzer.Timeline(evR, nv, perf, dRep.Tests, new List<FixEntry> { pf }, 30);
+                Check(tlr.Exists(delegate(TimelineItem i) { return i.Kind == "Tela azul" && i.Text.Contains("nvlddmkm.sys"); }) &&
+                      tlr.Exists(delegate(TimelineItem i) { return i.Kind == "Correção"; }), "linha do tempo: telas azuis com o driver culpado e as correções");
+                ReportExtras rx = new ReportExtras(); rx.Events = evR; rx.Fixes = new List<FixEntry> { pf }; rx.Windows = "Windows de teste";
+                string html = Report.Build(dRep, new MachineInfo(), perf, rx);
+                Check(html.Contains("Detalhes para o técnico") && html.Contains("Linha do tempo") && html.Contains("Suas correções") && html.Contains("1% low"),
+                    "relatório: resumo para o dono, parte técnica, correções e FPS");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;

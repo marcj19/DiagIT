@@ -18,7 +18,7 @@ $out = Join-Path $dist 'DiagIT.exe'
 $manifest = Join-Path $root 'assets\app.manifest'
 
 $vendor = Join-Path $root 'vendor\lhm'
-$refs = @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Management.dll','System.Web.Extensions.dll',
+$refs = @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Management.dll','System.Web.Extensions.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll',
           (Join-Path $vendor 'System.Numerics.Vectors.dll'))
 $cscArgs = @('/nologo','/target:winexe','/platform:x64','/optimize+','/codepage:65001','/warn:3','/unsafe',
              "/out:$out", "/win32manifest:$manifest")

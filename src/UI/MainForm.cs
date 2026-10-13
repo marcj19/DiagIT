@@ -178,6 +178,25 @@ namespace DiagIT
             bool show = overlayManual == 1 || (overlayManual == 0 && cfg.Overlay && InGame);
             if (!InGame && overlayManual == -1) overlayManual = 0;   // próxima partida volta ao automático
             overlay.SetShown(show);
+            // sem partida, o painel mede o programa em primeiro plano (como o Afterburner): um jogo ainda não detectado, o navegador...
+            if (show && !InGame)
+            {
+                int fg = ForegroundPid();
+                if (fg > 0 && fg != Process.GetCurrentProcess().Id)
+                {
+                    if (fg == fgCandidate) { if (++fgStable >= 2) w.MeasureForeground(fg); }
+                    else { fgCandidate = fg; fgStable = 0; }
+                }
+            }
+            else if (!show && !InGame && w.Frames.Running && w.Current == null) w.Frames.Stop();
+        }
+
+        int fgCandidate = -1, fgStable;
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+        static int ForegroundPid()
+        {
+            try { uint pid; GetWindowThreadProcessId(GetForegroundWindow(), out pid); return (int)pid; } catch { return -1; }
         }
 
         protected override void WndProc(ref Message m)
@@ -516,7 +535,7 @@ namespace DiagIT
         VerdictBlock lblVerdict;
         CompStateList bars;
         FindingList flist;
-        FlatButton btnAnalyze, btnExport;
+        FlatButton btnAnalyze, btnExport, btnPackage;
         Diagnosis lastDiag;
         List<SessionData> lastDiagSessions = new List<SessionData>();
 
@@ -540,16 +559,20 @@ namespace DiagIT
             btnAnalyze.Click += delegate { StartAnalyzeClick(true); };
             top.Controls.Add(btnAnalyze);
 
-            btnExport = new FlatButton("Exportar relatório HTML", false);
+            btnExport = new FlatButton("Relatório", false);
             btnExport.Location = new Point(btnAnalyze.Right + Theme.S(8), Theme.S(6));
             btnExport.Click += delegate { ExportReport(); };
             top.Controls.Add(btnExport);
+            btnPackage = new FlatButton("Pacote para o técnico", false);
+            btnPackage.Location = new Point(btnExport.Right + Theme.S(8), Theme.S(6));
+            btnPackage.Click += delegate { ExportPackage(); };
+            top.Controls.Add(btnPackage);
 
             lblDiagStatus = new Label();
             lblDiagStatus.ForeColor = Theme.Muted;
             lblDiagStatus.AutoSize = false;
             lblDiagStatus.TextAlign = ContentAlignment.MiddleLeft;
-            lblDiagStatus.SetBounds(btnExport.Right + Theme.S(12), Theme.S(6), Theme.S(400), Theme.S(32));
+            lblDiagStatus.SetBounds(btnPackage.Right + Theme.S(12), Theme.S(6), Theme.S(400), Theme.S(32));
             top.Controls.Add(lblDiagStatus);
 
             TableLayoutPanel t = new TableLayoutPanel();
@@ -662,16 +685,64 @@ namespace DiagIT
             if (changed) FixLog.Save(all);
         }
 
+        /// <summary>Dados do relatório coletados em segundo plano (drivers e versão do Windows levam alguns segundos).</summary>
+        void WithReport(string doing, Action<string, ReportExtras> done)
+        {
+            if (lastDiag == null) { MessageBox.Show(this, "Espere a análise terminar (alguns segundos) e tente de novo.", "DiagIT"); return; }
+            Diagnosis d = lastDiag;
+            List<SessionData> sds = lastDiagSessions;
+            MachineInfo m = machine ?? new MachineInfo();
+            btnExport.Enabled = btnPackage.Enabled = false;
+            SetDiagStatus(doing);
+            Thread t = new Thread(delegate()
+            {
+                try
+                {
+                    ReportExtras x = ReportExtras.Collect(events);
+                    string html = Report.Build(d, m, sds, x);
+                    Post(delegate { done(html, x); });
+                }
+                catch (Exception e) { Log.Write("Relatório: " + e); Post(delegate { MessageBox.Show(this, "Não foi possível gerar o relatório:\n" + e.Message, "DiagIT"); }); }
+                finally { Post(delegate { btnExport.Enabled = btnPackage.Enabled = true; SetDiagStatus(""); }); }
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
         void ExportReport()
         {
-            if (lastDiag == null) { MessageBox.Show(this, "Rode a análise primeiro.", "DiagIT"); return; }
-            try
+            WithReport("Montando o relatório...", delegate(string html, ReportExtras x)
             {
-                MachineInfo m = machine ?? new MachineInfo();
-                string path = Report.Save(Report.Build(lastDiag, m, lastDiagSessions));
-                Process.Start(path);
+                try { Process.Start(Report.Save(html)); }
+                catch (Exception e) { MessageBox.Show(this, "Não foi possível abrir o relatório:\n" + e.Message, "DiagIT"); }
+            });
+        }
+
+        void ExportPackage()
+        {
+            if (MessageBox.Show(this, "O pacote para o técnico é um arquivo .zip com:\n\n• " + string.Join("\n• ", TechPackage.Contents) +
+                "\n\nNão vai nenhum arquivo pessoal, senha ou os arquivos de tela azul (.dmp). Revise antes de enviar: ele mostra o modelo das peças e os nomes dos jogos.\n\nGerar o pacote?",
+                "Pacote para o técnico", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
+            string path;
+            using (SaveFileDialog dlg = new SaveFileDialog())
+            {
+                dlg.Filter = "Arquivo zip|*.zip";
+                dlg.FileName = "DiagIT-pacote-" + DateTime.Now.ToString("yyyy-MM-dd") + ".zip";
+                dlg.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                path = dlg.FileName;
             }
-            catch (Exception e) { MessageBox.Show(this, "Não foi possível gerar o relatório:\n" + e.Message, "DiagIT"); }
+            Diagnosis d = lastDiag;
+            List<SessionData> sds = lastDiagSessions;
+            WithReport("Montando o pacote para o técnico...", delegate(string html, ReportExtras x)
+            {
+                try
+                {
+                    TechPackage.Build(path, html, d, x, sds);
+                    Process.Start("explorer.exe", "/select,\"" + path + "\"");
+                }
+                catch (Exception e) { Log.Write("Pacote: " + e); MessageBox.Show(this, "Não foi possível gerar o pacote:\n" + e.Message, "DiagIT"); }
+            });
         }
     }
 }

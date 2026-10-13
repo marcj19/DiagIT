@@ -53,6 +53,15 @@ namespace DiagIT
         /// <summary>FPS do jogo (PresentMon), ligado durante as partidas.</summary>
         public readonly FrameMonitor Frames = new FrameMonitor();
         int fpsTriedPid = -1;
+        DateTime fpsTriedAt = DateTime.MinValue;
+
+        /// <summary>Mede o FPS de um processo fora de uma partida (painel aberto sobre o programa em primeiro plano).</summary>
+        public void MeasureForeground(int pid)
+        {
+            if (Current != null && gamePid > 0) return;   // durante a partida o jogo tem prioridade
+            if (pid <= 0 || (Frames.Pid == pid && Frames.Running)) return;
+            Frames.Start(pid);
+        }
 
         public void Start()
         {
@@ -170,7 +179,9 @@ namespace DiagIT
             // FPS do jogo: o PresentMon acompanha só o processo do jogo, enquanto a partida durar
             if (Current != null && gamePid > 0 && Current.Note != "teste")
             {
-                if (fpsTriedPid != gamePid) { fpsTriedPid = gamePid; Frames.Start(gamePid); }
+                // começa no início da partida; se o PresentMon cair, tenta de novo a cada minuto
+                if (fpsTriedPid != gamePid || (!Frames.Running && (now - fpsTriedAt).TotalSeconds > 60))
+                { fpsTriedPid = gamePid; fpsTriedAt = now; Frames.Start(gamePid); }
                 double fps, low, fms; int st;
                 Frames.Snapshot(out fps, out low, out fms, out st);
                 s.V[F.Fps] = fps; s.V[F.FpsLow] = low; s.V[F.FrameMs] = fms;

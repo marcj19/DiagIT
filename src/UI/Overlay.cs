@@ -110,12 +110,19 @@ namespace DiagIT
             using (SolidBrush text = new SolidBrush(Theme.Text))
             using (SolidBrush muted = new SolidBrush(Theme.Muted))
             {
-                string f = double.IsNaN(fps) ? "—" : fps.ToString("0");
+                string f = double.IsNaN(fps) ? "--" : fps.ToString("0");
                 g.DrawString(f, big, text, pad - Theme.S(2), pad - Theme.S(6));
                 float fw = g.MeasureString(f, big).Width;
                 g.DrawString("FPS", smallB, new SolidBrush(Theme.AccentText), pad + fw - Theme.S(4), pad + Theme.S(14));
-                string sub = !double.IsNaN(low) ? "1% low  " + low.ToString("0") :
-                    w.Frames.Error.Length > 0 ? (SysUtil.IsAdmin() ? "FPS indisponível" : "FPS: abra como administrador") : "medindo...";
+                FrameMonitor fm = w.Frames;
+                string who = fm.TargetName.Length > 0 ? fm.TargetName : "";
+                string sub;
+                if (!SysUtil.IsAdmin()) sub = "FPS: abra o DiagIT como administrador";
+                else if (!double.IsNaN(low)) sub = "1% low  " + low.ToString("0");
+                else if (fm.Error.Length > 0) sub = fm.Error.Length > 34 ? fm.Error.Substring(0, 33) + "…" : fm.Error;
+                else if (!fm.Running) sub = "abra um jogo ou outro programa";
+                else if ((DateTime.Now - fm.StartedAt).TotalSeconds < 4) sub = "medindo " + who + "...";
+                else sub = "sem quadros (pausado ou minimizado)";
                 g.DrawString(sub, small, muted, pad + fw + Theme.S(30), pad + Theme.S(14));
 
                 // tempo de quadro dos últimos 5 s: picos = engasgos
@@ -131,7 +138,8 @@ namespace DiagIT
                         pts[i] = new PointF(gr.X + gr.Width * i / (ft.Count - 1), gr.Bottom - (float)(Math.Min(ft[i], max) / max) * (gr.Height - 2));
                     using (Pen lp = new Pen(Theme.Accent, Theme.S(1.4f))) g.DrawLines(lp, pts);
                 }
-                g.DrawString("tempo de quadro", small, new SolidBrush(A(170, Theme.Faint)), gr.X + Theme.S(4), gr.Y + Theme.S(2));
+                using (SolidBrush fb = new SolidBrush(A(170, Theme.Faint)))
+                    g.DrawString(!double.IsNaN(fps) && who.Length > 0 ? "tempo de quadro · " + (who.Length > 22 ? who.Substring(0, 21) + "…" : who) : "tempo de quadro", small, fb, gr.X + Theme.S(4), gr.Y + Theme.S(2));
 
                 // uso e temperatura de GPU e CPU
                 Sample s = w.Last;

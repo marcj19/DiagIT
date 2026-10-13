@@ -38,6 +38,14 @@ com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver de
 Durante todos os testes são registradas temperaturas, consumo, clocks, tensões (+12/+5/+3,3 V), ventoinhas e link PCIe. O teste para
 sozinho se a temperatura ficar crítica (e isso já é o resultado: refrigeração insuficiente). **O DiagIT recusa iniciar testes com jogo aberto.**
 
+## Relatório e pacote para o técnico
+
+Em **Resultados**: **Relatório** abre um relatório imprimível (salva em PDF pelo navegador) com uma página em linguagem simples para o dono
+do PC e a parte técnica: sistema (Windows com build, BIOS, memória, discos), linha do tempo de 30 dias, cada tela azul com o driver culpado
+e a pilha, achados com evidência e pesos, testes, drivers instalados com versão e data, partidas com FPS e gráficos.
+**Pacote para o técnico** gera um .zip com o relatório e os dados brutos (eventos, partidas, testes, correções); os arquivos de tela azul
+(.dmp) não vão, porque contêm pedaços da memória do PC.
+
 ## FPS e painel no jogo
 
 Durante as partidas, o DiagIT mede **FPS, 1% low (o FPS dos quadros mais lentos) e engasgos** com o
@@ -45,7 +53,7 @@ Durante as partidas, o DiagIT mede **FPS, 1% low (o FPS dos quadros mais lentos)
 Cada partida guarda o resumo; o diagnóstico aponta jogos que engasgam e o acompanhamento das correções mostra o antes e depois
 (*"FPS mínimo em cs2: 42 → 59"*).
 
-O **painel no jogo** (como o do MSI Afterburner) mostra FPS, 1% low, o gráfico do tempo de quadro (engasgos aparecem como picos) e uso e
+O **painel no jogo** (como o do MSI Afterburner) mede o jogo durante a partida e, fora dela, o programa em primeiro plano. Mostra FPS, 1% low, o gráfico do tempo de quadro (engasgos aparecem como picos) e uso e
 temperatura de GPU e CPU. Liga sozinho nas partidas (Configurações) e **Ctrl+Shift+F** mostra/esconde a qualquer momento.
 
 ## O que mais ele lê

@@ -44,6 +44,8 @@ namespace DiagIT
                 return SelfTest.DumpInfo(args[1], args[2]);
             if (args.Length >= 2 && args[0] == "--diag-test")
                 return SelfTest.DiagScenarios(args[1]);
+            if (args.Length >= 2 && args[0] == "--report-real")
+                return SelfTest.ReportReal(args[1], args.Length >= 3 ? args[2] : null);
             if (args.Length >= 2 && args[0] == "--report-test")
                 return SelfTest.ReportTest(args[1]);
             if (args.Length >= 2 && args[0] == "--autostart")
