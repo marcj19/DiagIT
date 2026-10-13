@@ -270,16 +270,33 @@ namespace DiagIT
             }
             foreach (KeyValuePair<uint, List<CrashDump>> kv in byCode)
             {
+                int code = (int)(kv.Key & 0xFFFF);
                 string name, advice; Dictionary<Comp, double> w;
-                Bugcheck((int)(kv.Key & 0xFFFF), out name, out advice, out w);
-                Finding f = new Finding();
-                f.Sev = Sev.Crit; f.Source = "Arquivos de tela azul (Minidump)";
-                f.Title = "Tela azul 0x" + kv.Key.ToString("X") + " (" + name + ") registrada " + kv.Value.Count + "×";
+                Bugcheck(code, out name, out advice, out w);
                 List<string> lines = new List<string>();
-                foreach (CrashDump cd in kv.Value) lines.Add("  • " + cd.Time.ToString("dd/MM/yyyy HH:mm", Pt) + " — parâmetros 0x" + cd.P[0].ToString("X") + ", 0x" + cd.P[1].ToString("X"));
+                DateTime last = DateTime.MinValue;
+                foreach (CrashDump cd in kv.Value)
+                {
+                    lines.Add("  • " + cd.Time.ToString("dd/MM/yyyy HH:mm", Pt) + " — parâmetros 0x" + cd.P[0].ToString("X") + ", 0x" + cd.P[1].ToString("X"));
+                    if (cd.Time > last) last = cd.Time;
+                }
+                // a mesma tela azul já apareceu no registro do Windows: só acrescenta a prova do arquivo, sem somar o peso de novo
+                Finding ev = d.Findings.Find(delegate(Finding x) { return x.BugCode == code; });
+                if (ev != null)
+                {
+                    ev.Source = "Eventos do Windows + arquivos de tela azul";
+                    ev.Evidence += "\nConfirmado nos arquivos de despejo (Minidump):\n" + string.Join("\n", lines.ToArray());
+                    if (last > ev.Last) ev.Last = last;
+                    continue;
+                }
+                double s = Math.Min(1, (kv.Value.Count + 1) / 4.0);
+                Finding f = new Finding();
+                f.Sev = kv.Value.Count >= 2 ? Sev.Crit : Sev.Warn; f.Source = "Arquivos de tela azul (Minidump)";
+                f.Title = "Tela azul 0x" + kv.Key.ToString("X") + " (" + name + ") registrada " + kv.Value.Count + "×";
                 f.Evidence = "Lido diretamente dos arquivos de despejo do Windows.\n" + string.Join("\n", lines.ToArray());
                 f.Advice = advice;
-                foreach (KeyValuePair<Comp, double> c in w) f.Weigh(c.Key, c.Value);
+                f.Last = last; f.BugCode = code; f.Count = kv.Value.Count;
+                foreach (KeyValuePair<Comp, double> c in w) f.Weigh(c.Key, c.Value * s);
                 d.Findings.Add(f);
             }
             if (!h.CrashDumpEnabled)
@@ -288,7 +305,7 @@ namespace DiagIT
                 f.Sev = Sev.Info; f.Source = "Configuração do Windows";
                 f.Title = "O Windows não está guardando o motivo das telas azuis";
                 f.Evidence = "O registro de despejo de memória (minidump) está desativado.";
-                f.Advice = "Ative em Correções para que a próxima tela azul deixe o código exato do problema.";
+                f.Advice = "Ative em Resolver para que a próxima tela azul deixe o código exato do problema.";
                 d.Findings.Add(f);
             }
 
@@ -312,7 +329,7 @@ namespace DiagIT
                 List<string> l = new List<string>();
                 foreach (ProblemDevice x in pd) l.Add("• " + x.Name + " — " + x.Meaning + " (código " + x.Code + ")");
                 f.Evidence = string.Join("\n", l.ToArray());
-                f.Advice = HwFacts.DeviceHint(pd[0]) + (pd.Count > 1 ? " Para os demais, veja a aba Hardware." : "");
+                f.Advice = HwFacts.DeviceHint(pd[0]) + (pd.Count > 1 ? " Para os demais, veja Avançado → Hardware." : "");
                 bool critical = pd.Exists(delegate(ProblemDevice x) { return x.Class == "Display" || x.Class == "System" || x.Class == "SCSIAdapter" || x.Class == "HDC"; });
                 f.Weigh(Comp.Software, critical ? 0.35 : 0.1);
                 d.Findings.Add(f);
@@ -343,7 +360,7 @@ namespace DiagIT
                 f.Sev = inMenu ? Sev.Warn : Sev.Info; f.Source = "Configuração de inicialização";
                 f.Title = inMenu ? "O menu de inicialização oferece um Windows que não existe mais" : "Restos de instalações anteriores do Windows no gerenciador de boot (" + h.Boot.Stale().Count + ")";
                 f.Evidence = string.Join("\n", n.ToArray()) + (inMenu ? "\nPor isso o PC pergunta qual Windows iniciar: a entrada antiga não funciona se escolhida." : "\nNão aparecem no menu, mas são restos da instalação anterior.");
-                f.Advice = "Inofensivo. Para deixar só o Windows atual, use Correções → Limpar entradas antigas do boot (faz backup antes).";
+                f.Advice = "Inofensivo. Para deixar só o Windows atual, use Resolver → Limpar entradas antigas do boot (faz backup antes).";
                 d.Findings.Add(f);
             }
             if (h.WindowsOld != null)
@@ -352,7 +369,7 @@ namespace DiagIT
                 f.Sev = Sev.Info; f.Source = "Instalação do Windows";
                 f.Title = "A instalação anterior do Windows ficou guardada em " + h.WindowsOld;
                 f.Evidence = "Criada em " + h.WindowsOldCreated.ToString("dd/MM/yyyy HH:mm", Pt) + ": o Windows foi reinstalado sem formatar a partição. Drivers e programas antigos não estão ativos, mas ocupam espaço.";
-                f.Advice = "Copie o que precisar de Windows.old\\Users e depois remova pela aba Correções (Limpeza de Disco → Instalações anteriores do Windows).";
+                f.Advice = "Copie o que precisar de Windows.old\\Users e depois remova pela página Resolver (Limpeza de Disco → Instalações anteriores do Windows).";
                 d.Findings.Add(f);
             }
             foreach (VolumeInfo v in h.Volumes)
@@ -363,7 +380,7 @@ namespace DiagIT
                     f.Sev = Sev.Crit; f.Source = "Volumes"; f.Confirmed = true; f.Primary = (int)Comp.Disk;
                     f.Title = "Volume " + v.Letter + ": com sistema de arquivos em estado " + v.Health;
                     f.Evidence = "O Windows detectou problemas na estrutura do volume.";
-                    f.Advice = "Rode Correções → Verificar disco e faça backup.";
+                    f.Advice = "Rode Resolver → Verificar disco e faça backup.";
                     f.Weigh(Comp.Disk, 0.5);
                     d.Findings.Add(f);
                 }
@@ -403,6 +420,7 @@ namespace DiagIT
         // ================================================================ ESTADO POR COMPONENTE + VEREDITO
         static void BuildStates(Diagnosis d)
         {
+            List<Finding> cleared = new List<Finding>();   // indícios que os testes de hardware não reproduziram
             for (int i = 0; i < 8; i++)
             {
                 Comp c = (Comp)i;
@@ -436,23 +454,50 @@ namespace DiagIT
                             }
                         }
 
+                // último teste aprovado deste componente e o indício mais recente que pesa contra ele
+                if (s.HasTest)
+                    foreach (TestResult t in d.Tests)
+                        if (t.Kind == k && t.Status == "passed" && t.Start > DateTime.Now.AddDays(-Math.Max(d.Days, 30)) && (s.Passed == null || t.Start > s.Passed.Start)) s.Passed = t;
+                DateTime lastEv = DateTime.MinValue; bool undated = false;
+                foreach (Finding f in d.Findings)
+                {
+                    double w;
+                    if (f.Confirmed || f.Sev == Sev.Ok || !f.W.TryGetValue(c, out w) || w < 0.05) continue;
+                    if (f.Last == DateTime.MinValue) undated = true;
+                    else if (f.Last > lastEv) lastEv = f.Last;
+                }
+                bool suspicious = d.Score[i] >= 20 && top != null;
+                // o teste aprovado veio depois de todos os indícios datados: sob carga controlada o problema não se reproduziu
+                bool clearedByTest = ok != null && s.Passed != null && suspicious && !undated && s.Passed.Start > lastEv;
+                s.Retest = suspicious && s.Passed != null && lastEv > s.Passed.Start;
+
                 if (conf != null)
                 {
                     s.Status = CompStatus.Failed;
                     s.Headline = conf.Title;
                     s.Detail = conf.Advice;
+                    s.Cause = conf;
                 }
-                else if (ok != null && d.Score[i] < 45)
+                else if (ok != null && (clearedByTest || (d.Score[i] < 45 && !s.Retest)))
                 {
                     s.Status = CompStatus.Ok;
+                    s.Basis = ok;
                     s.Headline = ok.Title;
-                    s.Detail = ok.Evidence + (d.Score[i] >= 20 && top != null ? " Indício anterior (" + top.Title + ") não se confirmou no teste." : "");
+                    s.Detail = ok.Evidence + (suspicious ? " Indício anterior (" + top.Title + ") não se reproduziu no teste." : "");
+                    if (suspicious) { s.Cause = top; cleared.Add(top); }
                 }
-                else if (d.Score[i] >= 20 && top != null)
+                else if (suspicious)
                 {
                     s.Status = CompStatus.Suspect;
                     s.Headline = top.Title;
-                    s.Detail = s.HasTest ? "Para confirmar ou descartar: rode o teste de " + TestResult.KindLabel(k) + "." : "Sem teste automático para este item; siga a recomendação do achado.";
+                    s.Cause = top;
+                    if (s.Retest)
+                        s.Detail = "O teste de " + TestResult.KindLabel(k) + " passou em " + Dt(s.Passed) + ", mas o problema voltou a acontecer depois (" +
+                            lastEv.ToString("dd/MM HH:mm", Pt) + "). Repita o teste para ver se agora reproduz; se passar de novo, siga a recomendação do achado.";
+                    else if (s.Passed != null)
+                        s.Detail = "O teste de " + TestResult.KindLabel(k) + " já passou (" + Dt(s.Passed) + ") e não reproduziu o problema. Próximo passo: " + top.Advice;
+                    else
+                        s.Detail = s.HasTest ? "Para confirmar ou descartar: rode o teste de " + TestResult.KindLabel(k) + "." : "Sem teste automático para este item; siga a recomendação do achado.";
                 }
                 else
                 {
@@ -462,13 +507,28 @@ namespace DiagIT
                 }
             }
 
+            // Telas azuis/travamentos que nenhum teste de hardware reproduziu continuam sem explicação: com as peças
+            // aprovadas, a causa mais provável passa a ser driver, BIOS ou ajustes (EXPO/PBO/undervolt), que o DiagIT não testa.
+            CompState sw = d.States[(int)Comp.Software];
+            Finding unexplained = cleared.Find(delegate(Finding f) { return f.BugCode >= 0; }) ?? (cleared.Count > 0 ? cleared[0] : null);
+            if (unexplained != null && sw.Status == CompStatus.Untested)
+            {
+                sw.Status = CompStatus.Suspect;
+                sw.Cause = unexplained;
+                sw.Headline = "Sem defeito de hardware nos testes: " + unexplained.Title;
+                sw.Detail = "As peças apontadas passaram nos testes, então o próximo suspeito é driver, BIOS ou ajuste instável. " +
+                    "Volte a BIOS para o padrão (sem EXPO/XMP, PBO, Curve Optimizer ou undervolt) por alguns dias; se parar, reative um ajuste por vez. " +
+                    "Reinstale o driver de vídeo limpo (DDU), atualize chipset e BIOS. " + unexplained.Advice;
+            }
+
             // veredito concreto
             List<string> failed = new List<string>(), suspect = new List<string>(), okList = new List<string>();
             for (int i = 0; i < 8; i++)
             {
                 CompState s = d.States[i];
                 if (s.Status == CompStatus.Failed) failed.Add(CompInfo.Names[i] + ": " + s.Headline);
-                else if (s.Status == CompStatus.Suspect) suspect.Add(CompInfo.Names[i] + (s.HasTest ? " → teste de " + TestResult.KindLabel(s.Test) : ""));
+                else if (s.Status == CompStatus.Suspect) suspect.Add(CompInfo.Names[i] + (s.HasTest && s.Passed == null ? " → teste de " + TestResult.KindLabel(s.Test) :
+                    s.Retest ? " → repetir o teste de " + TestResult.KindLabel(s.Test) : s.Cause != null && s.Cause.BugCode >= 0 && i == (int)Comp.Software ? " → drivers/BIOS" : ""));
                 else if (s.Status == CompStatus.Ok) okList.Add(CompInfo.Names[i]);
             }
             StringBuilder v = new StringBuilder();
@@ -487,7 +547,7 @@ namespace DiagIT
             }
             else
             {
-                v.Append("Nenhum problema encontrado nos registros. Para confirmar a saúde de cada peça, rode os testes da aba Testes (feche os jogos antes).");
+                v.Append("Nenhum problema encontrado nos registros. Para confirmar a saúde de cada peça, rode os testes em Verificar peças (feche os jogos antes).");
             }
             if (okList.Count > 0 && (failed.Count > 0 || suspect.Count > 0)) v.Append("\nAprovados nos testes: " + string.Join(", ", okList.ToArray()) + ".");
             d.Verdict = v.ToString();

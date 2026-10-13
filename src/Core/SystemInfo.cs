@@ -87,6 +87,7 @@ namespace DiagIT
         public double SizeGB, FreeGB;
         public int Disk = -1;
         public string Health = "";
+        public string Media = "";   // SSD | HDD | "" (desconhecido)
     }
 
     public static class SystemInfo
@@ -154,6 +155,16 @@ namespace DiagIT
                     char c = Convert.ToChar(dl);
                     if (c != '\0') diskOf[c.ToString()] = Convert.ToInt32(p["DiskNumber"]);
                 }
+                Dictionary<int, string> mediaOf = new Dictionary<int, string>();
+                try
+                {
+                    foreach (ManagementObject d in new ManagementObjectSearcher(sc, new ObjectQuery("SELECT DeviceId,MediaType FROM MSFT_PhysicalDisk")).Get())
+                    {
+                        int id, mt = d["MediaType"] == null ? 0 : Convert.ToInt32(d["MediaType"]);
+                        if (int.TryParse(Convert.ToString(d["DeviceId"]), out id)) mediaOf[id] = mt == 3 ? "HDD" : mt == 4 ? "SSD" : "";
+                    }
+                }
+                catch { }
                 foreach (ManagementObject v in new ManagementObjectSearcher(sc, new ObjectQuery("SELECT DriveLetter,FileSystemLabel,FileSystem,Size,SizeRemaining,HealthStatus,DriveType FROM MSFT_Volume")).Get())
                 {
                     object dl = v["DriveLetter"];
@@ -167,7 +178,8 @@ namespace DiagIT
                     vi.FreeGB = Convert.ToDouble(v["SizeRemaining"]) / 1073741824.0;
                     int hs = Convert.ToInt32(v["HealthStatus"]);
                     vi.Health = hs == 0 ? "saudável" : hs == 1 ? "ALERTA" : hs == 2 ? "NÃO SAUDÁVEL" : "desconhecido";
-                    int dk; if (diskOf.TryGetValue(vi.Letter, out dk)) vi.Disk = dk;
+                    int dk;
+                    if (diskOf.TryGetValue(vi.Letter, out dk)) { vi.Disk = dk; string m; if (mediaOf.TryGetValue(dk, out m)) vi.Media = m; }
                     r.Add(vi);
                 }
             }

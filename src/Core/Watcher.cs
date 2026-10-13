@@ -216,6 +216,7 @@ namespace DiagIT
             si.Manual = manual;
             si.Status = "running";
             si.GamePid = pid;
+            if (!manual || pid > 0) si.Bg = Interference.Running();
             Paths.Ensure();
             si.Save();
             writer = new SessionWriter(si.CsvPath);

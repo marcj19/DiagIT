@@ -25,7 +25,7 @@ namespace DiagIT
                 return SelfTest.ValidateAll(args[1], args.Length >= 3 ? int.Parse(args[2]) : 1);
             if (args.Length >= 2 && args[0] == "--fix-boot")
             {
-                // mesma correção do botão "Limpar entradas antigas do boot" (aba Correções)
+                // mesma correção do botão "Limpar entradas antigas do boot" (página Resolver)
                 System.Text.StringBuilder sb = new System.Text.StringBuilder();
                 bool ok = Fixes.CleanBootEntries(delegate(string s) { sb.AppendLine(s); });
                 BootInfo after = SystemInfo.ReadBoot();
@@ -38,6 +38,8 @@ namespace DiagIT
                 return SelfTest.Facts(args[1]);
             if (args.Length >= 2 && args[0] == "--probe")
                 return SelfTest.Probe(args[1]);
+            if (args.Length >= 2 && args[0] == "--diag-test")
+                return SelfTest.DiagScenarios(args[1]);
             if (args.Length >= 2 && args[0] == "--report-test")
                 return SelfTest.ReportTest(args[1]);
             if (args.Length >= 2 && args[0] == "--autostart")
@@ -127,6 +129,7 @@ namespace DiagIT
             waiter.Start();
 
             if (offscreen) form.StartOffscreen();
+            for (int i = 0; i + 1 < args.Length; i++) if (args[i] == "--screenshots") form.ScheduleScreenshots(args[i + 1], Array.IndexOf(args, "--with-run") >= 0);   // só para desenvolvimento
             foreach (string a in args) if (a.StartsWith("--page=")) { int pg; if (int.TryParse(a.Substring(7), out pg)) form.NavigateTo(pg); }
             Microsoft.Win32.SystemEvents.SessionEnding += delegate { w.EndSession("Windows encerrando"); };
 

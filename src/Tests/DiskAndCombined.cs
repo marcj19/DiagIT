@@ -63,12 +63,22 @@ namespace DiagIT
             }
             r.Set("read_errors", readErrors);
 
+            // sem saúde lida e sem nenhuma leitura feita, o teste não verificou nada: não pode "passar"
+            bool anyHealth = drives.Exists(delegate(DriveHealth d) { return d.Read; });
+            double totalReads = 0;
+            foreach (DriveHealth d in drives) { double x = r.Get("disk" + d.Number + "_reads"); if (!double.IsNaN(x)) totalReads += x; }
+
             if (problems > 0 || readErrors > 0)
             {
                 r.Status = "failed";
                 r.Errors = (int)(problems + readErrors);
                 r.Summary = (readErrors > 0 ? readErrors + " setor(es) ilegível(is) encontrado(s)" : "") + (readErrors > 0 && problems > 0 ? " e " : "") +
                     (problems > 0 ? problems + " problema(s) reportado(s) pelo próprio disco (SMART)" : "") + ". Faça backup dos seus arquivos.";
+            }
+            else if (!ctx.Cancel && !anyHealth && totalReads == 0)
+            {
+                r.Status = "error";
+                r.Summary = "Não foi possível ler os discos (é preciso abrir o DiagIT como administrador). Nada foi verificado.";
             }
             else if (!ctx.Cancel)
             {

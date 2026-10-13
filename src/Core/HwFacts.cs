@@ -48,6 +48,14 @@ namespace DiagIT
         public DateTime WindowsInstalled = DateTime.MinValue;
         public string WindowsOld;
         public DateTime WindowsOldCreated;
+        public string GpuName = "";
+        /// <summary>Arquivos de paginação em uso agora (ex.: "C:\pagefile.sys").</summary>
+        public List<string> PagefileFiles = new List<string>();
+        /// <summary>Programas conhecidos por causar engasgos abertos no momento da coleta.</summary>
+        public List<string> Background = new List<string>();
+        public string RealtekNic, RealtekDriver = "";
+        /// <summary>Política "não incluir drivers nas atualizações do Windows" ativa.</summary>
+        public bool WuDriversBlocked;
     }
 
     public static class HwFacts
@@ -96,7 +104,7 @@ namespace DiagIT
             h.WindowsOld = SystemInfo.WindowsOld(out h.WindowsOldCreated);
             if (h.WindowsOld != null)
                 f.Add(new Fact("Windows e inicialização", "Instalação anterior guardada", h.WindowsOld + " (de " + h.WindowsOldCreated.ToString("dd/MM/yyyy HH:mm", Pt) + ")", 1,
-                    "O Windows foi instalado sem apagar a partição: a instalação antiga ficou guardada. Confira se há arquivos seus em Windows.old\\Users e depois remova pela aba Correções para liberar espaço."));
+                    "O Windows foi instalado sem apagar a partição: a instalação antiga ficou guardada. Confira se há arquivos seus em Windows.old\\Users e depois remova pela página Resolver para liberar espaço."));
             h.Boot = SystemInfo.ReadBoot();
             if (h.Boot.WindowsDisk >= 0 && h.Boot.EfiDisks.Count > 0)
             {
@@ -114,7 +122,7 @@ namespace DiagIT
                     foreach (BootEntry e in stale) names.Add("\"" + e.Description + "\" em " + e.OsDevice.Replace("partition=", "") +
                         (BootInfo.Broken(e) ? " (esse Windows não existe mais)" : " (duplicada)") + (h.Boot.DisplayOrder.Contains(e.Id) ? " — APARECE NO MENU" : ""));
                     f.Add(new Fact("Windows e inicialização", "Entradas antigas no boot", string.Join("; ", names.ToArray()), 1,
-                        "Restos de instalações anteriores do Windows. As marcadas \"aparece no menu\" fazem o PC mostrar a escolha entre dois Windows ao ligar (a antiga não inicia). Remova na aba Correções (com backup)."));
+                        "Restos de instalações anteriores do Windows. As marcadas \"aparece no menu\" fazem o PC mostrar a escolha entre dois Windows ao ligar (a antiga não inicia). Remova na página Resolver (com backup)."));
                     f.Add(new Fact("Windows e inicialização", "Opções no menu de inicialização", h.Boot.MenuCount.ToString(), h.Boot.MenuCount > 1 ? 1 : 0, null));
                 }
                 else f.Add(new Fact("Windows e inicialização", "Entradas no boot", "somente o Windows atual", 0, null));
@@ -188,12 +196,12 @@ namespace DiagIT
                 foreach (ManagementObject o in Q("SELECT AutomaticManagedPagefile FROM Win32_ComputerSystem"))
                     h.PagefileAuto = S(o, "AutomaticManagedPagefile").Equals("True", StringComparison.OrdinalIgnoreCase);
                 double pf = 0;
-                foreach (ManagementObject o in Q("SELECT AllocatedBaseSize FROM Win32_PageFileUsage")) { double v; double.TryParse(S(o, "AllocatedBaseSize"), out v); pf += v; }
+                foreach (ManagementObject o in Q("SELECT Name,AllocatedBaseSize FROM Win32_PageFileUsage")) { double v; double.TryParse(S(o, "AllocatedBaseSize"), out v); pf += v; h.PagefileFiles.Add(S(o, "Name")); }
                 h.PagefileGB = pf / 1024.0;
                 int lvl = h.CommitPct >= 95 ? 2 : h.CommitPct >= 85 ? 1 : 0;
                 f.Add(new Fact("Memória RAM", "Memória virtual em uso", h.CommitPct.ToString("0", Pt) + "% de " + h.CommitLimitGB.ToString("0.0", Pt) + " GB (arquivo de paginação " +
                     h.PagefileGB.ToString("0.0", Pt) + " GB" + (h.PagefileAuto ? ", automático" : "") + ")", lvl,
-                    lvl > 0 ? "Perto de 100% o Windows recusa memória: jogos fecham ou o PC congela. A aba Correções ajusta isso." : null));
+                    lvl > 0 ? "Perto de 100% o Windows recusa memória: jogos fecham ou o PC congela. A página Resolver ajusta isso." : null));
             }
             catch { }
 
@@ -204,6 +212,7 @@ namespace DiagIT
                 if (n.IndexOf("Basic", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Remote", StringComparison.OrdinalIgnoreCase) >= 0) continue;
                 DateTime d = WmiDate(S(o, "DriverDate"));
                 h.GpuDriver = S(o, "DriverVersion");
+                h.GpuName = n;
                 h.GpuDriverAgeDays = d > DateTime.MinValue ? (int)(DateTime.Now - d).TotalDays : -1;
                 f.Add(new Fact("Placa de vídeo", "Modelo", n, -1, null));
                 f.Add(new Fact("Placa de vídeo", "Driver", h.GpuDriver + (d > DateTime.MinValue ? " de " + d.ToString("dd/MM/yyyy", Pt) : ""),
@@ -258,7 +267,7 @@ namespace DiagIT
             int bsod = 0, live = 0;
             foreach (CrashDump d in h.Dumps) { if (d.Live) live++; else bsod++; }
             if (!h.CrashDumpEnabled)
-                f.Add(new Fact("Travamentos", "Registro de telas azuis", "desativado", 1, "Sem isso o Windows não guarda a causa das telas azuis. Ative em Correções."));
+                f.Add(new Fact("Travamentos", "Registro de telas azuis", "desativado", 1, "Sem isso o Windows não guarda a causa das telas azuis. Ative em Resolver."));
             if (h.DumpsReadable)
             {
                 f.Add(new Fact("Travamentos", "Telas azuis registradas", bsod == 0 ? "nenhuma" : bsod + " (última " + Last(h.Dumps, false) + ")", bsod == 0 ? 0 : 2, null));
@@ -283,6 +292,28 @@ namespace DiagIT
                 if (!double.IsNaN(s[F.BoardTemp])) f.Add(new Fact("Refrigeração", "Placa-mãe (sensor mais quente)", s[F.BoardTemp].ToString("0") + " °C", s[F.BoardTemp] >= 85 ? 1 : 0, null));
                 f.Add(new Fact("Sistema", "Sensores disponíveis", hub.Coverage, -1, null));
             }
+
+            // ---------- Jogos: itens do guia da comunidade que dá para conferir
+            const string G = "Jogos e desempenho";
+            foreach (string pf in h.PagefileFiles)
+            {
+                string letter = pf.Length > 0 ? pf.Substring(0, 1).ToUpperInvariant() : "";
+                VolumeInfo v = h.Volumes.Find(delegate(VolumeInfo x) { return x.Letter.Equals(letter, StringComparison.OrdinalIgnoreCase); });
+                string media = v == null || v.Media.Length == 0 ? "tipo de disco desconhecido" : v.Media;
+                f.Add(new Fact(G, "Arquivo de paginação", pf + " (" + media + ")", v != null && v.Media == "HDD" ? 1 : 0,
+                    v != null && v.Media == "HDD" ? "No HD, a troca de memória durante o jogo causa engasgos. A página Resolver tira do HD e mantém no SSD." : null));
+            }
+            h.Background = Interference.Running();
+            f.Add(new Fact(G, "Programas que costumam causar engasgos", h.Background.Count == 0 ? "nenhum aberto agora" : string.Join(", ", h.Background.ToArray()), h.Background.Count == 0 ? 0 : -1,
+                h.Background.Count == 0 ? null : "Só é problema se as partidas com eles abertos tiverem mais travamentos; os Resultados comparam."));
+            string drv;
+            h.RealtekNic = Interference.RealtekNic(out drv);
+            h.RealtekDriver = drv;
+            if (h.RealtekNic != null) f.Add(new Fact(G, "Placa de rede", h.RealtekNic + (drv.Length > 0 ? " — driver " + drv : ""), -1,
+                "Relatada pela comunidade como causa de engasgos e estalos no áudio mesmo sem cabo de rede."));
+            h.WuDriversBlocked = Fixes.WuDriversBlocked();
+            f.Add(new Fact(G, "Windows Update trocando drivers", h.WuDriversBlocked ? "bloqueado" : "permitido", -1,
+                h.WuDriversBlocked ? null : "O Windows pode substituir o driver de vídeo instalado por você; os Resultados avisam se isso aconteceu."));
             return h;
         }
 

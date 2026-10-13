@@ -76,7 +76,7 @@ namespace DiagIT
         // ================================================================ CORREÇÕES
         TextBox fixConsole;
         readonly List<FlatButton> fixButtons = new List<FlatButton>();
-        Label lblFixPage, lblFixDump, lblFixDriver, lblFixPawn, lblFixBoot, lblFixOld;
+        Label lblFixPage, lblFixDump, lblFixDriver, lblFixPawn, lblFixBoot, lblFixOld, lblFixWu;
         volatile bool fixRunning;
 
         void BuildFixes()
@@ -101,17 +101,17 @@ namespace DiagIT
             Theme.Dark(scroll);
             p.Controls.Add(scroll);
             p.Controls.Add(fixConsole);
-            p.Controls.Add(Header("Correções", ""));
+            p.Controls.Add(Header("Resolver", ""));
 
             int y = 0;
             int pageInit, pageMax;
             Fixes.RecommendedPagefile(out pageInit, out pageMax);
 
             y = FixCard(scroll, y, "Memória virtual (arquivo de paginação)",
-                "Quando a memória virtual chega perto de 100%, jogos fecham sozinhos ou o PC congela mesmo com RAM livre. Recomendado: tamanho fixo de " +
-                pageInit.ToString("N0") + " a " + pageMax.ToString("N0") + " MB no disco do sistema. Requer reiniciar.",
+                "Perto de 100% de uso, jogos fecham sozinhos ou o PC congela mesmo com RAM livre. Recomendado: tamanho fixo de " +
+                pageInit.ToString("N0") + " a " + pageMax.ToString("N0") + " MB no disco do sistema. Com o Windows em SSD, não deixe arquivo no HD (o jogo engasga). Requer reiniciar.",
                 out lblFixPage,
-                new string[] { "Aplicar recomendado", "Voltar ao automático" },
+                new string[] { "Aplicar recomendado", "Voltar ao automático", "Tirar do HD" },
                 new EventHandler[]
                 {
                     delegate
@@ -125,6 +125,15 @@ namespace DiagIT
                     {
                         if (!NeedAdmin()) return;
                         string msg; Fixes.RestorePagefileAuto(out msg); Console_(msg); RefreshFixes();
+                    },
+                    delegate
+                    {
+                        if (!NeedAdmin()) return;
+                        List<string> hdd = Fixes.PagefileOnHdd();
+                        if (hdd.Count == 0) { Console_("Nenhum arquivo de paginação em HD (ou o Windows não está em SSD). Nada a alterar."); return; }
+                        if (MessageBox.Show(this, "Remover o arquivo de paginação do HD (" + string.Join(", ", hdd.ToArray()) + ":) e manter só no SSD do Windows, com tamanho gerenciado pelo sistema?\nSerá necessário reiniciar o computador.",
+                            "Memória virtual", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                        string msg; Fixes.MovePagefileOffHdd(out msg); Console_(msg); RefreshFixes();
                     }
                 });
 
@@ -160,7 +169,7 @@ namespace DiagIT
                 });
 
             y = FixCard(scroll, y, "Teste completo de memória do Windows",
-                "Testa 100% da RAM fora do Windows (na inicialização), cobrindo a parte que o teste do DiagIT não alcança. Leva de 15 a 30 minutos e reinicia o PC; o resultado aparece no Diagnóstico.",
+                "Testa 100% da RAM fora do Windows (na inicialização), cobrindo a parte que o teste do DiagIT não alcança. Leva de 15 a 30 minutos e reinicia o PC; o resultado aparece em Resultados.",
                 out dummy, new string[] { "Agendar teste" },
                 new EventHandler[] { delegate { string msg; Fixes.ScheduleMemoryDiagnostic(out msg); Console_(msg); } });
 
@@ -215,6 +224,26 @@ namespace DiagIT
                             "3) Reinicie em Modo de Segurança, abra o DDU, escolha GPU / AMD e clique em \"Limpar e reiniciar\".\r\n" +
                             "4) Instale o driver baixado, reconecte a internet.\r\n" +
                             "5) Rode o teste de Placa de vídeo no DiagIT para confirmar.");
+                    }
+                });
+
+            y = FixCard(scroll, y, "Impedir o Windows Update de trocar drivers",
+                "Evita que o Windows Update troque o driver de vídeo que você instalou (causa travamentos e erro de versão no Adrenalin). " +
+                "Depois disso, atualize os drivers pelo site do fabricante.",
+                out lblFixWu, new string[] { "Impedir trocas de driver", "Permitir de novo" },
+                new EventHandler[]
+                {
+                    delegate
+                    {
+                        if (!NeedAdmin()) return;
+                        if (MessageBox.Show(this, "Impedir que o Windows Update instale drivers?\nAs atualizações do Windows continuam normais; drivers passam a ser atualizados só por você.",
+                            "Windows Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                        string msg; Fixes.SetWuDriversBlocked(true, out msg); Console_(msg); RefreshFixes();
+                    },
+                    delegate
+                    {
+                        if (!NeedAdmin()) return;
+                        string msg; Fixes.SetWuDriversBlocked(false, out msg); Console_(msg); RefreshFixes();
                     }
                 });
 
@@ -282,7 +311,7 @@ namespace DiagIT
         bool NeedAdmin()
         {
             if (SysUtil.IsAdmin()) return true;
-            if (MessageBox.Show(this, "Esta correção precisa de privilégios de administrador. Reiniciar o DiagIT como administrador agora?", "Correções",
+            if (MessageBox.Show(this, "Esta correção precisa de privilégios de administrador. Reiniciar o DiagIT como administrador agora?", "Resolver",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 if (SysUtil.RelaunchElevated("--elevated --page=" + P_FIX)) ExitApp();
@@ -301,7 +330,7 @@ namespace DiagIT
 
         void RunTools(string[][] steps)
         {
-            if (fixRunning) { MessageBox.Show(this, "Já existe uma correção em andamento.", "Correções"); return; }
+            if (fixRunning) { MessageBox.Show(this, "Já existe uma correção em andamento.", "Resolver"); return; }
             fixRunning = true;
             foreach (FlatButton b in fixButtons) b.Enabled = false;
             fixConsole.Clear();
@@ -332,6 +361,9 @@ namespace DiagIT
             ThreadPool.QueueUserWorkItem(delegate
             {
                 string page = Fixes.PagefileStatus();
+                List<string> pfHdd = Fixes.PagefileOnHdd();
+                if (pfHdd.Count > 0) page = "ATENÇÃO: arquivo de paginação no HD (" + string.Join(", ", pfHdd.ToArray()) + ":). " + page;
+                bool wuBlocked = Fixes.WuDriversBlocked();
                 double commit = NativeInfo.CommitPercent();
                 bool dumps = true;
                 try
@@ -363,7 +395,9 @@ namespace DiagIT
                 Post(delegate
                 {
                     lblFixPage.Text = page;
-                    lblFixPage.ForeColor = commit >= 90 ? Theme.Bad : commit >= 80 ? Theme.Warn : Theme.Good;
+                    lblFixPage.ForeColor = commit >= 90 ? Theme.Bad : commit >= 80 || pfHdd.Count > 0 ? Theme.Warn : Theme.Good;
+                    lblFixWu.Text = wuBlocked ? "Ativo: o Windows Update não instala drivers." : "Desativado: o Windows Update pode trocar drivers.";
+                    lblFixWu.ForeColor = wuBlocked ? Theme.Good : Theme.Muted;
                     lblFixDump.Text = dumps ? "Ativo." : "DESATIVADO — o motivo das telas azuis não está sendo guardado.";
                     lblFixDump.ForeColor = dumps ? Theme.Good : Theme.Warn;
                     lblFixDriver.Text = drv;

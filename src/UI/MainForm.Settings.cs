@@ -169,7 +169,7 @@ namespace DiagIT
                 "Leitura embutida, sem programas extras:\n" +
                 "  • GPU (temperatura, hotspot, VRAM, ventoinha, consumo, link PCIe): direto do driver de vídeo AMD (ADL) ou NVIDIA (NVML).\n" +
                 "  • CPU e placa-mãe (temperatura, consumo, tensões +12/+5/+3,3 V, ventoinhas): LibreHardwareMonitor embutido + driver PawnIO.\n" +
-                "    Requer o DiagIT como administrador e o PawnIO instalado (aba Correções).\n" +
+                "    Requer o DiagIT como administrador e o PawnIO instalado (página Resolver).\n" +
                 "  • HWiNFO é opcional: se estiver aberto com \"Shared Memory Support\", também é lido.", true);
             hint.SetBounds(0, y, colW, Theme.S(100)); scroll.Controls.Add(hint); y += Theme.S(104);
 

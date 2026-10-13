@@ -12,7 +12,8 @@ namespace DiagIT
 {
     public partial class MainForm : Form
     {
-        public const int P_LIVE = 0, P_TESTS = 1, P_DIAG = 2, P_HW = 3, P_FIX = 4, P_SESS = 5, P_SET = 6, PAGES = 7;
+        // páginas: as 5 primeiras são o caminho de quem é leigo; as demais ficam em "Avançado"
+        public const int P_HOME = 0, P_PROBLEM = 1, P_TESTS = 2, P_DIAG = 3, P_FIX = 4, P_LIVE = 5, P_HW = 6, P_SESS = 7, P_SET = 8, P_RUN = 9, PAGES = 10;
         readonly Watcher w;
         readonly AppSettings cfg;
         readonly TestRunner runner;
@@ -28,7 +29,7 @@ namespace DiagIT
         System.Windows.Forms.Timer ui;
 
         // sidebar
-        Label lblSideStatus, lblSideSensors;
+        SideStatus sideStatus;
 
         // cache de análise
         List<WinEvent> events;
@@ -45,12 +46,12 @@ namespace DiagIT
             allowVisible = !startHidden;
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "DiagIT — diagnóstico de hardware em jogos";
+            Text = "DiagIT — check-up do seu PC";
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
             Font = Theme.Font(9f);
-            ClientSize = new Size(Theme.S(1240), Theme.S(780));
-            MinimumSize = new Size(Theme.S(1000), Theme.S(660));
+            ClientSize = new Size(Theme.S(1280), Theme.S(820));
+            MinimumSize = new Size(Theme.S(1000), Theme.S(680));
             StartPosition = FormStartPosition.CenterScreen;
             Icon = AppIcon.Get();
 
@@ -62,10 +63,13 @@ namespace DiagIT
             BuildFixes();
             BuildSessions();
             BuildSettings();
+            BuildHome();      // depois dos testes: o Início usa a lista de testes para montar o check-up
+            BuildProblem();
+            BuildRun();
             BuildTray();
             runner.Finished += delegate(TestResult r) { Post(delegate { OnTestFinished(r); }); };
 
-            Navigate(0);
+            Navigate(P_HOME);
 
             ui = new System.Windows.Forms.Timer();
             ui.Interval = 1000;
@@ -100,7 +104,7 @@ namespace DiagIT
                     }
                     if (recovered != null && recovered.Count > 0)
                         Balloon("Partida anterior interrompida",
-                            "A última gravação terminou de forma abrupta (queda do PC ou travamento). Abra o Diagnóstico para ver as evidências.",
+                            "A última gravação terminou de forma abrupta (queda do PC ou travamento). Abra os Resultados para ver as evidências.",
                             ToolTipIcon.Warning);
                 });
             });
@@ -184,59 +188,57 @@ namespace DiagIT
         {
             side = new Panel();
             side.Dock = DockStyle.Left;
-            side.Width = Theme.S(220);
+            side.Width = Theme.S(244);
             side.BackColor = Theme.Side;
             Controls.Add(side);
 
-            Label logo = new Label();
-            logo.Text = "DiagIT";
-            logo.Font = Theme.Font(17f, FontStyle.Bold);
-            logo.ForeColor = Theme.Text;
-            logo.SetBounds(Theme.S(20), Theme.S(18), Theme.S(190), Theme.S(34));
-            side.Controls.Add(logo);
-            Label sub = new Label();
-            sub.Text = "Diagnóstico de hardware  •  v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
-            sub.Font = Theme.Font(8f);
-            sub.ForeColor = Theme.Muted;
-            sub.SetBounds(Theme.S(22), Theme.S(50), Theme.S(190), Theme.S(18));
-            side.Controls.Add(sub);
+            BrandMark brand = new BrandMark();
+            brand.SetBounds(0, Theme.S(14), side.Width, Theme.S(56));
+            side.Controls.Add(brand);
 
-            string[] caps = { "Painel ao vivo", "Testes", "Diagnóstico", "Hardware", "Correções", "Sessões", "Configurações" };
-            string[] gl = { "◉", "▶", "✚", "▦", "✔", "☰", "⚙" };
+            string[] caps = new string[PAGES];
+            string[] ics = new string[PAGES];
+            caps[P_HOME] = "Início"; ics[P_HOME] = "home";
+            caps[P_PROBLEM] = "Estou com um problema"; ics[P_PROBLEM] = "help";
+            caps[P_TESTS] = "Verificar peças"; ics[P_TESTS] = "search";
+            caps[P_DIAG] = "Resultados"; ics[P_DIAG] = "clipboard";
+            caps[P_FIX] = "Resolver"; ics[P_FIX] = "wrench";
+            caps[P_LIVE] = "Ao vivo"; ics[P_LIVE] = "activity";
+            caps[P_HW] = "Hardware"; ics[P_HW] = "chip";
+            caps[P_SESS] = "Partidas gravadas"; ics[P_SESS] = "gamepad";
+            caps[P_SET] = "Configurações"; ics[P_SET] = "gear";
+
             navs = new NavButton[PAGES];
-            for (int i = 0; i < PAGES; i++)
-            {
-                NavButton b = new NavButton();
-                b.Caption = caps[i];
-                b.Glyph = gl[i];
-                b.SetBounds(0, Theme.S(92) + i * Theme.S(46), side.Width, Theme.S(44));
-                int idx = i;
-                b.Click += delegate { Navigate(idx); };
-                side.Controls.Add(b);
-                navs[i] = b;
-            }
+            int y = Theme.S(90);
+            int[] main = { P_HOME, P_PROBLEM, P_TESTS, P_DIAG, P_FIX };
+            foreach (int i in main) { navs[i] = NavItem(caps[i], ics[i], i, y); y += Theme.S(46); }
+            Label adv = new Label();
+            adv.Text = "AVANÇADO";
+            adv.Font = Theme.Font(8f, FontStyle.Bold);
+            adv.ForeColor = Color.FromArgb(111, 123, 137);
+            adv.BackColor = Theme.Side;
+            adv.SetBounds(Theme.S(26), y + Theme.S(14), Theme.S(180), Theme.S(20));
+            side.Controls.Add(adv);
+            y += Theme.S(40);
+            int[] more = { P_LIVE, P_HW, P_SESS };
+            foreach (int i in more) { navs[i] = NavItem(caps[i], ics[i], i, y); y += Theme.S(46); }
 
-            lblSideStatus = new Label();
-            lblSideStatus.Font = Theme.Font(9f, FontStyle.Bold);
-            lblSideStatus.ForeColor = Theme.Muted;
-            lblSideStatus.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
-            lblSideStatus.SetBounds(Theme.S(20), side.Height - Theme.S(86), Theme.S(190), Theme.S(36));
-            side.Controls.Add(lblSideStatus);
-            lblSideSensors = new Label();
-            lblSideSensors.Font = Theme.Font(8f);
-            lblSideSensors.ForeColor = Theme.Muted;
-            lblSideSensors.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
-            lblSideSensors.SetBounds(Theme.S(20), side.Height - Theme.S(48), Theme.S(190), Theme.S(36));
-            side.Controls.Add(lblSideSensors);
+            sideStatus = new SideStatus();
+            sideStatus.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+            sideStatus.SetBounds(0, side.Height - Theme.S(150), side.Width, Theme.S(84));
+            sideStatus.Click += delegate { Navigate(runner.Busy ? P_RUN : w.Current != null ? P_LIVE : P_SESS); };
+            side.Controls.Add(sideStatus);
+            navs[P_SET] = NavItem(caps[P_SET], ics[P_SET], P_SET, side.Height - Theme.S(58));
+            navs[P_SET].Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
             side.Resize += delegate
             {
-                lblSideStatus.Top = side.Height - Theme.S(86);
-                lblSideSensors.Top = side.Height - Theme.S(48);
+                sideStatus.Top = side.Height - Theme.S(150);
+                navs[P_SET].Top = side.Height - Theme.S(58);
             };
 
             content = new Panel();
             content.Dock = DockStyle.Fill;
-            content.Padding = new Padding(Theme.S(20));
+            content.Padding = new Padding(Theme.S(36), Theme.S(28), Theme.S(28), Theme.S(20));
             content.BackColor = Theme.Bg;
             Controls.Add(content);
             content.BringToFront();
@@ -250,6 +252,17 @@ namespace DiagIT
                 pages[i].Visible = false;
                 content.Controls.Add(pages[i]);
             }
+        }
+
+        NavButton NavItem(string caption, string icon, int page, int y)
+        {
+            NavButton b = new NavButton();
+            b.Caption = caption;
+            b.Icon = icon;
+            b.SetBounds(0, y, side.Width, Theme.S(44));
+            b.Click += delegate { if (page == P_PROBLEM) OpenProblem(); else Navigate(page); };
+            side.Controls.Add(b);
+            return b;
         }
 
         bool offscreenMode;
@@ -266,14 +279,18 @@ namespace DiagIT
 
         void Navigate(int idx)
         {
+            if (idx == P_TESTS && runner.Busy) idx = P_RUN;   // durante a verificação, "Verificar peças" mostra o andamento
             if (idx == curPage) return;
             curPage = idx;
             for (int i = 0; i < pages.Length; i++)
             {
                 pages[i].Visible = i == idx;
-                navs[i].Selected = i == idx;
+                if (navs[i] == null) continue;
+                navs[i].Selected = i == idx || (idx == P_RUN && i == P_TESTS);
                 navs[i].Invalidate();
             }
+            if (idx == P_HOME) RefreshHome();
+            if (idx == P_RUN) RefreshRun();
             if (idx == P_LIVE) RefreshLive();
             if (idx == P_TESTS) ReloadTestHistory();
             if (idx == P_HW)
@@ -290,10 +307,10 @@ namespace DiagIT
         {
             Label l = new Label();
             l.Text = text;
-            l.Font = Theme.Font(16f, FontStyle.Bold);
+            l.Font = Theme.Display(18f);
             l.ForeColor = Theme.Text;
             l.AutoSize = false;
-            l.Height = Theme.S(36);
+            l.Height = Theme.S(48);
             l.Dock = DockStyle.Top;
             return l;
         }
@@ -322,7 +339,7 @@ namespace DiagIT
             m.Items.Add("Sair", null, delegate { ExitApp(); });
             tray.ContextMenuStrip = m;
             tray.DoubleClick += delegate { ShowFromTray(); };
-            tray.BalloonTipClicked += delegate { ShowFromTray(); Navigate(runner.Busy ? P_TESTS : P_DIAG); };
+            tray.BalloonTipClicked += delegate { ShowFromTray(); Navigate(runner.Busy ? P_RUN : P_DIAG); };
             tray.Visible = true;
         }
 
@@ -435,30 +452,22 @@ namespace DiagIT
         void OnUiTick()
         {
             // status da barra lateral
-            if (runner.Busy)
-            {
-                lblSideStatus.ForeColor = Theme.Warn;
-                lblSideStatus.Text = "● TESTANDO\n" + TestResult.KindLabel(runner.Current.Kind);
-            }
-            else if (w.Current != null)
-            {
-                lblSideStatus.ForeColor = Theme.Bad;
-                lblSideStatus.Text = "● GRAVANDO\n" + Trim(w.Current.Game, 24);
-            }
-            else
-            {
-                lblSideStatus.ForeColor = Theme.Good;
-                lblSideStatus.Text = "● Monitorando\naguardando um jogo";
-            }
             bool cpuT = false;
             Sample ls = w.Last;
             if (ls != null) cpuT = !double.IsNaN(ls[F.CpuTemp]);
-            lblSideSensors.Text = cpuT ? "Sensores: CPU, GPU e placa-mãe" : w.Sensors.Available ? "Sensores: só GPU\n(CPU requer administrador)" : "Sensores: não encontrados";
-            lblSideSensors.ForeColor = cpuT ? Theme.Muted : Theme.Warn;
+            if (runner.Busy)
+                sideStatus.Set(Theme.Accent, "Verificação em andamento", "Testando: " + TestResult.KindLabel(runner.Current.Kind) + ". Os jogos ficam bloqueados até terminar.");
+            else if (w.Current != null)
+                sideStatus.Set(Theme.Bad, "Gravando a partida", Trim(w.Current.Game, 30));
+            else if (!cpuT)
+                sideStatus.Set(Theme.Warn, "Monitorando suas partidas", w.Sensors.Available ? "Sem a temperatura do processador: abra como administrador." : "Sensores não encontrados.");
+            else
+                sideStatus.Set(Theme.Good, "Monitorando suas partidas", "O DiagIT grava sozinho quando você joga.");
             tray.Text = w.Current != null ? "DiagIT — gravando " + Trim(w.Current.Game, 40) : "DiagIT — monitorando";
 
             if (!Visible || WindowState == FormWindowState.Minimized) return;
             if (curPage == P_LIVE) RefreshLive();
+            else if (curPage == P_RUN) RefreshRun();
             else if (curPage == P_TESTS) RefreshTestRun();
             else if (curPage == P_SESS && selSess != null && selSess.Status == "running") UpdateSelectedSession(false);
         }
@@ -467,7 +476,8 @@ namespace DiagIT
 
         // ------------------------------------------------------------------ DIAGNÓSTICO (página)
         Segmented cmbScope;
-        Label lblVerdict, lblDiagStatus;
+        Label lblDiagStatus;
+        VerdictBlock lblVerdict;
         CompStateList bars;
         FindingList flist;
         FlatButton btnAnalyze, btnExport;
@@ -477,7 +487,7 @@ namespace DiagIT
         void BuildDiag()
         {
             Panel p = pages[P_DIAG];
-            p.Controls.Add(Header("Diagnóstico", ""));
+            p.Controls.Add(Header("Resultados", ""));
 
             Panel top = new Panel();
             top.Dock = DockStyle.Top;
@@ -522,26 +532,34 @@ namespace DiagIT
 
             bars = new CompStateList();
             bars.Dock = DockStyle.Fill;
-            bars.RowClicked += delegate(int comp)
-            {
-                if (lastDiag == null || lastDiag.States[comp] == null || !lastDiag.States[comp].HasTest) return;
-                Navigate(P_TESTS);
-                HighlightTest(lastDiag.States[comp].Test);
-            };
+            bars.RowClicked += delegate(int comp) { OpenComponent(comp); };
             left.Controls.Add(bars);
 
-            lblVerdict = new Label();
+            lblVerdict = new VerdictBlock();
             lblVerdict.Dock = DockStyle.Top;
-            lblVerdict.Height = Theme.S(150);
-            lblVerdict.Font = Theme.Font(10f, FontStyle.Bold);
-            lblVerdict.ForeColor = Theme.Text;
-            lblVerdict.Padding = new Padding(0, 0, 0, Theme.S(10));
-            lblVerdict.Text = "Analisando seus eventos do Windows e partidas gravadas...";
+            lblVerdict.Set("Analisando seu PC...", "Lendo os registros do Windows, os testes e as partidas gravadas.");
             left.Controls.Add(lblVerdict);   // adicionado depois = encaixado primeiro (veredito em cima, barras abaixo)
 
             flist = new FindingList();
             flist.Dock = DockStyle.Fill;
             t.Controls.Add(flist, 1, 0);
+        }
+
+        /// <summary>Clique numa peça: leva ao teste quando ele é o próximo passo; senão mostra o achado que explica o estado.</summary>
+        void OpenComponent(int comp)
+        {
+            if (lastDiag == null || lastDiag.States[comp] == null) return;
+            CompState s = lastDiag.States[comp];
+            bool testNext = s.HasTest && s.Status != CompStatus.Failed && (s.Passed == null || s.Retest);
+            Finding show = s.Cause ?? s.Basis;
+            if (!testNext && show != null)
+            {
+                Navigate(P_DIAG);
+                if (flist.Reveal(show)) return;
+            }
+            if (!s.HasTest) return;
+            Navigate(P_TESTS);
+            HighlightTest(s.Test);
         }
 
         void StartAnalyzeClick(bool refreshEvents)
@@ -563,13 +581,18 @@ namespace DiagIT
         {
             lastDiag = d;
             lastDiagSessions = sds;
-            lblVerdict.Text = d.Verdict;
-            lblVerdict.ForeColor = d.Verdict.StartsWith("PROBLEMA") ? Theme.Bad : Theme.Text;
+            string vt, vs;
+            Analyzer.PlainVerdict(d, out vt, out vs);
+            lblVerdict.Set(vt, vs);
             bars.States = d.States;
             bars.Invalidate();
             lblDiagStatus.Text = "Base: " + d.Tests.Count + " teste(s), " + d.Sessions + " sessão(ões) gravada(s), " + d.EventsTotal + " eventos do Windows (" + d.Days + " dias).";
             flist.SetFindings(d.Findings);
+            RefreshHome();
+            if (goResultsAfterRun) { goResultsAfterRun = false; if (curPage == P_RUN) Navigate(P_DIAG); }
         }
+
+        bool goResultsAfterRun;
 
         void ExportReport()
         {

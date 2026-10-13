@@ -102,6 +102,111 @@ namespace DiagIT
             catch (Exception e) { msg = "Falhou: " + e.Message; return false; }
         }
 
+        /// <summary>Volumes em HD com arquivo de paginação, quando o disco do sistema é SSD (vazio = nada a fazer).</summary>
+        public static List<string> PagefileOnHdd()
+        {
+            List<string> r = new List<string>();
+            try
+            {
+                List<VolumeInfo> vols = SystemInfo.Volumes();
+                string sys = Path.GetPathRoot(Environment.SystemDirectory).Substring(0, 1);
+                VolumeInfo sv = vols.Find(delegate(VolumeInfo v) { return v.Letter.Equals(sys, StringComparison.OrdinalIgnoreCase); });
+                if (sv == null || sv.Media != "SSD") return r;
+                foreach (ManagementObject o in new ManagementObjectSearcher("SELECT Name FROM Win32_PageFileUsage").Get())
+                {
+                    string n = Convert.ToString(o["Name"]);
+                    if (n.Length == 0) continue;
+                    VolumeInfo v = vols.Find(delegate(VolumeInfo x) { return x.Letter.Equals(n.Substring(0, 1), StringComparison.OrdinalIgnoreCase); });
+                    if (v != null && v.Media == "HDD") r.Add(v.Letter);
+                }
+            }
+            catch { }
+            return r;
+        }
+
+        /// <summary>Tira o arquivo de paginação dos HDs e deixa um "gerenciado pelo sistema" no SSD do Windows.</summary>
+        public static bool MovePagefileOffHdd(out string msg)
+        {
+            try
+            {
+                List<string> hdd = PagefileOnHdd();
+                if (hdd.Count == 0) { msg = "Nenhum arquivo de paginação em HD (ou o Windows não está em SSD). Nada a alterar."; return true; }
+                ConnectionOptions co = new ConnectionOptions();
+                co.EnablePrivileges = true;
+                ManagementScope sc = new ManagementScope(@"\\.\root\cimv2", co);
+                sc.Connect();
+                foreach (ManagementObject cs in new ManagementObjectSearcher(sc, new ObjectQuery("SELECT * FROM Win32_ComputerSystem")).Get())
+                {
+                    cs["AutomaticManagedPagefile"] = false;
+                    cs.Put();
+                }
+                string sysName = Path.GetPathRoot(Environment.SystemDirectory).Substring(0, 2) + "\\pagefile.sys";
+                bool hasSys = false;
+                foreach (ManagementObject o in new ManagementObjectSearcher(sc, new ObjectQuery("SELECT * FROM Win32_PageFileSetting")).Get())
+                {
+                    string n = Convert.ToString(o["Name"]);
+                    if (string.Equals(n, sysName, StringComparison.OrdinalIgnoreCase)) hasSys = true;
+                    else if (n.Length > 0 && hdd.Exists(delegate(string l) { return l.Equals(n.Substring(0, 1), StringComparison.OrdinalIgnoreCase); })) o.Delete();
+                }
+                if (!hasSys)
+                {
+                    ManagementClass mc = new ManagementClass(sc, new ManagementPath("Win32_PageFileSetting"), null);
+                    ManagementObject s = mc.CreateInstance();
+                    s["Name"] = sysName;
+                    s["InitialSize"] = (uint)0;   // 0/0 = tamanho gerenciado pelo sistema
+                    s["MaximumSize"] = (uint)0;
+                    s.Put();
+                }
+                msg = "Arquivo de paginação removido do HD (" + string.Join(", ", hdd.ToArray()) + ":) e mantido no SSD " + sysName.Substring(0, 2) +
+                    (hasSys ? " com o tamanho que já estava definido" : " com tamanho gerenciado pelo sistema") + ". Reinicie o computador para aplicar.";
+                Log.Write("Correção aplicada: " + msg);
+                return true;
+            }
+            catch (Exception e)
+            {
+                msg = "Não foi possível alterar a memória virtual: " + e.Message + (SysUtil.IsAdmin() ? "" : " (é preciso executar o DiagIT como administrador)");
+                return false;
+            }
+        }
+
+        // ------------------------------------------------------------------ Windows Update x drivers
+        const string WuPolicy = @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate";
+
+        public static bool WuDriversBlocked()
+        {
+            try
+            {
+                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(WuPolicy))
+                {
+                    object v = k == null ? null : k.GetValue("ExcludeWUDriversInQualityUpdate");
+                    return v != null && Convert.ToInt32(v) == 1;
+                }
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Política oficial "Não incluir drivers com as atualizações do Windows" (reversível).</summary>
+        public static bool SetWuDriversBlocked(bool block, out string msg)
+        {
+            try
+            {
+                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(WuPolicy))
+                {
+                    if (block) k.SetValue("ExcludeWUDriversInQualityUpdate", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                    else k.DeleteValue("ExcludeWUDriversInQualityUpdate", false);
+                }
+                msg = block ? "O Windows Update não vai mais instalar drivers (vídeo, chipset, rede...). Atualize-os pelo site do fabricante. Vale a partir da próxima busca de atualizações."
+                            : "O Windows Update voltou a poder instalar drivers.";
+                Log.Write("Correção aplicada: " + msg);
+                return true;
+            }
+            catch (Exception e)
+            {
+                msg = "Não foi possível alterar a política do Windows Update: " + e.Message + (SysUtil.IsAdmin() ? "" : " (é preciso executar o DiagIT como administrador)");
+                return false;
+            }
+        }
+
         // ------------------------------------------------------------------ entradas antigas do boot
         public static bool CleanBootEntries(Action<string> log)
         {

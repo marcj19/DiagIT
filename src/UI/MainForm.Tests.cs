@@ -51,20 +51,24 @@ namespace DiagIT
         TextBox txtTest;
         readonly Queue<object[]> testQueue = new Queue<object[]>();
         TableLayoutPanel testsRoot;
+        // verificação em andamento (mostrada na página "Verificando")
+        readonly List<object[]> runPlan = new List<object[]>();
+        readonly List<TestResult> runResults = new List<TestResult>();
+        bool runGuided;
 
         void BuildTests()
         {
             testDefs = new TestDef[]
             {
-                Def(TestKind.Cpu, "Processador (CPU)", "Todos os núcleos em carga máxima calculando e conferindo resultados bit a bit. Detecta erro de cálculo, superaquecimento e queda de clock.",
+                Def(TestKind.Cpu, "Processador", "Todos os núcleos no máximo, conferindo cada cálculo. Mostra se o processador erra, esquenta demais ou perde velocidade.",
                     new string[] { "2 min", "10 min", "30 min" }, new int[] { 120, 600, 1800 }, null),
-                Def(TestKind.Ram, "Memória RAM", "Grava e confere padrões em toda a RAM livre (5 padrões por passada). Qualquer bit trocado é erro real de memória.",
+                Def(TestKind.Ram, "Memória RAM", "Grava e confere padrões em toda a memória livre. Um único bit trocado já é defeito comprovado.",
                     new string[] { "5 min", "15 min", "45 min" }, new int[] { 300, 900, 2700 }, null),
-                Def(TestKind.Gpu, "Placa de vídeo e VRAM", "Carga total na GPU com cálculo repetido e comparado, teste de padrões na VRAM e detecção de travamento da GPU.",
+                Def(TestKind.Gpu, "Placa de vídeo", "A placa no máximo, conferindo cada cálculo e toda a memória dela. Detecta também o travamento do driver de vídeo.",
                     new string[] { "3 min", "10 min", "30 min" }, new int[] { 180, 600, 1800 }, null),
-                Def(TestKind.Disk, "Armazenamento", "Lê a saúde (SMART/NVMe) direto de cada disco e faz leituras por todo o disco medindo erros e lentidão. Somente leitura.",
+                Def(TestKind.Disk, "Armazenamento", "Lê a saúde que o próprio disco informa e confere a leitura de ponta a ponta. Nada é apagado ou gravado.",
                     new string[] { "Amostragem", "Disco inteiro" }, new int[] { 120, 14400 }, new object[] { new DiskTest.Options(), new DiskTest.Options { FullScan = true } }),
-                Def(TestKind.Combined, "Fonte de energia (carga máxima)", "CPU e GPU no máximo ao mesmo tempo: o maior consumo que o PC consegue gerar. Se ele desligar, a fonte é a causa mais provável.",
+                Def(TestKind.Combined, "Fonte de energia", "Processador e placa de vídeo no máximo ao mesmo tempo: o maior consumo possível. Se o PC desligar, a fonte é a principal suspeita.",
                     new string[] { "5 min", "15 min", "30 min" }, new int[] { 300, 900, 1800 }, null)
             };
 
@@ -75,19 +79,19 @@ namespace DiagIT
             testsRoot.RowCount = 5;
             testsRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(36)));
             testsRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(44)));
-            testsRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(396)));
+            testsRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(470)));
             testsRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
             testsRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             p.Controls.Add(testsRoot);
 
-            Label h = Header("Testes de hardware", "");
+            Label h = Header("Verificar peças", "");
             h.Dock = DockStyle.Fill;
             testsRoot.Controls.Add(h, 0, 0);
 
             lblTestsBanner = Body("", true);
             lblTestsBanner.Dock = DockStyle.Fill;
-            lblTestsBanner.Text = "Feche jogos e programas pesados antes de testar (o DiagIT recusa iniciar com jogo aberto). O teste para sozinho se a temperatura ficar crítica. " +
-                "Se o PC desligar no meio do teste, isso já é o resultado: abra o DiagIT de novo e ele registra o que aconteceu.";
+            lblTestsBanner.Text = "Cada teste coloca uma peça no máximo e confere cada resultado: peça boa nunca erra. Feche os jogos antes (o DiagIT não deixa testar com jogo aberto). " +
+                "É seguro: o teste para sozinho se algo esquentar demais, e se o PC desligar, isso já é a resposta.";
             testsRoot.Controls.Add(lblTestsBanner, 0, 1);
 
             TableLayoutPanel grid = new TableLayoutPanel();
@@ -243,11 +247,12 @@ namespace DiagIT
             dur.BackColor = Theme.Panel;
             c.Controls.Add(dur);
             FlatButton go = new FlatButton("Iniciar", true);
-            go.Width = Theme.S(96);
             go.Click += delegate
             {
                 int i = dur.SelectedIndex;
-                StartTest(d.Kind, d.Secs[i], d.Opts != null ? d.Opts[i] : null);
+                List<object[]> one = new List<object[]>();
+                one.Add(new object[] { d.Kind, d.Secs[i], d.Opts != null ? d.Opts[i] : null });
+                StartPlan(one, false);
             };
             c.Controls.Add(go);
             testButtons.Add(go);
@@ -255,10 +260,12 @@ namespace DiagIT
             {
                 int w = c.Width - Theme.S(28);
                 t.Width = w; desc.Width = w; last.Width = w;
-                desc.Height = Math.Max(Theme.S(36), c.Height - Theme.S(36) - Theme.S(100));
-                last.Top = desc.Bottom + Theme.S(2);
-                dur.Location = new Point(Theme.S(14), c.Height - dur.Height - Theme.S(12));
+                // duração e botão na mesma linha quando cabem; senão a duração sobe uma linha
+                bool oneLine = Theme.S(14) + dur.Width + Theme.S(12) + go.Width + Theme.S(14) <= c.Width;
                 go.Location = new Point(c.Width - go.Width - Theme.S(14), c.Height - go.Height - Theme.S(12));
+                dur.Location = new Point(Theme.S(14), oneLine ? go.Top + (go.Height - dur.Height) / 2 : go.Top - dur.Height - Theme.S(8));
+                desc.Height = Math.Max(Theme.S(36), (oneLine ? go.Top : dur.Top) - desc.Top - Theme.S(30));
+                last.Top = desc.Bottom + Theme.S(2);
             };
             testCards[d.Kind] = c;
             testDur[d.Kind] = dur;
@@ -269,23 +276,17 @@ namespace DiagIT
         Panel BatteryCard()
         {
             Panel c = CardShell();
-            Label t = Body("Bateria completa", false);
+            Label t = Body("Check-up completo", false);
             t.Font = Theme.Font(11f, FontStyle.Bold);
             t.BackColor = Theme.Panel;
             t.SetBounds(Theme.S(14), Theme.S(12), Theme.S(330), Theme.S(22));
             c.Controls.Add(t);
-            Label desc = Body("Roda todos os testes em sequência, na duração rápida (cerca de 20 minutos). Ao final, o Diagnóstico mostra o estado comprovado de cada peça.", true);
+            Label desc = Body("Testa todas as peças em sequência (cerca de 20 minutos). Ao final, os Resultados mostram o estado comprovado de cada uma.", true);
             desc.BackColor = Theme.Panel;
             desc.SetBounds(Theme.S(14), Theme.S(36), Theme.S(330), Theme.S(70));
             c.Controls.Add(desc);
-            FlatButton go = new FlatButton("Iniciar bateria", true);
-            go.Click += delegate
-            {
-                testQueue.Clear();
-                foreach (TestDef d in testDefs) testQueue.Enqueue(new object[] { d.Kind, d.Secs[0], d.Opts != null ? d.Opts[0] : null });
-                object[] first = testQueue.Dequeue();
-                if (!StartTest((TestKind)first[0], (int)first[1], first[2])) testQueue.Clear();
-            };
+            FlatButton go = new FlatButton("Fazer o check-up", true);
+            go.Click += delegate { StartPlan(QuickPlan(null), true); };
             c.Controls.Add(go);
             testButtons.Add(go);
             c.Resize += delegate
@@ -296,9 +297,39 @@ namespace DiagIT
             return c;
         }
 
-        bool StartTest(TestKind k, int secs, object opt)
+        /// <summary>Plano rápido (duração curta) para as peças pedidas; null = todas.</summary>
+        List<object[]> QuickPlan(List<TestKind> kinds)
         {
-            if (!SysUtil.IsAdmin() && testQueue.Count == 0)
+            List<object[]> r = new List<object[]>();
+            foreach (TestDef d in testDefs)
+                if (kinds == null || kinds.Contains(d.Kind)) r.Add(new object[] { d.Kind, d.Secs[0], d.Opts != null ? d.Opts[0] : null });
+            return r;
+        }
+
+        static int PlanSeconds(List<object[]> plan)
+        {
+            int s = 0;
+            foreach (object[] o in plan) s += (int)o[1] + 15;
+            return s;
+        }
+
+        /// <summary>Inicia uma verificação (um ou vários testes em sequência) e mostra o andamento.</summary>
+        bool StartPlan(List<object[]> plan, bool guided)
+        {
+            if (plan.Count == 0 || runner.Busy) return false;
+            testQueue.Clear();
+            for (int i = 1; i < plan.Count; i++) testQueue.Enqueue(plan[i]);
+            runPlan.Clear(); runPlan.AddRange(plan);
+            runResults.Clear();
+            runGuided = guided;
+            if (!StartTest((TestKind)plan[0][0], (int)plan[0][1], plan[0][2], true)) { testQueue.Clear(); runPlan.Clear(); return false; }
+            Navigate(P_RUN);
+            return true;
+        }
+
+        bool StartTest(TestKind k, int secs, object opt, bool askAdmin)
+        {
+            if (!SysUtil.IsAdmin() && askAdmin)
             {
                 DialogResult dr = MessageBox.Show(this, "O DiagIT está sem privilégios de administrador: a temperatura da CPU, as tensões da fonte e o SMART dos discos não serão medidos durante o teste.\n\n" +
                     "Reiniciar o DiagIT como administrador agora? (Não = testar assim mesmo)", "Testes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
@@ -350,6 +381,7 @@ namespace DiagIT
 
         void OnTestFinished(TestResult r)
         {
+            runResults.Add(r);
             ReloadTestHistory();
             ShowTestResult(r);
             bool stopQueue = r.Get("thermal_abort") == 1 || r.Status == "crashed";
@@ -361,7 +393,7 @@ namespace DiagIT
                 t.Tick += delegate
                 {
                     t.Stop(); t.Dispose();
-                    if (!StartTest((TestKind)next[0], (int)next[1], next[2])) { testQueue.Clear(); EndRunUi(); }
+                    if (!StartTest((TestKind)next[0], (int)next[1], next[2], false)) { testQueue.Clear(); EndRunUi(); }
                 };
                 t.Start();
                 lblRunPhase.Text = "Próximo teste em 5 s (resfriando)...";
@@ -369,9 +401,12 @@ namespace DiagIT
             }
             testQueue.Clear();
             EndRunUi();
-            Balloon("Teste concluído: " + TestResult.KindLabel(r.Kind), r.StatusLabel + " — " + r.Summary,
+            Balloon(runResults.Count > 1 ? "Verificação concluída" : "Teste concluído: " + TestResult.KindLabel(r.Kind),
+                runResults.Count > 1 ? "Abra o DiagIT para ver o resultado." : r.StatusLabel + " — " + r.Summary,
                 r.Status == "passed" ? ToolTipIcon.Info : ToolTipIcon.Warning);
+            goResultsAfterRun = curPage == P_RUN && r.Status != "aborted";
             StartAnalyzeClick(false);
+            RefreshRun();
         }
 
         void EndRunUi()

@@ -206,6 +206,8 @@ namespace DiagIT
         public bool Manual;
         public string Status = "running"; // running | ok | interrupted
         public string Note = "";
+        /// <summary>Programas em segundo plano que a comunidade associa a engasgos/travamentos, abertos durante a partida.</summary>
+        public List<string> Bg = new List<string>();
         public int GamePid = -1;           // não persistido
 
         public string MetaPath { get { return Path.Combine(Paths.Sessions, Id + ".meta"); } }
@@ -249,6 +251,7 @@ namespace DiagIT
             l.Add("manual=" + (Manual ? "1" : "0"));
             l.Add("status=" + Status);
             l.Add("note=" + Note.Replace('\n', ' ').Replace('\r', ' '));
+            if (Bg.Count > 0) l.Add("bg=" + string.Join("|", Bg.ToArray()));
             File.WriteAllLines(MetaPath, l.ToArray(), Encoding.UTF8);
         }
 
@@ -273,6 +276,7 @@ namespace DiagIT
                         case "manual": s.Manual = v == "1"; break;
                         case "status": s.Status = v; break;
                         case "note": s.Note = v; break;
+                        case "bg": s.Bg = new List<string>(v.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries)); break;
                     }
                 }
                 if (string.IsNullOrEmpty(s.Id)) return null;

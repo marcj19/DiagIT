@@ -57,13 +57,13 @@ namespace DiagIT
             {
                 r.Status = "error";
                 r.Summary = "Memória livre insuficiente para testar (RAM livre " + (availPhys >> 20) + " MB, memória virtual livre " + (availCommit >> 20) +
-                    " MB). Feche programas e, se a memória virtual estiver quase esgotada, aumente o arquivo de paginação na aba Correções.";
+                    " MB). Feche programas e, se a memória virtual estiver quase esgotada, aumente o arquivo de paginação na página Resolver.";
                 return;
             }
             if (opt != null && opt.MaxMB > 0) target = Math.Min(target, opt.MaxMB * 1024 * 1024);
             if (availCommit - 1024L * 1024 * 1024 < availPhys - reserve)
                 r.Detail("A memória virtual livre (" + (availCommit >> 20) + " MB) limita o teste a menos do que a RAM física livre (" + (availPhys >> 20) +
-                    " MB). Ajustar a memória virtual (aba Correções) permite testar mais RAM.");
+                    " MB). Ajustar a memória virtual (página Resolver) permite testar mais RAM.");
 
             ctx.Phase = "Reservando memória";
             try
@@ -128,7 +128,7 @@ namespace DiagIT
                 {
                     r.Status = ctx.Cancel ? "aborted" : "passed";
                     r.Summary = "Nenhum erro em " + gb.ToString("0.0") + " GB (" + (100.0 * got / m.TotalPhys).ToString("0") + "% da RAM) após " + pass +
-                        " passada(s) de 5 padrões. A parte da RAM em uso pelo Windows não pôde ser testada; para cobertura total use o teste de memória do Windows (aba Correções).";
+                        " passada(s) de 5 padrões. A parte da RAM em uso pelo Windows não pôde ser testada; para cobertura total use o teste de memória do Windows (página Resolver).";
                 }
             }
             finally

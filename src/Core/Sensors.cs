@@ -184,7 +184,7 @@ namespace DiagIT
                 {
                     string simple = new AssemblyName(a.Name).Name;
                     string f = Path.Combine(dir, simple + ".dll");
-                    if (File.Exists(f)) return Assembly.LoadFrom(f);
+                    if (File.Exists(f)) return Assembly.UnsafeLoadFrom(f);   // Unsafe: aceita DLLs extraídas de zip baixado (marca da internet)
                 }
                 catch { }
                 return null;
@@ -214,7 +214,7 @@ namespace DiagIT
                 string dll = FindDll();
                 if (dll == null) return false;
                 InstallResolver(Path.GetDirectoryName(dll));
-                Assembly asm = Assembly.LoadFrom(dll);
+                Assembly asm = Assembly.UnsafeLoadFrom(dll);
                 tComputer = asm.GetType("LibreHardwareMonitor.Hardware.Computer");
                 tHw = asm.GetType("LibreHardwareMonitor.Hardware.IHardware");
                 tSensor = asm.GetType("LibreHardwareMonitor.Hardware.ISensor");

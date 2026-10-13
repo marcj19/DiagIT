@@ -443,6 +443,7 @@ namespace DiagIT
             r.Set("t_pcie_lanes_max", Stat.Max(Stat.Vals(smp, F.PcieLanes)));
             r.Set("t_cpu_load_avg", Stat.Avg(Stat.Vals(smp, F.Cpu)));
             r.Set("t_gpu_load_avg", Stat.Avg(Stat.Vals(smp, F.Gpu)));
+            r.Set("t_gpu_clock_p95", Stat.Percentile(Stat.Vals(smp, F.GpuClock), 0.95));
             // clock no começo x fim (queda = throttling)
             int q = Math.Max(1, smp.Count / 4);
             if (smp.Count >= 12)

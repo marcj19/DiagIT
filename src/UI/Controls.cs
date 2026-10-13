@@ -9,18 +9,52 @@ namespace DiagIT
 {
     public static class Theme
     {
-        public static readonly Color Bg = Color.FromArgb(13, 17, 23);
-        public static readonly Color Side = Color.FromArgb(10, 13, 18);
-        public static readonly Color Panel = Color.FromArgb(22, 27, 34);
-        public static readonly Color Panel2 = Color.FromArgb(30, 36, 45);
-        public static readonly Color Border = Color.FromArgb(42, 49, 60);
-        public static readonly Color Text = Color.FromArgb(230, 234, 240);
-        public static readonly Color Muted = Color.FromArgb(139, 148, 160);
-        public static readonly Color Accent = Color.FromArgb(77, 163, 255);
-        public static readonly Color Good = Color.FromArgb(61, 214, 140);
-        public static readonly Color Warn = Color.FromArgb(255, 176, 32);
+        // identidade "check-up do PC": grafite + íris; status sempre com ícone, cor e texto
+        public static readonly Color Bg = Color.FromArgb(14, 19, 24);
+        public static readonly Color Side = Color.FromArgb(10, 14, 18);
+        public static readonly Color Panel = Color.FromArgb(22, 29, 37);
+        public static readonly Color Panel2 = Color.FromArgb(29, 38, 48);
+        public static readonly Color Panel3 = Color.FromArgb(19, 26, 33);
+        public static readonly Color Border = Color.FromArgb(36, 46, 58);
+        public static readonly Color Border2 = Color.FromArgb(54, 65, 79);
+        public static readonly Color Text = Color.FromArgb(236, 241, 245);
+        public static readonly Color Soft = Color.FromArgb(201, 210, 219);
+        public static readonly Color Muted = Color.FromArgb(164, 176, 189);
+        public static readonly Color Faint = Color.FromArgb(142, 154, 168);
+        public static readonly Color Accent = Color.FromArgb(157, 140, 255);      // íris (marca)
+        public static readonly Color AccentHover = Color.FromArgb(179, 166, 255);
+        public static readonly Color AccentInk = Color.FromArgb(18, 14, 43);
+        public static readonly Color AccentSoft = Color.FromArgb(38, 33, 69);
+        public static readonly Color AccentText = Color.FromArgb(201, 191, 255);
+        public static readonly Color Good = Color.FromArgb(67, 209, 140);
+        public static readonly Color GoodText = Color.FromArgb(91, 224, 160);
+        public static readonly Color Warn = Color.FromArgb(255, 181, 71);
+        public static readonly Color WarnText = Color.FromArgb(255, 194, 102);
         public static readonly Color Orange = Color.FromArgb(255, 125, 69);
-        public static readonly Color Bad = Color.FromArgb(255, 92, 92);
+        public static readonly Color Bad = Color.FromArgb(255, 107, 107);
+        public static readonly Color BadText = Color.FromArgb(255, 138, 138);
+        public static readonly Color None = Color.FromArgb(58, 70, 84);
+        public static readonly Color NoneText = Color.FromArgb(180, 190, 201);
+
+        public static Color StatusColor(CompStatus s)
+        {
+            switch (s) { case CompStatus.Failed: return Bad; case CompStatus.Suspect: return Warn; case CompStatus.Ok: return Good; default: return Faint; }
+        }
+        public static Color StatusText(CompStatus s)
+        {
+            switch (s) { case CompStatus.Failed: return BadText; case CompStatus.Suspect: return WarnText; case CompStatus.Ok: return GoodText; default: return NoneText; }
+        }
+        public static string StatusIcon(CompStatus s)
+        {
+            switch (s) { case CompStatus.Failed: return "x"; case CompStatus.Suspect: return "alert"; case CompStatus.Ok: return "check"; default: return "dashcircle"; }
+        }
+
+        /// <summary>Cor sobreposta com transparência a um fundo (para tintas em controles que não aceitam alfa).</summary>
+        public static Color Mix(Color over, Color under, int alpha)
+        {
+            float a = alpha / 255f;
+            return Color.FromArgb((int)(over.R * a + under.R * (1 - a)), (int)(over.G * a + under.G * (1 - a)), (int)(over.B * a + under.B * (1 - a)));
+        }
 
         static float scale = -1;
         public static float Scale
@@ -51,6 +85,61 @@ namespace DiagIT
             return f;
         }
         public static Font Font(float pt) { return Font(pt, FontStyle.Regular); }
+
+        static string displayFamily;
+        /// <summary>Fonte dos títulos: Segoe UI Variable Display (Windows 11) ou Segoe UI Semibold.</summary>
+        public static Font Display(float pt)
+        {
+            if (displayFamily == null)
+            {
+                displayFamily = "";
+                try
+                {
+                    using (InstalledFontCollection ic = new InstalledFontCollection())
+                        foreach (FontFamily ff in ic.Families)
+                            if (ff.Name == "Segoe UI Variable Display") displayFamily = ff.Name;
+                }
+                catch { }
+            }
+            string k = "D" + pt;
+            Font f;
+            if (!fonts.TryGetValue(k, out f))
+            {
+                f = displayFamily.Length > 0 ? new Font(displayFamily, pt, FontStyle.Bold, GraphicsUnit.Point) : new Font("Segoe UI Semibold", pt, FontStyle.Bold, GraphicsUnit.Point);
+                fonts[k] = f;
+            }
+            return f;
+        }
+
+        /// <summary>Pílula de status (ícone + texto) com fundo tingido. Devolve a largura usada.</summary>
+        public static int StatusPill(Graphics g, int x, int y, CompStatus st, string text, Color under)
+        {
+            Font f = Font(8.5f, FontStyle.Bold);
+            int tw = TextRenderer.MeasureText(g, text, f, Size.Empty, TextFormatFlags.NoPadding).Width;
+            int h = S(24), ic = S(14), w = S(8) + ic + S(6) + tw + S(11);
+            Rectangle r = new Rectangle(x, y, w, h);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (GraphicsPath p = Round(r, h / 2f))
+            using (SolidBrush b = new SolidBrush(Mix(StatusColor(st), under, 38))) g.FillPath(b, p);
+            Color fg = StatusText(st);
+            Icons.Draw(g, StatusIcon(st), new RectangleF(x + S(8), y + (h - ic) / 2f, ic, ic), fg, S(2.4f));
+            TextRenderer.DrawText(g, text, f, new Rectangle(x + S(8) + ic + S(6), y, tw + S(4), h), fg, TF | TextFormatFlags.VerticalCenter);
+            return w;
+        }
+
+        /// <summary>Pílula simples de texto (rótulos de confiança, contadores).</summary>
+        public static int TagPill(Graphics g, int x, int y, string text, Color fg, Color tint, Color under)
+        {
+            Font f = Font(7.5f, FontStyle.Bold);
+            int tw = TextRenderer.MeasureText(g, text, f, Size.Empty, TextFormatFlags.NoPadding).Width;
+            int h = S(20), w = tw + S(18);
+            Rectangle r = new Rectangle(x, y, w, h);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (GraphicsPath p = Round(r, h / 2f))
+            using (SolidBrush b = new SolidBrush(Mix(tint, under, 38))) g.FillPath(b, p);
+            TextRenderer.DrawText(g, text, f, r, fg, TF | TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+            return w;
+        }
 
         public static Color SevColor(Sev s)
         {
@@ -99,6 +188,7 @@ namespace DiagIT
             float d = rad * 2;
             if (d > r.Width) d = r.Width;
             if (d > r.Height) d = r.Height;
+            if (d <= 0.5f) { p.AddRectangle(new RectangleF(r.X, r.Y, Math.Max(1, r.Width), Math.Max(1, r.Height))); return p; }   // controle ainda sem tamanho
             p.AddArc(r.X, r.Y, d, d, 180, 90);
             p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
             p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
@@ -174,57 +264,97 @@ namespace DiagIT
     public class NavButton : BufferedControl
     {
         public string Caption = "";
-        public string Glyph = "";
+        public string Icon = "";
         public bool Selected;
         bool hover;
 
-        public NavButton() { Cursor = Cursors.Hand; BackColor = Theme.Side; }
+        public NavButton()
+        {
+            Cursor = Cursors.Hand; BackColor = Theme.Side;
+            SetStyle(ControlStyles.Selectable, true);
+            TabStop = true;
+            AccessibleRole = AccessibleRole.PushButton;
+        }
 
         protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+        protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space) { OnClick(EventArgs.Empty); e.Handled = true; }
+            base.OnKeyDown(e);
+        }
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            AccessibleName = Caption;
             Graphics g = e.Graphics;
             g.Clear(Theme.Side);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            RectangleF r = new RectangleF(Theme.S(12), 2, Width - Theme.S(24), Height - 4);
             if (Selected || hover)
-            {
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                RectangleF r = new RectangleF(Theme.S(8), 2, Width - Theme.S(16), Height - 4);
-                using (GraphicsPath p = Theme.Round(r, Theme.S(8)))
-                using (SolidBrush b = new SolidBrush(Selected ? Theme.Panel2 : Theme.Panel))
+                using (GraphicsPath p = Theme.Round(r, Theme.S(10)))
+                using (SolidBrush b = new SolidBrush(Selected ? Theme.AccentSoft : Theme.Panel2))
                     g.FillPath(b, p);
-                if (Selected)
-                    using (SolidBrush b = new SolidBrush(Theme.Accent))
-                        g.FillRectangle(b, Theme.S(8), Height / 2 - Theme.S(9), Theme.S(3), Theme.S(18));
-            }
-            Theme.Text_(g, Glyph, Theme.Font(12f), Selected ? Theme.Accent : Theme.Muted,
-                new Rectangle(Theme.S(20), 0, Theme.S(26), Height), TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
-            Theme.Text_(g, Caption, Theme.Font(10f, Selected ? FontStyle.Bold : FontStyle.Regular), Selected ? Theme.Text : Theme.Muted,
-                new Rectangle(Theme.S(52), 0, Width - Theme.S(60), Height), TextFormatFlags.VerticalCenter);
+            if (Focused && ShowFocusCues)
+                using (GraphicsPath p = Theme.Round(r, Theme.S(10)))
+                using (Pen pen = new Pen(Theme.AccentHover, Theme.S(2f))) g.DrawPath(pen, p);
+            Color fg = Selected || hover ? Theme.Text : Theme.Muted;
+            float ic = Theme.S(20f);
+            Icons.Draw(g, Icon, new RectangleF(Theme.S(24), (Height - ic) / 2f, ic, ic), fg, Theme.S(2f));
+            Theme.Text_(g, Caption, Theme.Font(10f, Selected ? FontStyle.Bold : FontStyle.Regular), fg,
+                new Rectangle(Theme.S(56), 0, Width - Theme.S(64), Height), TextFormatFlags.VerticalCenter);
         }
     }
 
-    // ------------------------------------------------------------------ botão comum
+    // ------------------------------------------------------------------ botão comum (arredondado, desenhado pelo app)
     public class FlatButton : Button
     {
+        readonly bool primary;
+        bool hover, down;
+
         public FlatButton(string text, bool primary)
         {
+            this.primary = primary;
             Text = text;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
             FlatStyle = FlatStyle.Flat;
-            FlatAppearance.BorderSize = 1;
-            FlatAppearance.BorderColor = primary ? Theme.Accent : Theme.Border;
-            FlatAppearance.MouseOverBackColor = primary ? Color.FromArgb(60, 140, 230) : Theme.Panel2;
-            FlatAppearance.MouseDownBackColor = Theme.Panel2;
-            BackColor = primary ? Theme.Accent : Theme.Panel;
-            ForeColor = primary ? Color.FromArgb(8, 12, 18) : Theme.Text;
-            Font = Theme.Font(9f, primary ? FontStyle.Bold : FontStyle.Regular);
-            Height = Theme.S(32);
+            FlatAppearance.BorderSize = 0;
+            Font = Theme.Font(9.5f, FontStyle.Bold);
+            Height = Theme.S(38);
             Padding = new Padding(0);
             AutoSize = false;
             Cursor = Cursors.Hand;
             UseVisualStyleBackColor = false;
-            Width = Math.Max(Theme.S(90), TextRenderer.MeasureText(text, Font).Width + Theme.S(48));
+            Width = Math.Max(Theme.S(90), TextRenderer.MeasureText(text, Font).Width + Theme.S(40));
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; down = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { down = true; Invalidate(); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { down = false; Invalidate(); base.OnMouseUp(e); }
+        protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
+        protected override void OnTextChanged(EventArgs e) { Invalidate(); base.OnTextChanged(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            Color under = Parent != null ? Parent.BackColor : Theme.Bg;
+            g.Clear(under);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            RectangleF r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            Color fill, fg, border = Color.Empty;
+            if (!Enabled) { fill = primary ? Theme.Mix(Theme.Accent, under, 70) : under; fg = primary ? Theme.Mix(Theme.AccentInk, fill, 160) : Theme.Faint; border = primary ? Color.Empty : Theme.Border; }
+            else if (primary) { fill = hover && !down ? Theme.AccentHover : Theme.Accent; fg = Theme.AccentInk; }
+            else { fill = hover || down ? Theme.Panel2 : under; fg = Theme.Text; border = Theme.Border2; }
+            using (GraphicsPath p = Theme.Round(r, Theme.S(10)))
+            {
+                using (SolidBrush b = new SolidBrush(fill)) g.FillPath(b, p);
+                if (border != Color.Empty) using (Pen pen = new Pen(border)) g.DrawPath(pen, p);
+                if (Focused && ShowFocusCues) using (Pen pen = new Pen(Theme.AccentHover, Theme.S(2f))) g.DrawPath(pen, p);
+            }
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
         }
     }
 
@@ -278,7 +408,7 @@ namespace DiagIT
                 Rectangle seg = new Rectangle(x, Theme.S(3), w, Height - Theme.S(7));
                 if (i == sel)
                     using (GraphicsPath sp = Theme.Round(seg, Theme.S(5)))
-                    using (SolidBrush sb = new SolidBrush(Color.FromArgb(38, 74, 120))) g.FillPath(sb, sp);
+                    using (SolidBrush sb = new SolidBrush(Theme.AccentSoft)) g.FillPath(sb, sp);
                 Theme.Text_(g, items[i], Theme.Font(9f, i == sel ? FontStyle.Bold : FontStyle.Regular), i == sel ? Theme.Text : Theme.Muted, seg,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 x += w;
@@ -565,6 +695,7 @@ namespace DiagIT
             foreach (Finding f in list)
             {
                 FindingCard c = new FindingCard(f);
+                c.ToggledDetails += delegate { Relayout(); };
                 cards.Add(c);
                 Controls.Add(c);
             }
@@ -593,39 +724,96 @@ namespace DiagIT
             AutoScrollMinSize = new Size(0, y);
             ResumeLayout();
         }
+
+        /// <summary>Rola até o achado e o destaca por alguns segundos.</summary>
+        public bool Reveal(Finding f)
+        {
+            FindingCard c = cards.Find(delegate(FindingCard x) { return x.Finding == f; });
+            if (c == null) return false;
+            AutoScrollPosition = new Point(0, Math.Max(0, c.Top - AutoScrollPosition.Y - Theme.S(4)));
+            c.Highlight = true; c.Invalidate();
+            Timer t = new Timer();
+            t.Interval = 2500;
+            t.Tick += delegate { t.Stop(); t.Dispose(); if (!c.IsDisposed) { c.Highlight = false; c.Invalidate(); } };
+            t.Start();
+            return true;
+        }
     }
 
+    /// <summary>Achado em duas camadas: linguagem simples na frente, detalhes técnicos sob demanda.</summary>
     public class FindingCard : BufferedControl
     {
+        readonly Finding f;
+        const TextFormatFlags WB = TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left;
+        int hTitle, hAdv, hTech;
+        Rectangle toggleRect = Rectangle.Empty;
+        public bool Highlight, Expanded;
+        public event EventHandler ToggledDetails;
+
+        public FindingCard(Finding f) { this.f = f; AccessibleName = f.Plain; AccessibleDescription = f.Advice; }
+        public Finding Finding { get { return f; } }
+
+        bool HasTech { get { return f.Evidence.Length > 0 || f.Simple.Length > 0; } }
+        string Tech
+        {
+            get
+            {
+                string t = (f.Simple.Length > 0 ? f.Title + "\n" : "") + f.Evidence;
+                return (f.Source.Length > 0 ? "Fonte: " + f.Source + "\n" : "") + t.Trim();
+            }
+        }
+
         public static Color LabelColor(Finding f)
         {
-            switch (f.Label)
+            switch (Analyzer.Confidence(f))
             {
-                case "CONFIRMADO": return Theme.Bad;
-                case "PROVÁVEL": return Theme.Orange;
-                case "PISTA": return Theme.Warn;
+                case "COMPROVADO": return Theme.Bad;
+                case "INDÍCIO": return Theme.Warn;
                 case "OK": return Theme.Good;
                 default: return Theme.Accent;
             }
         }
 
-        readonly Finding f;
-        const TextFormatFlags WB = TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left;
-        int hTitle, hEv, hAdv;
+        static Color LabelText(Finding f)
+        {
+            switch (Analyzer.Confidence(f))
+            {
+                case "COMPROVADO": return Theme.BadText;
+                case "INDÍCIO": return Theme.WarnText;
+                case "OK": return Theme.GoodText;
+                default: return Theme.AccentText;
+            }
+        }
 
-        public FindingCard(Finding f) { this.f = f; }
-
-        int InnerW(int width) { return width - Theme.S(18) - Theme.S(16); }
+        int InnerW(int width) { return width - Theme.S(40); }
 
         public int Measure(int width)
         {
-            int iw = InnerW(width);
-            hTitle = TextRenderer.MeasureText(f.Title, Theme.Font(10.5f, FontStyle.Bold), new Size(iw, 0), WB).Height;
-            hEv = f.Evidence.Length == 0 ? 0 : TextRenderer.MeasureText(f.Evidence, Theme.Font(9f), new Size(iw, 0), WB).Height;
-            hAdv = f.Advice.Length == 0 ? 0 : TextRenderer.MeasureText(f.Advice, Theme.Font(9f), new Size(iw, 0), WB).Height;
-            return Theme.S(10) + Theme.S(15) + hTitle + Theme.S(6)
-                + (hEv > 0 ? hEv + Theme.S(8) : 0)
-                + (hAdv > 0 ? Theme.S(15) + hAdv : 0) + Theme.S(12);
+            int iw = Math.Max(50, InnerW(width));
+            hTitle = TextRenderer.MeasureText(f.Plain, Theme.Font(11f, FontStyle.Bold), new Size(iw, 0), WB).Height;
+            hAdv = f.Advice.Length == 0 ? 0 : TextRenderer.MeasureText(f.Advice, Theme.Font(9.5f), new Size(iw, 0), WB).Height;
+            hTech = Expanded && HasTech ? TextRenderer.MeasureText(Tech, Theme.Font(9f), new Size(iw, 0), WB).Height : 0;
+            return Theme.S(16) + Theme.S(20) + Theme.S(10) + hTitle
+                + (hAdv > 0 ? Theme.S(14) + Theme.S(18) + hAdv : 0)
+                + (HasTech ? Theme.S(14) + Theme.S(40) + (hTech > 0 ? hTech + Theme.S(4) : 0) : Theme.S(4))
+                + Theme.S(12);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            Cursor = toggleRect.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            if (toggleRect.Contains(e.Location))
+            {
+                Expanded = !Expanded;
+                if (ToggledDetails != null) ToggledDetails(this, EventArgs.Empty);
+                Invalidate();
+            }
+            base.OnMouseClick(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -633,41 +821,50 @@ namespace DiagIT
             Graphics g = e.Graphics;
             g.Clear(Theme.Bg);
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            string conf = Analyzer.Confidence(f);
+            Color bg = Highlight ? Theme.AccentSoft : Theme.Panel;
+            Color border = Highlight ? Theme.Accent : conf == "COMPROVADO" ? Theme.Mix(Theme.Bad, Theme.Panel, 120) : conf == "INDÍCIO" && f.Sev != Sev.Info ? Theme.Mix(Theme.Warn, Theme.Panel, 90) : Theme.Border;
             RectangleF r = new RectangleF(0.5f, 0.5f, Width - 2, Height - 2);
-            Color sc = Theme.SevColor(f.Sev);
-            using (GraphicsPath p = Theme.Round(r, Theme.S(8)))
-            using (SolidBrush b = new SolidBrush(Theme.Panel))
-            using (Pen pen = new Pen(Theme.Border))
+            using (GraphicsPath p = Theme.Round(r, Theme.S(14)))
+            using (SolidBrush b = new SolidBrush(bg))
+            using (Pen pen = new Pen(border))
             {
                 g.FillPath(b, p);
                 g.DrawPath(pen, p);
-                g.SetClip(p);
-                using (SolidBrush sb = new SolidBrush(sc)) g.FillRectangle(sb, 0, 0, Theme.S(5), Height);
-                g.ResetClip();
             }
-            int x = Theme.S(18), iw = InnerW(Width), y = Theme.S(10);
-            string head = f.Label;
-            sc = LabelColor(f);
-            int hw = TextRenderer.MeasureText(head, Theme.Font(7.5f, FontStyle.Bold)).Width + Theme.S(4);
-            Theme.Text_(g, head, Theme.Font(7.5f, FontStyle.Bold), sc, new Rectangle(x, y, hw, Theme.S(15)), 0);
-            Theme.Text_(g, f.Source.ToUpper(), Theme.Font(7.5f), Theme.Muted, new Rectangle(x + hw + Theme.S(8), y, iw - hw, Theme.S(15)), 0);
-            y += Theme.S(15);
-            TextRenderer.DrawText(g, f.Title, Theme.Font(10.5f, FontStyle.Bold), new Rectangle(x, y, iw, hTitle), Theme.Text, WB);
-            y += hTitle + Theme.S(6);
-            if (hEv > 0)
-            {
-                TextRenderer.DrawText(g, f.Evidence, Theme.Font(9f), new Rectangle(x, y, iw, hEv), Theme.Muted, WB);
-                y += hEv + Theme.S(8);
-            }
+            int x = Theme.S(20), iw = InnerW(Width), y = Theme.S(16);
+            int cw = Theme.TagPill(g, x, y, conf, LabelText(f), LabelColor(f), bg);
+            if (f.Source.Length > 0)
+                Theme.Text_(g, f.Source, Theme.Font(8.5f), Theme.Faint, new Rectangle(x + cw + Theme.S(10), y, iw - cw - Theme.S(10), Theme.S(20)), TextFormatFlags.VerticalCenter);
+            y += Theme.S(20) + Theme.S(10);
+            TextRenderer.DrawText(g, f.Plain, Theme.Font(11f, FontStyle.Bold), new Rectangle(x, y, iw, hTitle), Theme.Text, WB);
+            y += hTitle;
             if (hAdv > 0)
             {
-                Theme.Text_(g, "O QUE FAZER", Theme.Font(7.5f, FontStyle.Bold), Theme.Accent, new Rectangle(x, y, iw, Theme.S(15)), 0);
-                y += Theme.S(15);
-                TextRenderer.DrawText(g, f.Advice, Theme.Font(9f), new Rectangle(x, y, iw, hAdv), Theme.Text, WB);
+                y += Theme.S(14);
+                Theme.Text_(g, "O QUE FAZER", Theme.Font(7.5f, FontStyle.Bold), Theme.AccentText, new Rectangle(x, y, iw, Theme.S(16)), 0);
+                y += Theme.S(18);
+                TextRenderer.DrawText(g, f.Advice, Theme.Font(9.5f), new Rectangle(x, y, iw, hAdv), Theme.Soft, WB);
+                y += hAdv;
             }
+            if (HasTech)
+            {
+                y += Theme.S(14);
+                using (Pen sep = new Pen(Theme.Border)) g.DrawLine(sep, Theme.S(1), y, Width - Theme.S(2), y);
+                toggleRect = new Rectangle(0, y, Width, Theme.S(40));
+                string lbl = Expanded ? "Ocultar detalhes técnicos" : "Ver detalhes técnicos";
+                Theme.Text_(g, lbl, Theme.Font(9f, FontStyle.Bold), Theme.Soft, new Rectangle(x, y, iw, Theme.S(40)), TextFormatFlags.VerticalCenter);
+                float ic = Theme.S(16f);
+                Icons.Draw(g, Expanded ? "chevup" : "chevdown", new RectangleF(Width - Theme.S(20) - ic, y + (Theme.S(40) - ic) / 2f, ic, ic), Theme.Muted, Theme.S(2f));
+                y += Theme.S(40);
+                if (hTech > 0)
+                    TextRenderer.DrawText(g, Tech, Theme.Font(9f), new Rectangle(x, y, iw, hTech), Theme.Muted, WB);
+            }
+            else toggleRect = Rectangle.Empty;
         }
     }
 }
+
 namespace DiagIT
 {
     using System.Collections.Generic;
@@ -675,15 +872,17 @@ namespace DiagIT
     using System.Drawing.Drawing2D;
     using System.Windows.Forms;
 
-    /// <summary>Estado de cada componente (FALHOU / SUSPEITO / OK / NÃO TESTADO), clicável para ir ao teste.</summary>
+    /// <summary>Estado de cada componente (com defeito / precisa verificar / saudável / não verificado), clicável para ir ao teste ou ao achado que o explica.</summary>
     public class CompStateList : BufferedControl
     {
         public CompState[] States = new CompState[8];
         public event Action<int> RowClicked;
         int hover = -1;
+        readonly ToolTip tip = new ToolTip();
         static readonly int[] Order = { (int)Comp.Cpu, (int)Comp.Gpu, (int)Comp.Ram, (int)Comp.Disk, (int)Comp.Psu, (int)Comp.Cooling, (int)Comp.Board, (int)Comp.Software };
+        public static readonly string[] CompIcon = { "chip", "gpu", "ram", "ssd", "bolt", "thermo", "window", "board" };
 
-        int RowH { get { return Math.Max(Theme.S(52), (Height - Theme.S(8)) / 8); } }
+        int RowH { get { return Math.Max(Theme.S(60), (Height - Theme.S(8)) / 8); } }
 
         int RowAt(int y)
         {
@@ -694,9 +893,13 @@ namespace DiagIT
         protected override void OnMouseMove(MouseEventArgs e)
         {
             int r = RowAt(e.Y);
-            bool canClick = r >= 0 && States[r] != null && States[r].HasTest;
+            bool canClick = r >= 0 && States[r] != null && (States[r].HasTest || States[r].Cause != null);
             Cursor = canClick ? Cursors.Hand : Cursors.Default;
-            if (r != hover) { hover = r; Invalidate(); }
+            if (r != hover)
+            {
+                hover = r; Invalidate();
+                tip.SetToolTip(this, r >= 0 && States[r] != null ? Wrap(States[r].Detail, 90) : "");
+            }
             base.OnMouseMove(e);
         }
 
@@ -709,15 +912,24 @@ namespace DiagIT
             base.OnMouseClick(e);
         }
 
+        static string Wrap(string s, int n)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            int col = 0;
+            foreach (string w in s.Split(' '))
+            {
+                if (col > 0 && col + w.Length > n) { sb.Append('\n'); col = 0; }
+                else if (col > 0) { sb.Append(' '); col++; }
+                sb.Append(w); col += w.Length;
+            }
+            return sb.ToString();
+        }
+
         public static void Badge(CompStatus s, out string text, out Color color)
         {
-            switch (s)
-            {
-                case CompStatus.Failed: text = "PROBLEMA"; color = Theme.Bad; break;
-                case CompStatus.Suspect: text = "SUSPEITO"; color = Theme.Orange; break;
-                case CompStatus.Ok: text = "OK"; color = Theme.Good; break;
-                default: text = "NÃO TESTADO"; color = Theme.Muted; break;
-            }
+            text = Analyzer.StatusLabel(s);
+            color = Theme.StatusColor(s);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -730,30 +942,25 @@ namespace DiagIT
             {
                 int i = Order[row];
                 CompState s = States[i];
-                Rectangle r = new Rectangle(0, Theme.S(4) + row * rh, Width - 1, rh - Theme.S(6));
-                using (GraphicsPath p = Theme.Round(r, Theme.S(7)))
-                using (SolidBrush b = new SolidBrush(hover == i ? Theme.Panel2 : Theme.Panel))
-                using (Pen pen = new Pen(Theme.Border))
+                Rectangle r = new Rectangle(0, Theme.S(4) + row * rh, Width - 1, rh - Theme.S(8));
+                Color bg = hover == i ? Theme.Panel2 : Theme.Panel;
+                using (GraphicsPath p = Theme.Round(r, Theme.S(12)))
+                using (SolidBrush b = new SolidBrush(bg))
+                using (Pen pen = new Pen(s != null && s.Status == CompStatus.Suspect ? Theme.Mix(Theme.Warn, Theme.Panel, 80) : s != null && s.Status == CompStatus.Failed ? Theme.Mix(Theme.Bad, Theme.Panel, 110) : Theme.Border))
                 {
                     g.FillPath(b, p);
                     g.DrawPath(pen, p);
                 }
-                string bt; Color bc;
-                Badge(s == null ? CompStatus.Untested : s.Status, out bt, out bc);
-                int bw = Theme.S(96);
-                Rectangle br = new Rectangle(r.X + Theme.S(10), r.Y + (r.Height - Theme.S(20)) / 2, bw, Theme.S(20));
-                using (GraphicsPath bp = Theme.Round(br, Theme.S(10)))
-                using (SolidBrush bb = new SolidBrush(Color.FromArgb(40, bc)))
-                using (Pen bpen = new Pen(bc))
-                {
-                    g.FillPath(bb, bp);
-                    g.DrawPath(bpen, bp);
-                }
-                Theme.Text_(g, bt, Theme.Font(7.5f, FontStyle.Bold), bc, br, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-                int x = br.Right + Theme.S(12);
-                Theme.Text_(g, CompInfo.Names[i], Theme.Font(9.5f, FontStyle.Bold), Theme.Text, new Rectangle(x, r.Y + Theme.S(6), r.Right - x - Theme.S(8), Theme.S(18)), 0);
-                string head = s == null ? "Analisando..." : s.Headline;
-                TextRenderer.DrawText(g, head, Theme.Font(8.5f), new Rectangle(x, r.Y + Theme.S(24), r.Right - x - Theme.S(8), r.Height - Theme.S(26)), Theme.Muted,
+                float ic = Theme.S(22f);
+                Icons.Draw(g, CompIcon[i], new RectangleF(r.X + Theme.S(14), r.Y + (r.Height - ic) / 2f, ic, ic), Theme.Soft, Theme.S(1.8f));
+                CompStatus st = s == null ? CompStatus.Untested : s.Status;
+                string label = Analyzer.StatusLabel(st);
+                int pw = TextRenderer.MeasureText(label, Theme.Font(8.5f, FontStyle.Bold)).Width + Theme.S(40);
+                Theme.StatusPill(g, r.Right - pw - Theme.S(10), r.Y + (r.Height - Theme.S(24)) / 2, st, label, bg);
+                int x = r.X + Theme.S(50), tw = r.Right - pw - Theme.S(20) - x;
+                Theme.Text_(g, CompInfo.Plain[i], Theme.Font(10f, FontStyle.Bold), Theme.Text, new Rectangle(x, r.Y + Theme.S(8), tw, Theme.S(20)), 0);
+                string note = s == null ? "Analisando..." : Analyzer.PlainNote(s, i);
+                TextRenderer.DrawText(g, note, Theme.Font(8.5f), new Rectangle(x, r.Y + Theme.S(28), tw, r.Height - Theme.S(30)), Theme.Muted,
                     TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
             }
         }

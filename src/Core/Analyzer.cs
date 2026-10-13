@@ -20,6 +20,16 @@ namespace DiagIT
         /// <summary>Problema comprovado (teste reprovado, erro registrado pelo próprio hardware), não apenas indício.</summary>
         public bool Confirmed;
         public int Primary = -1;
+        /// <summary>Quando o indício ocorreu pela última vez (MinValue = sem data). Usado para saber se um teste aprovado veio depois.</summary>
+        public DateTime Last = DateTime.MinValue;
+        /// <summary>Código da tela azul (16 bits baixos) — junta o registro do Windows e o arquivo de despejo da mesma falha.</summary>
+        public int BugCode = -1;
+        /// <summary>Quantas ocorrências (telas azuis do mesmo código).</summary>
+        public int Count;
+        /// <summary>O mesmo achado em linguagem do dia a dia (camada simples da interface). Vazio = usa o Title.</summary>
+        public string Simple = "";
+
+        public string Plain { get { return Simple.Length > 0 ? Simple : Title; } }
 
         public Finding Weigh(Comp c, double w) { W[c] = w; return this; }
 
@@ -63,6 +73,18 @@ namespace DiagIT
             "Processador (CPU)", "Placa de vídeo (GPU)", "Memória RAM", "Armazenamento (SSD/HD)",
             "Fonte de energia (PSU)", "Refrigeração / temperatura", "Drivers / software", "Placa-mãe / PCIe"
         };
+        /// <summary>Nomes para quem é leigo.</summary>
+        public static readonly string[] Plain =
+        {
+            "Processador", "Placa de vídeo", "Memória RAM", "Armazenamento",
+            "Fonte de energia", "Temperatura", "Drivers e Windows", "Placa-mãe"
+        };
+        /// <summary>O que a peça faz, em uma linha (quando não há modelo para mostrar).</summary>
+        public static readonly string[] Role =
+        {
+            "Faz os cálculos do PC", "Desenha a imagem dos jogos", "Guarda o que está aberto", "Guarda seus arquivos",
+            "Alimenta todas as peças", "Coolers e ventilação", "Programas que controlam as peças", "Liga todas as peças"
+        };
     }
 
     public enum CompStatus { Untested, Ok, Suspect, Failed }
@@ -74,6 +96,14 @@ namespace DiagIT
         public string Detail = "";
         public bool HasTest;
         public TestKind Test;
+        /// <summary>Achado que sustenta o estado OK (teste aprovado, dados de saúde).</summary>
+        public Finding Basis;
+        /// <summary>Achado que motivou o estado (suspeita ou indício descartado pelo teste).</summary>
+        public Finding Cause;
+        /// <summary>Último teste aprovado deste componente, se houver.</summary>
+        public TestResult Passed;
+        /// <summary>O indício aconteceu DEPOIS da última aprovação: repetir o teste faz sentido.</summary>
+        public bool Retest;
     }
 
     public static partial class Analyzer
@@ -141,6 +171,8 @@ namespace DiagIT
             TelemetryRules(d, sessions, all, events);
             TestRules(d, days);
             FactRules(d);
+            GamingRules(d, sessions, events);
+            PlainTitles(d);
             Finish(d);
             BuildStates(d);
             return d;
@@ -241,6 +273,7 @@ namespace DiagIT
                 f.Advice = "Causas comuns: driver corrompido (reinstale com DDU em modo seguro), GPU superaquecendo, " +
                     "undervolt/overclock instável, cabos PCIe mal encaixados ou fonte sem folga. Em AMD, desative também o " +
                     "overclock automático/ajustes de desempenho no Adrenalin para testar.";
+                f.Last = tdr[0].Time;
                 f.Weigh(Comp.Gpu, 0.35 * w).Weigh(Comp.Software, 0.30 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.12 * w);
                 d.Findings.Add(f);
             }
@@ -279,6 +312,7 @@ namespace DiagIT
                     f.Title = "Travamentos de GPU registrados pelo Windows (LiveKernelEvent 141/117/193) — " + strong.Count + "×";
                     f.Evidence = "A GPU parou de responder e o Windows a recuperou sem tela azul. Último em " + D(strong[0].Time) + ".\n" + Recent(strong, 4);
                     f.Advice = "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot.";
+                    f.Last = strong[0].Time;
                     f.Weigh(Comp.Gpu, 0.40 * w).Weigh(Comp.Software, 0.20 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.10 * w);
                     d.Findings.Add(f);
                 }
@@ -304,6 +338,7 @@ namespace DiagIT
                         (instEp > 0 ? " Episódios durante a instalação de drivers são esperados (o driver de vídeo reinicia a tela ao ser instalado) e pesam pouco." : "") + "\n" + Recent(soft, 4);
                     f.Advice = "Costumam aparecer junto de congelamentos ou telas pretas. Atualize/reinstale o driver de vídeo (DDU) e o de Wi-Fi, " +
                         "desative XMP/EXPO para testar e anote o horário exato quando o problema acontecer para cruzar com as evidências do DiagIT.";
+                    f.Last = soft[0].Time;
                     f.Weigh(Comp.Gpu, 0.22 * w).Weigh(Comp.Software, 0.28 * w).Weigh(Comp.Ram, 0.10 * w);
                     d.Findings.Add(f);
                 }
@@ -327,6 +362,7 @@ namespace DiagIT
                 f.Advice = "Esse é o padrão clássico de fonte falhando/sem potência, superaquecimento (proteção térmica corta tudo), " +
                     "ou falha de hardware que trava o sistema inteiro. Descarte antes: queda de energia, régua/filtro de linha e o botão " +
                     "de energia sendo pressionado. Se acontece em jogo, a fonte e a temperatura são as primeiras suspeitas.";
+                f.Last = noBsod[0].Time;
                 f.Weigh(Comp.Psu, 0.32 * w).Weigh(Comp.Cooling, 0.22 * w).Weigh(Comp.Gpu, 0.14 * w)
                  .Weigh(Comp.Cpu, 0.10 * w).Weigh(Comp.Ram, 0.10 * w).Weigh(Comp.Board, 0.10 * w);
                 d.Findings.Add(f);
@@ -336,17 +372,7 @@ namespace DiagIT
             Dictionary<int, List<WinEvent>> bc = new Dictionary<int, List<WinEvent>>();
             foreach (WinEvent e in ev)
             {
-                int code = -1;
-                if (e.Provider == "Microsoft-Windows-WER-SystemErrorReporting" && e.Id == 1001)
-                {
-                    Match m = Regex.Match(e.Prop(0) + " " + e.Msg, @"0x([0-9a-fA-F]{1,8})");
-                    if (m.Success) code = (int)(Convert.ToInt64(m.Groups[1].Value, 16) & 0xFFFF);
-                }
-                else if (e.Provider == "Microsoft-Windows-Kernel-Power" && e.Id == 41)
-                {
-                    long c = ParseCode(e.Prop(0));
-                    if (c > 0) code = (int)(c & 0xFFFF);
-                }
+                int code = BugcodeOf(e);
                 if (code <= 0) continue;
                 List<WinEvent> l;
                 if (!bc.TryGetValue(code, out l)) { l = new List<WinEvent>(); bc[code] = l; }
@@ -365,6 +391,7 @@ namespace DiagIT
                 f.Title = "Tela azul 0x" + kv.Key.ToString("X") + " (" + name + ") — " + kv.Value.Count + "×";
                 f.Evidence = "Último em " + D(kv.Value[0].Time) + ".\n" + Recent(kv.Value, 4);
                 f.Advice = advice;
+                f.Last = kv.Value[0].Time; f.BugCode = kv.Key; f.Count = kv.Value.Count;
                 foreach (KeyValuePair<Comp, double> c in w) f.Weigh(c.Key, c.Value * s);
                 d.Findings.Add(f);
             }
@@ -380,6 +407,7 @@ namespace DiagIT
                 f.Evidence = "O Windows registrou que a frequência dos núcleos foi reduzida pelo firmware (térmico, limite de energia ou VRM). Último em " + D(thr[0].Time) + ".";
                 f.Advice = "Verifique a temperatura da CPU sob carga, a pasta térmica/cooler e o limite de energia (PPT/TDC/EDC) na BIOS. " +
                     "Em placas de entrada, VRM quente também causa isso.";
+                f.Last = thr[0].Time;
                 f.Weigh(Comp.Cooling, 0.32 * w).Weigh(Comp.Cpu, 0.10 * w).Weigh(Comp.Psu, 0.08 * w).Weigh(Comp.Board, 0.08 * w);
                 d.Findings.Add(f);
             }
@@ -419,7 +447,7 @@ namespace DiagIT
                     int n; perApp.TryGetValue(app, out n); perApp[app] = n + 1;
                     string code = e.Prop(6).ToLowerInvariant();
                     if (code == "c0000005" || code == "c0000409" || code == "c0000374") av++;
-                    if (Has(e.Prop(3), "atiu9p", "atidxx", "amdxx", "aticfx", "amdvlk", "nvwgf2", "nvd3d", "igd")) gpuMod++;
+                    if (GpuModule(e.Prop(3))) gpuMod++;
                 }
                 List<string> top = new List<string>();
                 foreach (KeyValuePair<string, int> kv in perApp) top.Add(kv.Key + " ×" + kv.Value);
@@ -433,6 +461,7 @@ namespace DiagIT
                     f.Evidence = "Falhas de acesso à memória (c0000005/c0000409) em: " + string.Join(", ", top.GetRange(0, Math.Min(8, top.Count)).ToArray()) + ".";
                     f.Advice = "Um único programa travando é bug dele; vários programas diferentes travando assim sugere memória RAM instável " +
                         "(ou overclock/EXPO mal estável). Rode MemTest86 e teste com o perfil de memória desativado.";
+                    f.Last = crashes[0].Time;
                     f.Weigh(Comp.Ram, 0.32 * w).Weigh(Comp.Cpu, 0.15 * w).Weigh(Comp.Software, 0.10 * w);
                     d.Findings.Add(f);
                 }
@@ -444,6 +473,7 @@ namespace DiagIT
                     f.Title = "Jogos/apps travaram dentro do driver de vídeo — " + gpuMod + "×";
                     f.Evidence = "O módulo que falhou pertence ao driver gráfico (atiu9p64, atidxx64, amdxx64, nvwgf2umx...).";
                     f.Advice = "Reinstale o driver com DDU. Se persistir com driver limpo, suspeite da própria GPU, VRAM ou energia.";
+                    f.Last = crashes[0].Time;
                     f.Weigh(Comp.Gpu, 0.22 * w).Weigh(Comp.Software, 0.30 * w);
                     d.Findings.Add(f);
                 }

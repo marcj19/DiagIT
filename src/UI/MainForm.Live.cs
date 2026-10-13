@@ -168,7 +168,7 @@ namespace DiagIT
 
             double ct = s[F.CpuTemp], gt = s[F.GpuTemp];
             if (double.IsNaN(ct))
-                cCpuT.Set("—", SysUtil.IsAdmin() ? "Sensor indisponível (veja Correções → PawnIO)" : "Requer executar como administrador", double.NaN, -1);
+                cCpuT.Set("—", SysUtil.IsAdmin() ? "Sensor indisponível (veja Resolver → PawnIO)" : "Requer executar como administrador", double.NaN, -1);
             else
                 cCpuT.Set(ct.ToString("0") + " °C", (double.IsNaN(s[F.CpuPower]) ? "" : "Consumo " + N(s[F.CpuPower], "0") + " W") +
                     (double.IsNaN(s[F.CpuFan]) ? "" : "  •  ventoinha " + N(s[F.CpuFan], "0") + " RPM"), ct / 100, ct >= 90 ? 2 : ct >= 80 ? 1 : 0);

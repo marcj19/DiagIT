@@ -36,6 +36,147 @@ namespace DiagIT
             return 0;
         }
 
+        /// <summary>Cenários de diagnóstico sintéticos: tela azul x teste aprovado (ordem no tempo, sem contar a mesma falha duas vezes).</summary>
+        public static int DiagScenarios(string outFile)
+        {
+            o = new StreamWriter(outFile, false, new UTF8Encoding(false));
+            try
+            {
+                Paths.Ensure();
+                // 2 telas azuis 0x1A (MEMORY_MANAGEMENT) há 5 dias, também gravadas em Minidump
+                Func<int, List<WinEvent>> bsods = delegate(int daysAgo)
+                {
+                    List<WinEvent> l = new List<WinEvent>();
+                    for (int k = 0; k < 2; k++)
+                    {
+                        WinEvent e = new WinEvent();
+                        e.Provider = "Microsoft-Windows-WER-SystemErrorReporting"; e.Id = 1001; e.Time = DateTime.Now.AddDays(-daysAgo).AddHours(-k * 3);
+                        e.P = new string[] { "0x0000001a" };
+                        l.Add(e);
+                    }
+                    return l;
+                };
+                Func<int, HwSnapshot> dumps = delegate(int daysAgo)
+                {
+                    HwSnapshot h = new HwSnapshot();
+                    h.CrashDumpEnabled = true;
+                    for (int k = 0; k < 2; k++)
+                    {
+                        CrashDump cd = new CrashDump(); cd.Code = 0x1A; cd.Time = DateTime.Now.AddDays(-daysAgo).AddHours(-k * 3); cd.P = new ulong[] { 0x41793, 0, 0, 0 };
+                        h.Dumps.Add(cd);
+                    }
+                    return h;
+                };
+                Func<int, List<TestResult>> ramPass = delegate(int daysAgo)
+                {
+                    TestResult t = new TestResult(); t.Id = "x"; t.Kind = TestKind.Ram; t.Status = "passed"; t.Start = DateTime.Now.AddDays(-daysAgo); t.Summary = "Sem erros.";
+                    return new List<TestResult> { t };
+                };
+                int ram = (int)Comp.Ram, sw = (int)Comp.Software;
+
+                Say("== 1. Tela azul há 5 dias, teste de RAM aprovado há 1 dia");
+                Diagnosis d = Analyzer.Run(new List<SessionData>(), bsods(5), new List<DiskHealth>(), 30, ramPass(1), dumps(5));
+                Say("  RAM: " + d.States[ram].Status + " — " + d.States[ram].Headline + " | " + d.States[ram].Detail);
+                Say("  Software: " + d.States[sw].Status + " — " + d.States[sw].Headline);
+                Check(d.Findings.FindAll(delegate(Finding f) { return f.BugCode == 0x1A; }).Count == 1, "registro do Windows + Minidump viram UM achado (sem peso em dobro)");
+                Check(d.States[ram].Status == CompStatus.Ok, "RAM fica OK: o teste depois da tela azul não reproduziu o problema");
+                Check(d.States[sw].Status == CompStatus.Suspect && d.States[sw].Cause != null && d.States[sw].Cause.BugCode == 0x1A, "a tela azul sem explicação passa para drivers/BIOS");
+                Finding fb1 = d.Findings.Find(delegate(Finding f) { return f.BugCode == 0x1A; });
+                string vt, vsub;
+                Analyzer.PlainVerdict(d, out vt, out vsub);
+                Say("  Simples: " + (fb1 == null ? "-" : fb1.Plain) + " | " + vt + " | " + vsub);
+                Check(fb1 != null && fb1.Plain == "O PC teve 2 telas azuis ligadas à memória", "achado em linguagem simples (camada para leigos)");
+                Check(vt == "Seu PC teve 2 telas azuis, mas as peças testadas estão boas" && vsub.Contains("um driver ou um ajuste da BIOS"), "veredito simples aponta driver/BIOS");
+                Check(Analyzer.PlainNote(d.States[ram], ram).StartsWith("Passou no teste em"), "nota simples da RAM: passou no teste");
+
+                Say("== 2. Teste de RAM aprovado há 5 dias, tela azul há 1 dia");
+                d = Analyzer.Run(new List<SessionData>(), bsods(1), new List<DiskHealth>(), 30, ramPass(5), dumps(1));
+                Say("  RAM: " + d.States[ram].Status + " — " + d.States[ram].Detail);
+                Check(d.States[ram].Status == CompStatus.Suspect && d.States[ram].Retest, "RAM suspeita e pede para REPETIR o teste (problema depois da aprovação)");
+
+                Say("== 3. Tela azul sem nenhum teste");
+                d = Analyzer.Run(new List<SessionData>(), bsods(1), new List<DiskHealth>(), 30, new List<TestResult>(), dumps(1));
+                Say("  RAM: " + d.States[ram].Status + " — " + d.States[ram].Detail);
+                Check(d.States[ram].Status == CompStatus.Suspect && d.States[ram].Passed == null, "RAM suspeita e indica rodar o teste");
+
+                // ---- itens do guia da comunidade
+                Func<int, WinEvent> tdr = delegate(int daysAgo)
+                {
+                    WinEvent e = new WinEvent(); e.Provider = "Display"; e.Id = 4101; e.Time = DateTime.Now.AddDays(-daysAgo); return e;
+                };
+                Func<List<WinEvent>, List<WinEvent>> sorted = delegate(List<WinEvent> l) { l.Sort(delegate(WinEvent a, WinEvent b) { return b.Time.CompareTo(a.Time); }); return l; };
+                Predicate<Finding> wuF = delegate(Finding f) { return f.Title.Contains("Windows Update"); };
+
+                Say("== 4. Windows Update instalou o driver de vídeo em uso e os travamentos começaram depois");
+                WinEvent wu = new WinEvent(); wu.Provider = "Microsoft-Windows-WindowsUpdateClient"; wu.Id = 19; wu.Time = DateTime.Now.AddDays(-10);
+                wu.P = new string[] { "Advanced Micro Devices, Inc. - Display - 31.0.21921.1000" };
+                HwSnapshot hw = new HwSnapshot(); hw.GpuName = "AMD Radeon RX 7600"; hw.GpuDriver = "31.0.21921.1000";
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { wu, tdr(2), tdr(4), tdr(6) }), new List<DiskHealth>(), 30, new List<TestResult>(), hw);
+                Finding fw = d.Findings.Find(wuF);
+                Say("  " + (fw == null ? "(nenhum achado)" : fw.Title));
+                Check(fw != null && fw.Sev == Sev.Warn && fw.Title.StartsWith("Os travamentos de vídeo começaram depois"), "liga os travamentos à troca de driver pelo Windows Update");
+                hw.GpuDriver = "32.0.11000.1";   // usuário já instalou outro driver depois
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { wu, tdr(2) }), new List<DiskHealth>(), 30, new List<TestResult>(), hw);
+                Check(d.Findings.Find(wuF) == null, "não acusa quando o driver do Windows Update já não está em uso");
+
+                Say("== 5. GPU acima do clock oficial");
+                string model;
+                Check(Analyzer.OfficialBoost("AMD Radeon RX 7600", out model) == 2655 && Analyzer.OfficialBoost("AMD Radeon RX 7600 XT", out model) == 2755 &&
+                      Analyzer.OfficialBoost("AMD Radeon RX 9070 XT", out model) == 2970 && Analyzer.OfficialBoost("AMD Radeon RX 9070", out model) == 2520,
+                      "boost oficial pelo nome (RX 7600 x RX 7600 XT, RX 9070 x RX 9070 XT)");
+                TestResult gt = new TestResult(); gt.Id = "g"; gt.Kind = TestKind.Gpu; gt.Status = "passed"; gt.Start = DateTime.Now.AddDays(-1); gt.Summary = "ok";
+                gt.Set("t_gpu_clock_p95", 2790);
+                hw = new HwSnapshot(); hw.GpuName = "AMD Radeon RX 7600";
+                Predicate<Finding> clkF = delegate(Finding f) { return f.Title.StartsWith("A GPU trabalha acima do clock oficial"); };
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { tdr(3) }), new List<DiskHealth>(), 30, new List<TestResult> { gt }, hw);
+                Finding fc = d.Findings.Find(clkF);
+                Say("  " + (fc == null ? "(nenhum achado)" : fc.Title));
+                Check(fc != null && fc.Sev == Sev.Warn && fc.Advice.Contains("2655"), "com travamentos: pista + limitar a 2655 MHz no Adrenalin");
+                d = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult> { gt }, hw);
+                fc = d.Findings.Find(clkF);
+                Check(fc != null && fc.Sev == Sev.Info && fc.W.Count == 0, "sem travamentos: só informa, sem peso");
+
+                Say("== 6. Programa em segundo plano x partidas com problema");
+                List<SessionData> ss = new List<SessionData>();
+                for (int k = 0; k < 6; k++)
+                {
+                    SessionData sd = new SessionData(); sd.Info = new SessionInfo(); sd.Info.Id = "s" + k; sd.Info.Game = "jogo.exe";
+                    sd.Info.Start = DateTime.Now.AddDays(-k - 1); sd.Info.End = sd.Info.Start.AddHours(1);
+                    bool we = k < 3;
+                    if (we) sd.Info.Bg.Add("Wallpaper Engine");
+                    sd.Info.Status = we && k < 2 ? "interrupted" : "ok";
+                    ss.Add(sd);
+                }
+                d = Analyzer.Run(ss, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fb = d.Findings.Find(delegate(Finding f) { return f.Title.Contains("Wallpaper Engine"); });
+                Say("  " + (fb == null ? "(nenhum achado)" : fb.Title));
+                Check(fb != null && fb.Sev == Sev.Warn, "partidas com Wallpaper Engine caem mais (2 de 3 x 0 de 3)");
+                foreach (SessionData sd in ss) sd.Info.Status = sd.Info.Id == "s0" || sd.Info.Id == "s4" ? "interrupted" : "ok";
+                d = Analyzer.Run(ss, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(d.Findings.Find(delegate(Finding f) { return f.Title.Contains("Wallpaper Engine"); }) == null, "sem diferença entre com e sem: não acusa");
+
+                Say("== 7. Arquivo de paginação no HD com o Windows em SSD");
+                string sysL = Path.GetPathRoot(Environment.SystemDirectory).Substring(0, 1);
+                string other = sysL == "D" ? "E" : "D";
+                hw = new HwSnapshot();
+                VolumeInfo vs = new VolumeInfo(); vs.Letter = sysL; vs.Media = "SSD"; vs.Health = "saudável"; hw.Volumes.Add(vs);
+                VolumeInfo vh = new VolumeInfo(); vh.Letter = other; vh.Media = "HDD"; vh.Health = "saudável"; hw.Volumes.Add(vh);
+                hw.PagefileFiles.Add(sysL + ":\\pagefile.sys"); hw.PagefileFiles.Add(other + ":\\pagefile.sys");
+                d = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), hw);
+                Finding fp = d.Findings.Find(delegate(Finding f) { return f.Title.StartsWith("Memória virtual também no HD"); });
+                Say("  " + (fp == null ? "(nenhum achado)" : fp.Title));
+                Check(fp != null, "aponta o arquivo de paginação no HD");
+                hw.PagefileFiles.RemoveAt(1);
+                d = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), hw);
+                Check(d.Findings.Find(delegate(Finding f) { return f.Title.StartsWith("Memória virtual também no HD"); }) == null, "só no SSD: nada a apontar");
+                Say("");
+                Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
+                return fails == 0 ? 0 : 1;
+            }
+            catch (Exception e) { Say("EXCEÇÃO: " + e); return 2; }
+            finally { o.Close(); }
+        }
+
         /// <summary>Sonda as fontes de sensores reais e escreve tudo que foi lido.</summary>
         public static int Probe(string outFile)
         {

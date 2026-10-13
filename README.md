@@ -7,11 +7,19 @@ Feito em C# / Windows Forms (.NET Framework 4.8, que já vem no Windows). Não p
 
 ## Como usar
 
+Feito para quem entende de hardware **e** para quem só quer resolver o problema: tudo aparece primeiro em linguagem simples,
+com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver detalhes técnicos*.
+
 1. Abra `dist\DiagIT.exe` (ele pede permissão de administrador — necessária para ler a CPU, a placa-mãe, o SMART dos discos e os arquivos de tela azul).
-2. **Jogue normalmente.** O DiagIT fica na bandeja, detecta o jogo sozinho, grava a telemetria da partida e avisa no fim se viu algo errado.
-3. **Aba Testes** (com os jogos fechados): rode a *Bateria completa* (~20 min) ou testes individuais.
-4. **Aba Diagnóstico**: cada componente aparece como **PROBLEMA** (comprovado), **SUSPEITO** (há indícios — o teste indicado confirma ou descarta), **OK** (passou no teste) ou **NÃO TESTADO**.
-5. **Aba Correções**: aplica as soluções com um clique (sempre pedindo confirmação).
+2. **Jogue normalmente.** O DiagIT fica na bandeja, detecta o jogo sozinho, grava a partida e avisa no fim se viu algo errado.
+3. **Início**: o veredito do seu PC em uma frase, o anel com as 8 peças (cada segmento é uma peça, na cor do estado) e *O que fazer agora*.
+4. **Estou com um problema**: escolha o que acontece (tela azul, desliga sozinho, jogo fecha, travadinhas, tela preta, FPS baixo).
+   O DiagIT mostra o que já sabe, monta a verificação certa (sem repetir o que já passou) e acompanha tudo na tela *Verificando*.
+5. **Resultados**: cada peça como **Saudável**, **Precisa verificar**, **Com defeito** ou **Não verificado** (sempre com ícone, cor e texto),
+   e cada achado como **Comprovado**, **Indício** ou **Informação**, com *O que fazer*.
+   Um indício anterior ao teste aprovado não deixa a peça suspeita; se o problema voltar depois da aprovação, o DiagIT pede para repetir o teste.
+6. **Resolver**: aplica as soluções com um clique (sempre pedindo confirmação).
+7. **Avançado**: *Ao vivo* (gráficos em tempo real), *Hardware* (tudo que foi lido do PC) e *Partidas gravadas*. Testes individuais e mais longos ficam em *Verificar peças*.
 
 ## Testes (resultado verificável, não estimativa)
 
@@ -35,10 +43,15 @@ sozinho se a temperatura ficar crítica (e isso já é o resultado: refrigeraç�
 - **Configuração**: pentes de RAM (dual channel, kits misturados), memória virtual, BIOS, driver de vídeo, link PCIe.
 - **Partidas gravadas**: se o PC cair no meio do jogo, a partida fica marcada como interrompida com as últimas leituras.
   O app diferencia queda real do PC (Windows reiniciou) de o próprio DiagIT ter sido fechado.
+- **Itens do guia da comunidade** ([r/AMDHelp](https://www.reddit.com/r/AMDHelp/comments/1lnxb8o/)) que dá para medir. Cada um só vira achado quando cruza com problemas registrados:
+  - o Windows Update trocou o driver de vídeo em uso e os travamentos de vídeo começaram depois;
+  - a placa Radeon trabalha acima do clock oficial do modelo (medido nas partidas e no teste de GPU) e há travamentos de vídeo;
+  - programas citados como causa de engasgos (Wallpaper Engine, Instant Replay do Adrenalin, softwares de RGB): cada partida registra quais estavam abertos e o diagnóstico compara as partidas com e sem eles; placa de rede Realtek 2.5GbE com congelamentos registrados;
+  - arquivo de paginação no HD com o Windows em SSD.
 
 ## Correções disponíveis
 
-Memória virtual (tamanho recomendado), SFC + DISM, chkdsk online, teste completo de memória do Windows (no boot),
+Memória virtual (tamanho recomendado ou tirar do HD), impedir o Windows Update de trocar drivers, SFC + DISM, chkdsk online, teste completo de memória do Windows (no boot),
 ativação do registro de telas azuis, instalação limpa do driver de vídeo (passo a passo) e instalação do driver PawnIO.
 
 ## Compilar
@@ -49,7 +62,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 Gera `dist\DiagIT.exe` e copia as bibliotecas de sensores para `dist\sensores`. Use `-OutDir build\dev` para compilar sem
 substituir o executável que estiver aberto. Testes sem interface: `DiagIT.exe --selftest saida.txt` e
-`DiagIT.exe --run-test cpu|ram|gpu|disk|combined segundos saida.txt`.
+`DiagIT.exe --run-test cpu|ram|gpu|disk|combined segundos saida.txt`. Cenários do diagnóstico com dados sintéticos: `DiagIT.exe --diag-test saida.txt`. Imagens de todas as telas (para revisar o visual): `DiagIT.exe --multi --offscreen --no-elevate --screenshots pasta` (com `--with-run` também fotografa um teste rodando, o que grava esse teste no histórico).
 
 ## Dados e privacidade
 
