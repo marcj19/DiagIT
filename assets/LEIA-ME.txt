@@ -1,26 +1,33 @@
-﻿DiagIT v1.1.0 - check-up do seu PC, com testes comprovados
+﻿DiagIT v1.2.0 - check-up do seu PC, com testes comprovados
 ================================================================
 
 COMO USAR
 1. Extraia esta pasta para um lugar fixo (ex.: Documentos\DiagIT).
 2. Abra DiagIT.exe e aceite a permissao de administrador.
-   (necessaria para temperatura da CPU, tensoes da fonte, SMART dos discos e arquivos de tela azul)
-3. Jogue normalmente: o DiagIT fica na bandeja, detecta o jogo e grava a partida sozinho.
+   (necessaria para temperatura da CPU, tensoes da fonte, SMART dos discos, arquivos de tela azul e FPS)
+3. Jogue normalmente: o DiagIT fica na bandeja, detecta o jogo e grava a partida sozinho,
+   com FPS, 1% low e engasgos. O painel no jogo aparece sozinho; Ctrl+Shift+F mostra/esconde.
 4. Abra o DiagIT: a tela Inicio mostra a saude do PC e o que fazer agora.
    Com algum problema? Clique em "Estou com um problema", escolha o que acontece
    e o DiagIT monta a verificacao certa (feche os jogos antes).
-5. Veja o resultado em Resultados e aplique as solucoes em Resolver.
+5. Veja o resultado em Resultados. Use "Resolver passo a passo" ou "Ja fiz isso":
+   o DiagIT acompanha em "Suas correcoes" (Inicio) se o problema voltou ou foi resolvido.
 
 REQUISITOS
 - Windows 10 ou 11, 64 bits (o .NET Framework 4.8 ja vem no Windows).
 - Para ler CPU e placa-mae: driver PawnIO. Se nao estiver instalado, use
-  Correcoes > "Instalar / atualizar PawnIO" ou rode:  winget install namazso.PawnIO
+  Resolver > "Instalar / atualizar PawnIO" ou rode:  winget install namazso.PawnIO
 - Placa de video AMD ou NVIDIA: sensores lidos direto do driver de video (nada a instalar).
 
 IMPORTANTE
 - Os testes usam o hardware no maximo. O DiagIT recusa iniciar testes com jogo aberto.
 - Se o PC desligar durante um teste, abra o DiagIT de novo: ele registra o que aconteceu.
 - Seus dados ficam em %LOCALAPPDATA%\DiagIT. Nada e enviado para a internet.
+- O painel no jogo nao mexe no jogo (seguro com anti-cheat). Se nao aparecer, deixe o jogo
+  em "tela cheia sem bordas" ou janela.
+- Mantenha a pasta PresentMon junto do DiagIT.exe: ela mede o FPS.
+- O Windows pode avisar "O Windows protegeu o computador" (executavel sem assinatura paga):
+  clique em "Mais informacoes" > "Executar assim mesmo".
 
 Codigo-fonte e documentacao: https://github.com/marcj19/DiagIT
 Componentes de terceiros: veja THIRD_PARTY_NOTICES.md
