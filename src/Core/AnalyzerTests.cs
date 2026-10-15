@@ -345,14 +345,15 @@ namespace DiagIT
             if (pd.Count > 0)
             {
                 Finding f = new Finding();
-                f.Sev = Sev.Warn; f.Source = "Gerenciador de dispositivos";
+                bool benign = pd.TrueForAll(delegate(ProblemDevice x) { return HwFacts.IsBenignDevice(x); });
+                f.Sev = benign ? Sev.Info : Sev.Warn; f.Source = "Gerenciador de dispositivos";
                 f.Title = pd.Count + " dispositivo(s) com problema ou sem driver";
                 List<string> l = new List<string>();
                 foreach (ProblemDevice x in pd) l.Add("• " + x.Name + " — " + x.Meaning + " (código " + x.Code + ")");
                 f.Evidence = string.Join("\n", l.ToArray());
                 f.Advice = HwFacts.DeviceHint(pd[0]) + (pd.Count > 1 ? " Para os demais, veja Avançado → Hardware." : "");
                 bool critical = pd.Exists(delegate(ProblemDevice x) { return x.Class == "Display" || x.Class == "System" || x.Class == "SCSIAdapter" || x.Class == "HDC"; });
-                f.Weigh(Comp.Software, critical ? 0.35 : 0.1);
+                if (!benign) f.Weigh(Comp.Software, critical ? 0.35 : 0.1);   // só informa; não faz "Drivers e Windows" virar suspeito
                 d.Findings.Add(f);
             }
 

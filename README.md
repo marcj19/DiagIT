@@ -81,6 +81,9 @@ ativação do registro de telas azuis, instalação limpa do driver de vídeo (p
 
 Na instalação limpa do driver, o DiagIT percebe sozinho quando o driver de vídeo muda com o app aberto (marca o passo *Instale o driver baixado*, atualiza a placa e refaz a análise),
 tem o botão *Conferir o driver* (qual está em uso, se veio do Windows Update ou do fabricante, se o Windows ainda pode trocá-lo) e não conta como travamento de GPU os eventos que o próprio DDU e o instalador provocam.
+Quando o driver do fabricante entra e o teste da placa passa, o DiagIT registra a troca **na hora em que o driver foi instalado** e passa a acompanhar sozinho:
+o que aconteceu antes vira "antes da troca do driver" (informação, sem alerta), o veredito diz que a troca está em acompanhamento e, se o problema voltar,
+o alerta volta inteiro e a correção aparece como "ainda não resolveu". As regras de RAM e de disco não contam mais os testes do próprio DiagIT como "pouca RAM" ou "picos de disco".
 
 ## Compilar
 

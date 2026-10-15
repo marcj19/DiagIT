@@ -485,6 +485,7 @@ namespace DiagIT
                 List<SessionData> sds = LoadData(ScopeSessions(scope, sel));
                 // o acompanhamento das correções olha todas as partidas dos 30 dias, mesmo com outro escopo selecionado
                 List<SessionData> all = scope == 0 ? sds : LoadData(ScopeSessions(0, sel));
+                CloseDriverGuideIfDone();
                 Diagnosis d = Analyzer.Run(sds, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load());
                 if (scope != 0) { Diagnosis full = Analyzer.Run(all, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load()); d.Fixes = full.Fixes; }
                 Post(delegate { done(d, sds); });

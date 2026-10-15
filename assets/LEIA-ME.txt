@@ -1,4 +1,4 @@
-﻿DiagIT v1.2.2 - check-up do seu PC, com testes comprovados
+﻿DiagIT v1.2.3 - check-up do seu PC, com testes comprovados
 ================================================================
 
 COMO USAR

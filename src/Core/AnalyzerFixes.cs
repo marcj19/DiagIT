@@ -73,7 +73,8 @@ namespace DiagIT
             string t = f.Title;
             if (t.StartsWith("O driver de vídeo parou", StringComparison.Ordinal) || t.StartsWith("Travamentos de GPU", StringComparison.Ordinal) ||
                 t.StartsWith("Jogos/apps travaram dentro do driver", StringComparison.Ordinal) || t.StartsWith("Os travamentos de vídeo", StringComparison.Ordinal) ||
-                t.StartsWith("A GPU trabalha acima", StringComparison.Ordinal) || t.StartsWith("O Windows Update instalou", StringComparison.Ordinal)) return "video";
+                t.StartsWith("A GPU trabalha acima", StringComparison.Ordinal) || t.StartsWith("O Windows Update instalou", StringComparison.Ordinal) ||
+                t.StartsWith("Watchdog do kernel", StringComparison.Ordinal) || t.StartsWith("REPRODUZIDO: o watchdog", StringComparison.Ordinal)) return "video";
             if (t.StartsWith("O PC desligou", StringComparison.Ordinal) || t.StartsWith("Partida interrompida", StringComparison.Ordinal)) return "desligamentos";
             if (t.StartsWith("O sistema 'congelou'", StringComparison.Ordinal) || t.StartsWith("Tempo excessivo em drivers", StringComparison.Ordinal) ||
                 t.StartsWith("Disco com picos", StringComparison.Ordinal) || t.StartsWith("Memória virtual também no HD", StringComparison.Ordinal) ||
@@ -106,6 +107,9 @@ namespace DiagIT
             }
             return best;
         }
+
+        /// <summary>Correção que troca o driver de vídeo (instalação limpa ou conferida pelo DiagIT).</summary>
+        static bool IsDriverSwap(FixEntry fx) { return fx.Kind.StartsWith("guia:driver-video-limpo", StringComparison.Ordinal) || fx.Kind.StartsWith("auto:driver-video", StringComparison.Ordinal); }
 
         static void FixRules(Diagnosis d, List<WinEvent> ev, List<SessionData> sessions, List<FixEntry> fixes)
         {
@@ -163,13 +167,25 @@ namespace DiagIT
                 st.Text += PerfChange(sessions, fx.When);
                 d.Fixes.Add(st);
 
-                // correção que resolveu: os indícios de antes dela pesam bem menos (o problema daquela época foi tratado)
-                if (st.State == 1)
+                // correção que resolveu: os indícios de antes dela pesam bem menos (o problema daquela época foi tratado).
+                // Troca de driver de vídeo é um caso à parte: o que aconteceu antes foi com o driver antigo, que já não existe;
+                // enquanto nada novo aparecer, esses indícios pesam menos, mesmo que ainda faltem dias para dar como resolvido.
+                bool driverSwap = IsDriverSwap(fx) && st.After == 0;
+                if (st.State == 1 || driverSwap)
                     foreach (Finding f in d.Findings)
                     {
                         if (f.Confirmed || f.Sev == Sev.Ok || f.Last == DateTime.MinValue || f.Last > fx.When) continue;
                         string sc = ScopeOf(f);
                         if (fx.Scope != "geral" && sc != fx.Scope && !(fx.Scope == "telas-azuis" && sc == "video") && !(fx.Scope == "video" && sc == "telas-azuis" && f.BugCode >= 0 && Array.IndexOf(VideoBugchecks, f.BugCode) >= 0)) continue;
+                        if (st.State != 1)
+                        {
+                            // driver novo, ainda sem confirmação: o que veio antes é histórico do driver antigo, não um alerta de agora.
+                            // Se o problema voltar, esta correção vira "não resolveu" (State 2) e o achado volta a valer inteiro.
+                            f.Sev = Sev.Info; f.W.Clear(); f.Guide = null;
+                            f.Simple = f.Plain + ", antes da troca do driver";
+                            f.Evidence += "\nAconteceu antes do driver novo (" + fx.When.ToString("dd/MM HH:mm") + "), com o driver antigo. Nada novo desde então: o DiagIT acompanha e só dá como resolvido depois de alguns dias de uso. Se voltar, este alerta volta a valer.";
+                            continue;
+                        }
                         List<Comp> keys = new List<Comp>(f.W.Keys);
                         foreach (Comp c in keys) f.W[c] = f.W[c] * 0.3;
                         f.Evidence += "\nAconteceu antes da correção de " + fx.When.ToString("dd/MM") + " (\"" + fx.Title + "\"), e não voltou desde então.";

@@ -332,10 +332,16 @@ namespace DiagIT
             return h;
         }
 
-        public static string DeviceHint(ProblemDevice d)
+        /// <summary>Conexão USB de water cooler: o cooler funciona sem o driver, só falta o monitoramento. Não é causa de travamento nem de tela azul.</summary>
+        public static bool IsBenignDevice(ProblemDevice d)
         {
             string n = d.Name.ToLowerInvariant();
-            if (n.Contains("h80i") || n.Contains("h100i") || n.Contains("h115i") || n.Contains("h150i") || n.Contains("corsair"))
+            return n.Contains("h80i") || n.Contains("h100i") || n.Contains("h115i") || n.Contains("h150i") || n.Contains("corsair");
+        }
+
+        public static string DeviceHint(ProblemDevice d)
+        {
+            if (IsBenignDevice(d))
                 return "É a conexão USB do water cooler Corsair. O cooler funciona sem ela, mas para monitorar a bomba e a temperatura do líquido instale o Corsair iCUE.";
             if (d.Code == 28 || d.Code == 1 || d.Code == 18) return "Instale o driver do fabricante (site do fabricante da placa-mãe ou do próprio dispositivo) ou procure em Windows Update > Atualizações opcionais.";
             if (d.Code == 43) return "O dispositivo reportou falha: reconecte-o, troque de porta USB e reinstale o driver. Se repetir, o dispositivo pode estar com defeito.";

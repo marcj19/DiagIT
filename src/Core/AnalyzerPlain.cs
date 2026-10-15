@@ -73,6 +73,21 @@ namespace DiagIT
         /// <summary>Veredito em linguagem simples para o topo do Início e dos Resultados.</summary>
         public static void PlainVerdict(Diagnosis d, out string title, out string sub)
         {
+            PlainVerdictCore(d, out title, out sub);
+            // troca de driver de vídeo em acompanhamento: diz claramente em que pé está, em vez de deixar o usuário na dúvida
+            foreach (FixStatus fs in d.Fixes)
+            {
+                if (!IsDriverSwap(fs.Fix) || fs.State == 2) continue;
+                sub = (sub.Length > 0 ? sub + " " : "") + (fs.State == 1
+                    ? "O driver de vídeo foi trocado em " + fs.Fix.When.ToString("dd/MM") + " e os travamentos pararam."
+                    : "Você trocou o driver de vídeo em " + fs.Fix.When.ToString("dd/MM 'às' HH:mm") + " e nada de errado apareceu desde então. " +
+                      "Falta usar o PC por alguns dias (jogue normalmente) para confirmar; o DiagIT acompanha e avisa.");
+                break;
+            }
+        }
+
+        static void PlainVerdictCore(Diagnosis d, out string title, out string sub)
+        {
             List<int> failed = new List<int>(), suspect = new List<int>(), untested = new List<int>();
             int ok = 0;
             for (int i = 0; i < 8; i++)

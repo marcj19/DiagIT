@@ -52,14 +52,17 @@ namespace DiagIT
             }
         }
 
-        public static FixEntry Add(string kind, string title, string scope)
+        public static FixEntry Add(string kind, string title, string scope) { return Add(kind, title, scope, DateTime.Now); }
+
+        /// <summary>Registra a correção na hora em que ela de fato aconteceu (ex.: quando o driver foi instalado), não na hora em que o usuário a marcou.</summary>
+        public static FixEntry Add(string kind, string title, string scope, DateTime when)
         {
             List<FixEntry> l = Load();
             // a mesma correção registrada de novo no mesmo dia não duplica
-            l.RemoveAll(delegate(FixEntry x) { return x.Kind == kind && (DateTime.Now - x.When).TotalHours < 12; });
+            l.RemoveAll(delegate(FixEntry x) { return x.Kind == kind && Math.Abs((when - x.When).TotalHours) < 12; });
             FixEntry f = new FixEntry();
             f.Id = DateTime.Now.ToString("yyyyMMddHHmmss") + "_" + l.Count;
-            f.When = DateTime.Now; f.Kind = kind; f.Title = title; f.Scope = string.IsNullOrEmpty(scope) ? "geral" : scope;
+            f.When = when; f.Kind = kind; f.Title = title; f.Scope = string.IsNullOrEmpty(scope) ? "geral" : scope;
             l.Add(f);
             Save(l);
             Log.Write("Correção registrada para acompanhamento: " + title + " (" + f.Scope + ")");

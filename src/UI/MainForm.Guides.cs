@@ -131,7 +131,14 @@ namespace DiagIT
         {
             if (curGuide == null) return;
             if (!AllDone() && MessageBox.Show(this, "Ainda faltam passos. Marcar o guia como concluído mesmo assim?", "Passo a passo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            FixLog.Add("guia:" + curGuide.Id, curGuide.Done, curGuide.Scope);
+            DateTime when = DateTime.Now;
+            if (curGuide.Id == "driver-video-limpo")
+            {
+                // o que vale é a hora em que o driver novo entrou, não a hora do clique: o que acontecer depois dela já é do driver novo
+                DateTime at = VideoAdapters.InstalledAt(VideoAdapters.Primary(VideoAdapters.ReadAll()));
+                if (at > DateTime.MinValue && (DateTime.Now - at).TotalDays <= 3) when = at;
+            }
+            FixLog.Add("guia:" + curGuide.Id, curGuide.Done, curGuide.Scope, when);
             ClearGuideProgress();
             MessageBox.Show(this, "Pronto! A partir de agora o DiagIT acompanha os " + Analyzer.ScopeName(curGuide.Scope) +
                 ": se pararem, ele avisa que resolveu; se voltarem, mostra o próximo passo. Você vê isso no Início, em \"Suas correções\".",

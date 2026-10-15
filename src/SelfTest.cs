@@ -153,6 +153,46 @@ namespace DiagIT
                 Say("  " + (fs == null ? "(nenhum)" : fs.Title + " | " + fs.Evidence.Replace("\n", " / ")));
                 Check(fs != null && fs.Title.EndsWith("1×") && fs.Evidence.Contains("durante a instalação"), "só conta o travamento fora da troca de driver e explica os que ignorou");
 
+                Say("== 4d. Driver de vídeo trocado: o que veio antes não pesa, e o veredito diz que está acompanhando");
+                FixEntry swapFix = new FixEntry(); swapFix.Id = "t1"; swapFix.Kind = "guia:driver-video-limpo"; swapFix.Scope = "video"; swapFix.Title = "Reinstalei o driver de vídeo do jeito certo";
+                swapFix.When = DateTime.Now.AddHours(-2);
+                List<WinEvent> before = sorted(new List<WinEvent> { lke193(DateTime.Now.AddHours(-30)), lke193(DateTime.Now.AddHours(-26)), lke193(DateTime.Now.AddHours(-20)) });
+                Func<Diagnosis, Finding> gpuF = delegate(Diagnosis dd) { return dd.Findings.Find(delegate(Finding f) { return f.Title.StartsWith("Travamentos de GPU registrados"); }); };
+                d = Analyzer.Run(new List<SessionData>(), before, new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                double wBefore = gpuF(d).W[Comp.Gpu];
+                d = Analyzer.Run(new List<SessionData>(), before, new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swapFix });
+                string swapT, swapS; Analyzer.PlainVerdict(d, out swapT, out swapS);
+                Say("  " + swapT + " | " + swapS);
+                Check(wBefore > 0 && gpuF(d) != null && gpuF(d).Sev == Sev.Info && gpuF(d).W.Count == 0 && gpuF(d).Plain.EndsWith("antes da troca do driver") && gpuF(d).Guide == null &&
+                      gpuF(d).Evidence.Contains("antes do driver novo"), "troca de driver sem nada novo: o que veio antes vira informação, sem botão de resolver");
+                HwSnapshot hwCooler = new HwSnapshot();
+                ProblemDevice cooler = new ProblemDevice(); cooler.Name = "Corsair H100i Platinum"; cooler.Class = "USB"; cooler.Code = 28; hwCooler.Problems.Add(cooler);
+                Diagnosis dCooler = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), hwCooler);
+                Finding fCooler = dCooler.Findings.Find(delegate(Finding f) { return f.Title.Contains("dispositivo(s) com problema"); });
+                Check(fCooler != null && fCooler.Sev == Sev.Info && fCooler.W.Count == 0, "conexão USB do cooler sem driver só informa, não vira suspeita de driver");
+                Check(d.Fixes.Count == 1 && d.Fixes[0].State != 2 && swapS.Contains("Você trocou o driver de vídeo"), "o veredito diz que a troca está em acompanhamento");
+                List<WinEvent> again = new List<WinEvent>(before); again.Add(lke193(DateTime.Now.AddMinutes(-20))); sorted(again);
+                d = Analyzer.Run(new List<SessionData>(), again, new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swapFix });
+                Analyzer.PlainVerdict(d, out swapT, out swapS);
+                Check(d.Fixes[0].State == 2 && !swapS.Contains("Você trocou o driver de vídeo") && !(gpuF(d).Evidence.Contains("antes do driver novo")), "travamento depois da troca: não esconde nada e avisa que não resolveu");
+
+                Say("== 4e. Testes do próprio DiagIT não viram 'pouca RAM' nem 'picos de disco'");
+                Func<string, SessionData> stress = delegate(string name)
+                {
+                    SessionData sd = new SessionData(); sd.Info = new SessionInfo(); sd.Info.Id = "x"; sd.Info.Game = name; sd.Info.Start = DateTime.Now.AddHours(-5); sd.Info.End = DateTime.Now.AddHours(-4);
+                    for (int i = 0; i < 60; i++)
+                    {
+                        Sample x = new Sample(); x.Time = sd.Info.Start.AddSeconds(i * 2);
+                        x.V[F.Cpu] = 20; x.V[F.Avail] = 200; x.V[F.Commit] = 97; x.V[F.DiskLat] = i == 30 ? 1500 : 2;   // RAM travada de propósito e leitura total do disco
+                        sd.S.Add(x);
+                    }
+                    return sd;
+                };
+                Predicate<Finding> memDisk = delegate(Finding f) { return f.Title.StartsWith("Pouca memória") || f.Title.StartsWith("Memória virtual (commit)") || f.Title.StartsWith("Disco com picos"); };
+                Diagnosis dTest = Analyzer.Run(new List<SessionData> { stress("[Teste] Memória RAM") }, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Diagnosis dGame = Analyzer.Run(new List<SessionData> { stress("jogo.exe") }, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(dTest.Findings.Find(memDisk) == null && dGame.Findings.Find(memDisk) != null, "RAM/disco no limite só contam em partida de jogo, não durante os testes");
+
                 Say("== 4c. Adaptador de vídeo básico em qualquer idioma");
                 Check(VideoAdapters.IsGeneric("Adaptador de Vídeo Básico da Microsoft", "", "") && VideoAdapters.IsGeneric("Microsoft Basic Display Adapter", "", "") &&
                       VideoAdapters.IsGeneric("Qualquer nome", "Microsoft", "") && VideoAdapters.IsGeneric("Qualquer nome", "", "BasicDisplay.sys") &&

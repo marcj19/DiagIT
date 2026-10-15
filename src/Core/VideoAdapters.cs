@@ -7,7 +7,7 @@ namespace DiagIT
     /// <summary>Uma placa de vídeo como o Windows a enxerga agora.</summary>
     public class VideoAdapter
     {
-        public string Name = "", DriverVersion = "", PnpId = "", Maker = "", Drivers = "";
+        public string Name = "", DriverVersion = "", PnpId = "", Maker = "", Drivers = "", Inf = "";
         public DateTime DriverDate = DateTime.MinValue;
         /// <summary>Adaptador genérico do Windows (sem driver do fabricante) ou virtual (área de trabalho remota).</summary>
         public bool Generic;
@@ -36,7 +36,7 @@ namespace DiagIT
             List<VideoAdapter> l = new List<VideoAdapter>();
             try
             {
-                using (ManagementObjectSearcher s = new ManagementObjectSearcher("SELECT Name,DriverVersion,DriverDate,PNPDeviceID,AdapterCompatibility,InstalledDisplayDrivers FROM Win32_VideoController"))
+                using (ManagementObjectSearcher s = new ManagementObjectSearcher("SELECT Name,DriverVersion,DriverDate,PNPDeviceID,AdapterCompatibility,InstalledDisplayDrivers,InfFilename FROM Win32_VideoController"))
                     foreach (ManagementObject o in s.Get())
                     {
                         VideoAdapter a = new VideoAdapter();
@@ -45,6 +45,7 @@ namespace DiagIT
                         a.PnpId = Convert.ToString(o["PNPDeviceID"]) ?? "";
                         a.Maker = Convert.ToString(o["AdapterCompatibility"]) ?? "";
                         a.Drivers = Convert.ToString(o["InstalledDisplayDrivers"]) ?? "";
+                        a.Inf = Convert.ToString(o["InfFilename"]) ?? "";
                         try { string dd = Convert.ToString(o["DriverDate"]); if (!string.IsNullOrEmpty(dd)) a.DriverDate = ManagementDateTimeConverter.ToDateTime(dd); } catch { }
                         a.Generic = IsGeneric(a.Name, a.Maker, a.Drivers);
                         l.Add(a);
@@ -52,6 +53,18 @@ namespace DiagIT
             }
             catch (Exception e) { Log.Write("VideoAdapters: " + e.Message); }
             return l;
+        }
+
+        /// <summary>Quando o driver em uso entrou no Windows (o .inf é copiado para C:\Windows\INF na instalação), ou MinValue se não der para saber.</summary>
+        public static DateTime InstalledAt(VideoAdapter a)
+        {
+            try
+            {
+                if (a == null || a.Inf.Length == 0) return DateTime.MinValue;
+                string p = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "INF", a.Inf);
+                return System.IO.File.Exists(p) ? System.IO.File.GetCreationTime(p) : DateTime.MinValue;
+            }
+            catch { return DateTime.MinValue; }
         }
 
         /// <summary>A placa de verdade (a primeira que não é genérica), ou null se só há o adaptador básico.</summary>

@@ -876,8 +876,13 @@ namespace DiagIT
                 }
             }
 
+            // RAM e disco: sÃ³ as partidas de jogo. Os testes do DiagIT enchem a memÃ³ria e leem o disco inteiro de propÃ³sito,
+            // e isso nÃ£o Ã© problema do PC (aparecia como "pouca RAM livre" e "picos de latÃªncia no disco" logo depois de rodar os testes).
+            List<Sample> play = new List<Sample>();
+            foreach (SessionData sd in sessions) if (GameSession(sd)) play.AddRange(sd.S);
+
             // ---------- RAM
-            double[] avail = Stat.Vals(all, F.Avail), commit = Stat.Vals(all, F.Commit), hard = Stat.Vals(all, F.Hard);
+            double[] avail = Stat.Vals(play, F.Avail), commit = Stat.Vals(play, F.Commit), hard = Stat.Vals(play, F.Hard);
             if (avail.Length > 0)
             {
                 double mn = Stat.Min(avail), lowFrac = Stat.FracBelow(avail, 1024);
@@ -905,7 +910,7 @@ namespace DiagIT
             }
 
             // ---------- Disco
-            double[] lat = Stat.Vals(all, F.DiskLat);
+            double[] lat = Stat.Vals(play, F.DiskLat);
             if (lat.Length > 20)
             {
                 double p99 = Stat.Percentile(lat, 0.99), mx = Stat.Max(lat);

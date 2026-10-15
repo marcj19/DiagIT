@@ -115,8 +115,45 @@ namespace DiagIT
             else if (!blocked)
                 sb.Append("O driver está certo, mas o Windows ainda pode trocá-lo sozinho. No passo \"Impeça o Windows de trocar o driver\", clique em \"Impedir agora\" (precisa do DiagIT como administrador).");
             else
-                sb.Append("Tudo certo com o driver. Agora rode o teste da placa e jogue normalmente: o DiagIT acompanha se os travamentos voltam.");
+            {
+                bool tracking = CloseDriverGuideIfDone();
+                sb.Append(tracking
+                    ? "Tudo certo com o driver, e o teste da placa já passou depois da instalação. Registrei a troca e o DiagIT passa a acompanhar: nos Resultados, o que aconteceu antes do driver novo aparece como \"antes da troca\". Jogue normalmente; se os travamentos voltarem, ele avisa."
+                    : "Tudo certo com o driver. Agora rode o teste da placa (3 minutos): quando ele passar, o DiagIT registra a troca e passa a acompanhar sozinho.");
+                if (tracking) StartAnalyzeClick(false);
+            }
             MessageBox.Show(this, sb.ToString(), "Conferir o driver de vídeo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        /// <summary>
+        /// Passo a passo do driver limpo em andamento, com o driver do fabricante já instalado e o teste da placa aprovado depois disso:
+        /// registra a correção na hora em que o driver entrou (23:02, não "agora") e passa a acompanhar. Assim ninguém precisa lembrar de
+        /// clicar em "Concluir", e o que aconteceu antes do driver novo não é confundido com problema atual. Devolve true se registrou.
+        /// </summary>
+        bool CloseDriverGuideIfDone()
+        {
+            try
+            {
+                string[] s = GuideInProgress();
+                if (s == null || s.Length < 3 || s[0] != "driver-video-limpo") return false;
+                Guide g = Rules.GuideById("driver-video-limpo");
+                if (g == null) return false;
+                int idx = -1;
+                for (int i = 0; i < g.Steps.Count; i++) if (g.Steps[i].Title.StartsWith("Instale o driver", StringComparison.OrdinalIgnoreCase)) { idx = i; break; }
+                if (idx < 0 || idx >= s[2].Length || s[2][idx] != '1') return false;
+                VideoAdapter a = VideoAdapters.Primary(VideoAdapters.ReadAll());
+                DateTime at = VideoAdapters.InstalledAt(a);
+                if (a == null || at == DateTime.MinValue || (DateTime.Now - at).TotalDays > 3) return false;
+                bool tested = false;
+                foreach (TestResult t in TestStore.ListAll()) if (t.Kind == TestKind.Gpu && t.Status == "passed" && t.Start > at) tested = true;
+                if (!tested) return false;
+                FixLog.Add("guia:" + g.Id, g.Done, g.Scope, at);
+                ClearGuideProgress();
+                Post(delegate { if (curGuide != null && curGuide.Id == g.Id) curGuide = null; });
+                Balloon("Driver de vídeo: acompanhando", "Registrei a troca do driver de " + at.ToString("dd/MM HH:mm") + " e o teste da placa passou. O DiagIT avisa se os travamentos voltarem.", ToolTipIcon.Info);
+                return true;
+            }
+            catch (Exception e) { Log.Write("CloseDriverGuideIfDone: " + e.Message); return false; }
         }
 
         /// <summary>Se o passo a passo do driver limpo está em andamento, marca "Instale o driver baixado" como feito.</summary>
