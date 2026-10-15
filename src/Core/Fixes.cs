@@ -170,22 +170,34 @@ namespace DiagIT
         }
 
         // ------------------------------------------------------------------ Windows Update x drivers
+        // Duas portas por onde o Windows troca o driver: (1) as atualizações de qualidade trazem drivers (política abaixo) e
+        // (2) o Windows procura driver sozinho assim que um dispositivo fica sem ele, como logo depois do DDU. A segunda é a que
+        // reinstala o driver antigo por cima da limpeza, e é a "Instalação de dispositivos" (SearchOrderConfig) + a política de busca.
         const string WuPolicy = @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate";
+        const string DriverSearchPolicy = @"SOFTWARE\Policies\Microsoft\Windows\DriverSearching";
+        const string DriverSearchUser = @"SOFTWARE\Microsoft\Windows\CurrentVersion\DriverSearching";
 
-        public static bool WuDriversBlocked()
+        static int RegInt(string path, string name, int def)
         {
             try
             {
-                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(WuPolicy))
+                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(path))
                 {
-                    object v = k == null ? null : k.GetValue("ExcludeWUDriversInQualityUpdate");
-                    return v != null && Convert.ToInt32(v) == 1;
+                    object v = k == null ? null : k.GetValue(name);
+                    return v == null ? def : Convert.ToInt32(v);
                 }
             }
-            catch { return false; }
+            catch { return def; }
         }
 
-        /// <summary>Política oficial "Não incluir drivers com as atualizações do Windows" (reversível).</summary>
+        /// <summary>Bloqueio completo: sem drivers nas atualizações E sem busca automática de driver no Windows Update.</summary>
+        public static bool WuDriversBlocked()
+        {
+            return RegInt(WuPolicy, "ExcludeWUDriversInQualityUpdate", 0) == 1 &&
+                   (RegInt(DriverSearchUser, "SearchOrderConfig", 1) == 0 || RegInt(DriverSearchPolicy, "DontSearchWindowsUpdate", 0) == 1);
+        }
+
+        /// <summary>Impede o Windows Update de trocar drivers, nas duas portas (reversível).</summary>
         public static bool SetWuDriversBlocked(bool block, out string msg)
         {
             try
@@ -195,7 +207,15 @@ namespace DiagIT
                     if (block) k.SetValue("ExcludeWUDriversInQualityUpdate", 1, Microsoft.Win32.RegistryValueKind.DWord);
                     else k.DeleteValue("ExcludeWUDriversInQualityUpdate", false);
                 }
-                msg = block ? "O Windows Update não vai mais instalar drivers (vídeo, chipset, rede...). Atualize-os pelo site do fabricante. Vale a partir da próxima busca de atualizações."
+                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(DriverSearchPolicy))
+                {
+                    if (block) k.SetValue("DontSearchWindowsUpdate", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                    else k.DeleteValue("DontSearchWindowsUpdate", false);
+                }
+                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(DriverSearchUser))
+                    k.SetValue("SearchOrderConfig", block ? 0 : 1, Microsoft.Win32.RegistryValueKind.DWord);
+                msg = block ? "Pronto: o Windows não vai mais instalar drivers sozinho, nem nas atualizações nem quando um dispositivo fica sem driver (como logo depois do DDU). " +
+                              "Atualize os drivers pelo site do fabricante. Vale na hora para a busca de driver e na próxima busca de atualizações."
                             : "O Windows Update voltou a poder instalar drivers.";
                 Log.Write("Correção aplicada: " + msg);
                 return true;

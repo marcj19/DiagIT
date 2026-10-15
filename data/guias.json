@@ -12,15 +12,16 @@
           "acoes": [ { "rotulo": "Abrir o site do driver", "tipo": "abrir", "alvo": "{site_driver}" } ] },
         { "titulo": "Baixe o DDU", "texto": "O DDU (Display Driver Uninstaller) remove o driver antigo por completo, sem deixar restos. Baixe na página oficial e extraia numa pasta fácil de achar, como a Área de Trabalho.",
           "acoes": [ { "rotulo": "Abrir a página do DDU", "tipo": "abrir", "alvo": "https://www.wagnardsoft.com/display-driver-uninstaller-ddu-" } ] },
-        { "titulo": "Impeça o Windows de trocar o driver", "texto": "Sem isso, o Windows Update pode instalar outro driver por cima do seu logo depois.",
+        { "titulo": "Impeça o Windows de trocar o driver", "texto": "Sem isso, o Windows instala sozinho um driver antigo assim que o DDU remove o seu, em poucos segundos, e o seu trabalho se perde. O botão desliga as duas formas de o Windows trocar drivers (nas atualizações e na busca automática de dispositivo sem driver).",
           "acoes": [ { "rotulo": "Impedir agora", "tipo": "diagit", "alvo": "bloquear-wu" } ] },
-        { "titulo": "Desconecte a internet", "texto": "Tire o cabo de rede ou desligue o Wi-Fi. Assim o Windows não instala nenhum driver sozinho enquanto você troca o seu.", "acoes": [] },
+        { "titulo": "Desconecte a internet", "texto": "Tire o cabo de rede ou desligue o Wi-Fi, mesmo depois de clicar no botão acima. É a garantia de que o Windows não instala nenhum driver sozinho enquanto você troca o seu.", "acoes": [] },
         { "titulo": "Reinicie em modo de segurança", "texto": "Clique no botão abaixo: o PC reinicia numa tela de opções. Escolha Solução de problemas → Opções avançadas → Configurações de Inicialização → Reiniciar, e depois aperte a tecla 4. O DiagIT guarda em que passo você está.",
           "acoes": [ { "rotulo": "Reiniciar nas opções avançadas", "tipo": "diagit", "alvo": "reiniciar-avancado" } ] },
         { "titulo": "Remova o driver com o DDU", "texto": "No modo de segurança, abra o DDU da pasta onde você extraiu. Escolha o tipo 'GPU' e '{nome_ddu}' e clique em 'Limpar e reiniciar'.", "acoes": [] },
-        { "titulo": "Instale o driver baixado", "texto": "Depois que o PC reiniciar, instale o driver que você baixou no passo 1. Quando terminar, reconecte a internet.", "acoes": [] },
-        { "titulo": "Confirme com o teste", "texto": "Rode o teste da placa de vídeo (3 minutos). Depois, o DiagIT acompanha se os travamentos voltam.",
-          "acoes": [ { "rotulo": "Testar a placa de vídeo", "tipo": "diagit", "alvo": "teste-gpu" } ] }
+        { "titulo": "Instale o driver baixado", "texto": "Depois que o PC reiniciar, instale o driver que você baixou no passo 1. Se o instalador oferecer instalação limpa (\"Factory Reset\" na AMD, \"Executar instalação limpa\" na NVIDIA), marque. Quando terminar, reconecte a internet. O DiagIT percebe sozinho que o driver mudou.", "acoes": [] },
+        { "titulo": "Confirme com o teste", "texto": "Confira qual driver ficou em uso e de onde ele veio, e rode o teste da placa de vídeo (3 minutos). Depois, o DiagIT acompanha se os travamentos voltam.",
+          "acoes": [ { "rotulo": "Conferir o driver", "tipo": "diagit", "alvo": "verificar-driver" },
+                     { "rotulo": "Testar a placa de vídeo", "tipo": "diagit", "alvo": "teste-gpu" } ] }
       ]
     },
     {

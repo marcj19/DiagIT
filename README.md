@@ -76,8 +76,11 @@ temperatura de GPU e CPU. Liga sozinho nas partidas (Configurações) e **Ctrl+S
 
 ## Correções disponíveis
 
-Memória virtual (tamanho recomendado ou tirar do HD), impedir o Windows Update de trocar drivers, SFC + DISM, chkdsk online, teste completo de memória do Windows (no boot),
+Memória virtual (tamanho recomendado ou tirar do HD), impedir o Windows Update de trocar drivers (nas atualizações **e** na busca automática de driver, que é a que reinstala um driver antigo logo depois do DDU), SFC + DISM, chkdsk online, teste completo de memória do Windows (no boot),
 ativação do registro de telas azuis, instalação limpa do driver de vídeo (passo a passo) e instalação do driver PawnIO.
+
+Na instalação limpa do driver, o DiagIT percebe sozinho quando o driver de vídeo muda com o app aberto (marca o passo *Instale o driver baixado*, atualiza a placa e refaz a análise),
+tem o botão *Conferir o driver* (qual está em uso, se veio do Windows Update ou do fabricante, se o Windows ainda pode trocá-lo) e não conta como travamento de GPU os eventos que o próprio DDU e o instalador provocam.
 
 ## Compilar
 

@@ -235,7 +235,9 @@ namespace DiagIT
 
     public class MachineInfo
     {
-        public string Cpu = "", Gpu = "", GpuDriver = "", Board = "", Os = "";
+        public string Cpu = "", Gpu = "", GpuDriver = "", Board = "", Os = "", VideoSignature = "";
+        /// <summary>O Windows só enxerga o adaptador básico: falta o driver do fabricante.</summary>
+        public bool GpuMissingDriver;
         public double RamGB, VramGB;
         public int Cores, Threads;
 
@@ -252,15 +254,17 @@ namespace DiagIT
                     m.Threads = Convert.ToInt32(o["NumberOfLogicalProcessors"]);
                     break;
                 }
-                foreach (System.Management.ManagementObject o in new System.Management.ManagementObjectSearcher(
-                    "SELECT Name,DriverVersion FROM Win32_VideoController").Get())
+                List<VideoAdapter> va = VideoAdapters.ReadAll();
+                VideoAdapter gpu = VideoAdapters.Primary(va);
+                if (gpu != null) { m.Gpu = gpu.Name; m.GpuDriver = gpu.DriverVersion; }
+                else
                 {
-                    string n = Convert.ToString(o["Name"]);
-                    if (n.IndexOf("Basic", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Remote", StringComparison.OrdinalIgnoreCase) >= 0) continue;
-                    m.Gpu = n;
-                    m.GpuDriver = Convert.ToString(o["DriverVersion"]);
-                    break;
+                    // só o adaptador básico do Windows: a placa existe, mas está sem o driver do fabricante
+                    m.GpuMissingDriver = va.Count > 0;
+                    string brand = va.Count > 0 ? VideoAdapters.VendorFromPnp(va[0].PnpId) : "";
+                    m.Gpu = va.Count > 0 ? (brand.Length > 0 ? "Placa " + brand + " (sem driver)" : "Placa de vídeo (sem driver)") : "";
                 }
+                m.VideoSignature = VideoAdapters.Signature(va);
                 foreach (System.Management.ManagementObject o in new System.Management.ManagementObjectSearcher(
                     "SELECT Manufacturer,Product FROM Win32_BaseBoard").Get())
                 {

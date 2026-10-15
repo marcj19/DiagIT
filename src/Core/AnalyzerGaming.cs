@@ -53,7 +53,7 @@ namespace DiagIT
                 if (!hit && e.Provider == "Windows Error Reporting" && e.Id == 1001 && e.Prop(2) == "LiveKernelEvent")
                 {
                     string c = e.Prop(5).ToLowerInvariant();
-                    hit = c == "141" || c == "117" || c == "193" || c == "10e";
+                    hit = (c == "141" || c == "117" || c == "193" || c == "10e") && !DuringInstall(installs, e.Time);
                 }
                 if (!hit && Array.IndexOf(VideoBugchecks, BugcodeOf(e)) >= 0) hit = true;
                 if (!hit && e.Provider == "Application Error" && e.Id == 1000 && GpuModule(e.Prop(3))) hit = true;

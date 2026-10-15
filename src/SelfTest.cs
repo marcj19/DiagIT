@@ -136,6 +136,31 @@ namespace DiagIT
                 d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { wu, tdr(2) }), new List<DiskHealth>(), 30, new List<TestResult>(), hw);
                 Check(d.Findings.Find(wuF) == null, "não acusa quando o driver do Windows Update já não está em uso");
 
+                Say("== 4b. Troca de driver (DDU + instalador) não conta como GPU travando");
+                Func<DateTime, WinEvent> lke193 = delegate(DateTime t)
+                {
+                    WinEvent e = new WinEvent(); e.Provider = "Windows Error Reporting"; e.Id = 1001; e.Time = t;
+                    e.P = new string[] { "", "", "LiveKernelEvent", "", "", "193" }; return e;
+                };
+                WinEvent msi = new WinEvent(); msi.Provider = "MsiInstaller"; msi.Id = 1033; msi.Time = DateTime.Now.AddHours(-3);
+                msi.Msg = "O Windows Installer instalou o produto. Nome do Produto: AMD Software.";
+                List<WinEvent> swap = new List<WinEvent> { msi, lke193(msi.Time.AddMinutes(-12)), lke193(msi.Time.AddMinutes(-9)), lke193(msi.Time.AddMinutes(-2)) };
+                d = Analyzer.Run(new List<SessionData>(), sorted(swap), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(d.Findings.Find(delegate(Finding f) { return f.Title.StartsWith("Travamentos de GPU registrados"); }) == null, "travamentos durante a troca do driver não viram achado");
+                swap.Add(lke193(DateTime.Now.AddHours(-30)));
+                d = Analyzer.Run(new List<SessionData>(), sorted(swap), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fs = d.Findings.Find(delegate(Finding f) { return f.Title.StartsWith("Travamentos de GPU registrados"); });
+                Say("  " + (fs == null ? "(nenhum)" : fs.Title + " | " + fs.Evidence.Replace("\n", " / ")));
+                Check(fs != null && fs.Title.EndsWith("1×") && fs.Evidence.Contains("durante a instalação"), "só conta o travamento fora da troca de driver e explica os que ignorou");
+
+                Say("== 4c. Adaptador de vídeo básico em qualquer idioma");
+                Check(VideoAdapters.IsGeneric("Adaptador de Vídeo Básico da Microsoft", "", "") && VideoAdapters.IsGeneric("Microsoft Basic Display Adapter", "", "") &&
+                      VideoAdapters.IsGeneric("Qualquer nome", "Microsoft", "") && VideoAdapters.IsGeneric("Qualquer nome", "", "BasicDisplay.sys") &&
+                      !VideoAdapters.IsGeneric("AMD Radeon RX 7600", "Advanced Micro Devices, Inc.", "amdkmdag.sys"),
+                      "reconhece o adaptador básico em português, inglês, pelo fabricante e pelo arquivo do driver");
+                Check(VideoAdapters.VendorFromPnp(@"PCI\VEN_1002&DEV_7480&SUBSYS_53131849") == "AMD Radeon" && VideoAdapters.VendorFromPnp(@"PCI\VEN_10DE&DEV_2504") == "NVIDIA",
+                      "marca da placa pelo código PCI quando ainda não há driver");
+
                 Say("== 5. GPU acima do clock oficial");
                 string model;
                 Check(Analyzer.OfficialBoost("AMD Radeon RX 7600", out model) == 2655 && Analyzer.OfficialBoost("AMD Radeon RX 7600 XT", out model) == 2755 &&
@@ -210,7 +235,7 @@ namespace DiagIT
                 foreach (DriverRule dr in Rules.Drivers) if (!Rules.DriverTypes.ContainsKey(dr.Type) || dr.File.Length < 2 || dr.Name.Length == 0) drvOk = false;
                 Check(drvOk, "drivers: todo driver tem nome e aponta para um tipo existente (" + Rules.Drivers.Count + " drivers)");
                 bool guiasOk = Rules.Guides.Count >= 5;
-                string[] acoesValidas = { "bloquear-wu", "tirar-hd", "reiniciar-avancado", "reiniciar-bios", "teste-gpu", "teste-memoria" };
+                string[] acoesValidas = { "bloquear-wu", "tirar-hd", "reiniciar-avancado", "reiniciar-bios", "teste-gpu", "teste-memoria", "verificar-driver" };
                 foreach (Guide gu in Rules.Guides)
                 {
                     if (gu.Id.Length == 0 || gu.Title.Length == 0 || gu.Done.Length == 0 || gu.Steps.Count == 0 || Array.IndexOf(Analyzer.Scopes, gu.Scope) < 0) guiasOk = false;
@@ -798,7 +823,7 @@ namespace DiagIT
                 Check(dt.States[(int)Comp.Cpu].Status == CompStatus.Ok, "CPU marcada como OK (teste aprovado)");
                 Check(dt.Verdict.StartsWith("PROBLEMA CONFIRMADO"), "veredito concreto");
                 string html = Report.Build(dt, MachineInfo.Read(double.NaN), new List<SessionData>());
-                Check(html.Contains("Estado de cada componente") && html.Contains("PROBLEMA"), "relatório HTML com estado por componente");
+                Check(html.Contains("Suas peças") && html.Contains("Com defeito"), "relatório HTML com estado por componente");
 
                 SessionStore.Delete(si);
                 Say(fails == 0 ? "\nTODOS OS TESTES PASSARAM" : "\n" + fails + " FALHA(S)");

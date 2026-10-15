@@ -391,16 +391,17 @@ namespace DiagIT
                 string drv = "";
                 try
                 {
-                    foreach (System.Management.ManagementObject o in new System.Management.ManagementObjectSearcher("SELECT Name,DriverVersion,DriverDate FROM Win32_VideoController").Get())
+                    List<VideoAdapter> vas = VideoAdapters.ReadAll();
+                    VideoAdapter va = VideoAdapters.Primary(vas);
+                    if (va != null)
                     {
-                        string n = Convert.ToString(o["Name"]);
-                        if (n.IndexOf("Basic", StringComparison.OrdinalIgnoreCase) >= 0) continue;
-                        DateTime d = System.Management.ManagementDateTimeConverter.ToDateTime(Convert.ToString(o["DriverDate"]));
-                        VideoVendor vv = Rules.VideoFor(n);
-                        drv = n + " — driver " + o["DriverVersion"] + " de " + d.ToString("dd/MM/yyyy") + " (" + (int)(DateTime.Now - d).TotalDays + " dias)" +
+                        DateTime d = va.DriverDate;
+                        VideoVendor vv = Rules.VideoFor(va.Name);
+                        drv = va.Name + " — driver " + va.DriverVersion + (d > DateTime.MinValue ? " de " + d.ToString("dd/MM/yyyy") + " (" + (int)(DateTime.Now - d).TotalDays + " dias)" : "") +
                             (vv.Brand.Length > 0 ? ". O botão abre o site da " + vv.Brand + "." : ". Marca não reconhecida: o botão abre as atualizações opcionais do Windows.");
-                        break;
                     }
+                    else if (vas.Count > 0)
+                        drv = "SEM DRIVER — o Windows está usando o Adaptador de Vídeo Básico. Instale o driver do fabricante da placa.";
                 }
                 catch { }
                 bool pawn = File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"PawnIO\PawnIOLib.dll"));

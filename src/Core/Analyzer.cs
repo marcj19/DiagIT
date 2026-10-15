@@ -305,10 +305,14 @@ namespace DiagIT
             });
             if (lke.Count > 0)
             {
+                // travamentos de GPU que a própria troca de driver (DDU, instalador do fabricante) provoca não contam: o vídeo é reiniciado de propósito
+                int strongInstall = 0;
                 List<WinEvent> strong = Where(lke, delegate(WinEvent e)
                 {
                     string c = e.Prop(5).ToLowerInvariant();
-                    return c == "141" || c == "117" || c == "193" || c == "10e";
+                    if (!(c == "141" || c == "117" || c == "193" || c == "10e")) return false;
+                    if (DuringInstall(installs, e.Time)) { strongInstall++; return false; }
+                    return true;
                 });
                 List<WinEvent> soft = Where(lke, delegate(WinEvent e)
                 {
@@ -329,7 +333,8 @@ namespace DiagIT
                     Finding f = new Finding();
                     f.Sev = strong.Count >= 3 ? Sev.Crit : Sev.Warn; f.Source = "Eventos do Windows";
                     f.Title = "Travamentos de GPU registrados pelo Windows (LiveKernelEvent 141/117/193) — " + strong.Count + "×";
-                    f.Evidence = "A GPU parou de responder e o Windows a recuperou sem tela azul. Último em " + D(strong[0].Time) + ".\n" + Recent(strong, 4);
+                    f.Evidence = "A GPU parou de responder e o Windows a recuperou sem tela azul. Último em " + D(strong[0].Time) + ".\n" + Recent(strong, 4) +
+                        (strongInstall > 0 ? "\n(" + strongInstall + " ocorrência(s) durante a instalação de driver não entraram na conta: são esperadas quando o driver é trocado.)" : "");
                     f.Advice = "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot.";
                     f.Last = strong[0].Time;
                     f.Weigh(Comp.Gpu, 0.40 * w).Weigh(Comp.Software, 0.20 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.10 * w);

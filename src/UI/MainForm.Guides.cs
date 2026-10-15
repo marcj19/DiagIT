@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -169,6 +169,9 @@ namespace DiagIT
                     if (!NeedAdmin()) return;
                     Fixes.SetWuDriversBlocked(true, out msg);
                     MessageBox.Show(this, msg, "Passo a passo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    break;
+                case "verificar-driver":
+                    VerifyVideoDriver();
                     break;
                 case "tirar-hd":
                     if (!NeedAdmin()) return;

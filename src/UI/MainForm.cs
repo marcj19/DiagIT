@@ -520,6 +520,7 @@ namespace DiagIT
                 sideStatus.Set(Theme.Good, "Monitorando suas partidas", "O DiagIT grava sozinho quando você joga.");
             tray.Text = w.Current != null ? "DiagIT — gravando " + Trim(w.Current.Game, 40) : "DiagIT — monitorando";
             UpdateOverlay();
+            WatchVideoDriver();
 
             if (!Visible || WindowState == FormWindowState.Minimized) return;
             if (curPage == P_LIVE) RefreshLive();

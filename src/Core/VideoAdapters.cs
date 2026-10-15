@@ -1,0 +1,89 @@
+using System;
+using System.Collections.Generic;
+using System.Management;
+
+namespace DiagIT
+{
+    /// <summary>Uma placa de vídeo como o Windows a enxerga agora.</summary>
+    public class VideoAdapter
+    {
+        public string Name = "", DriverVersion = "", PnpId = "", Maker = "", Drivers = "";
+        public DateTime DriverDate = DateTime.MinValue;
+        /// <summary>Adaptador genérico do Windows (sem driver do fabricante) ou virtual (área de trabalho remota).</summary>
+        public bool Generic;
+    }
+
+    /// <summary>Leitura única das placas de vídeo, igual em qualquer idioma do Windows.</summary>
+    public static class VideoAdapters
+    {
+        /// <summary>
+        /// O Windows chama o adaptador sem driver de "Microsoft Basic Display Adapter" em inglês e "Adaptador de Vídeo Básico da Microsoft"
+        /// em português: o nome muda com o idioma, então o critério principal é o fabricante (placa de verdade nunca é "Microsoft")
+        /// e o arquivo do driver (BasicDisplay.sys).
+        /// </summary>
+        public static bool IsGeneric(string name, string maker, string drivers)
+        {
+            if ((maker ?? "").StartsWith("Microsoft", StringComparison.OrdinalIgnoreCase)) return true;
+            string dr = (drivers ?? "").ToLowerInvariant();
+            if (dr.Contains("basicdisplay") || dr.Contains("basicrender")) return true;
+            string n = (name ?? "").ToLowerInvariant();
+            return n.Contains("basic") || n.Contains("básico") || n.Contains("basico") || n.Contains("remote") || n.Contains("remoto") ||
+                   n.Contains("virtual") || n.Contains("indirect display") || n.Contains("mirror driver");
+        }
+
+        public static List<VideoAdapter> ReadAll()
+        {
+            List<VideoAdapter> l = new List<VideoAdapter>();
+            try
+            {
+                using (ManagementObjectSearcher s = new ManagementObjectSearcher("SELECT Name,DriverVersion,DriverDate,PNPDeviceID,AdapterCompatibility,InstalledDisplayDrivers FROM Win32_VideoController"))
+                    foreach (ManagementObject o in s.Get())
+                    {
+                        VideoAdapter a = new VideoAdapter();
+                        a.Name = Convert.ToString(o["Name"]) ?? "";
+                        a.DriverVersion = Convert.ToString(o["DriverVersion"]) ?? "";
+                        a.PnpId = Convert.ToString(o["PNPDeviceID"]) ?? "";
+                        a.Maker = Convert.ToString(o["AdapterCompatibility"]) ?? "";
+                        a.Drivers = Convert.ToString(o["InstalledDisplayDrivers"]) ?? "";
+                        try { string dd = Convert.ToString(o["DriverDate"]); if (!string.IsNullOrEmpty(dd)) a.DriverDate = ManagementDateTimeConverter.ToDateTime(dd); } catch { }
+                        a.Generic = IsGeneric(a.Name, a.Maker, a.Drivers);
+                        l.Add(a);
+                    }
+            }
+            catch (Exception e) { Log.Write("VideoAdapters: " + e.Message); }
+            return l;
+        }
+
+        /// <summary>A placa de verdade (a primeira que não é genérica), ou null se só há o adaptador básico.</summary>
+        public static VideoAdapter Primary(List<VideoAdapter> l)
+        {
+            foreach (VideoAdapter a in l) if (!a.Generic) return a;
+            return null;
+        }
+
+        /// <summary>Marca da placa pelo código do fabricante no PCI, para quando ainda não há driver (e o nome não diz nada).</summary>
+        public static string VendorFromPnp(string pnpId)
+        {
+            string id = (pnpId ?? "").ToUpperInvariant();
+            if (id.Contains("VEN_10DE")) return "NVIDIA";
+            if (id.Contains("VEN_1002") || id.Contains("VEN_1022")) return "AMD Radeon";
+            if (id.Contains("VEN_8086")) return "Intel";
+            return "";
+        }
+
+        /// <summary>Resumo que muda quando a placa ou o driver mudam (usado para perceber uma reinstalação com o app aberto).</summary>
+        public static string Signature(List<VideoAdapter> l)
+        {
+            List<string> p = new List<string>();
+            foreach (VideoAdapter a in l) p.Add(a.Name + "|" + a.DriverVersion + "|" + (a.Generic ? "g" : "r"));
+            p.Sort(StringComparer.Ordinal);
+            return string.Join(";", p.ToArray());
+        }
+
+        public static string Describe(VideoAdapter a)
+        {
+            if (a == null) return "sem driver de vídeo";
+            return a.Name + " — driver " + a.DriverVersion + (a.DriverDate > DateTime.MinValue ? " de " + a.DriverDate.ToString("dd/MM/yyyy") : "");
+        }
+    }
+}

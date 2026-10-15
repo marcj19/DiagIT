@@ -52,6 +52,8 @@ namespace DiagIT
         public string WindowsOld;
         public DateTime WindowsOldCreated;
         public string GpuName = "", CpuName = "";
+        /// <summary>O Windows só enxerga o adaptador básico (sem driver do fabricante).</summary>
+        public bool GpuMissingDriver;
         /// <summary>Arquivos de paginação em uso agora (ex.: "C:\pagefile.sys").</summary>
         public List<string> PagefileFiles = new List<string>();
         /// <summary>Programas conhecidos por causar engasgos abertos no momento da coleta.</summary>
@@ -210,18 +212,27 @@ namespace DiagIT
             catch { }
 
             // ---------- GPU
-            foreach (ManagementObject o in Q("SELECT Name,DriverVersion,DriverDate FROM Win32_VideoController"))
+            List<VideoAdapter> adapters = VideoAdapters.ReadAll();
+            VideoAdapter gpuA = VideoAdapters.Primary(adapters);
+            if (gpuA != null)
             {
-                string n = S(o, "Name");
-                if (n.IndexOf("Basic", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Remote", StringComparison.OrdinalIgnoreCase) >= 0) continue;
-                DateTime d = WmiDate(S(o, "DriverDate"));
-                h.GpuDriver = S(o, "DriverVersion");
-                h.GpuName = n;
+                DateTime d = gpuA.DriverDate;
+                h.GpuDriver = gpuA.DriverVersion;
+                h.GpuName = gpuA.Name;
                 h.GpuDriverAgeDays = d > DateTime.MinValue ? (int)(DateTime.Now - d).TotalDays : -1;
-                f.Add(new Fact("Placa de vídeo", "Modelo", n, -1, null));
+                f.Add(new Fact("Placa de vídeo", "Modelo", gpuA.Name, -1, null));
                 f.Add(new Fact("Placa de vídeo", "Driver", h.GpuDriver + (d > DateTime.MinValue ? " de " + d.ToString("dd/MM/yyyy", Pt) : ""),
                     h.GpuDriverAgeDays > 240 ? 1 : 0, h.GpuDriverAgeDays > 240 ? "Driver com mais de 8 meses." : null));
-                break;
+            }
+            else if (adapters.Count > 0)
+            {
+                // só o adaptador básico do Windows: a placa existe, mas sem o driver do fabricante (jogos rodam muito lentos e o vídeo trava)
+                string brand = VideoAdapters.VendorFromPnp(adapters[0].PnpId);
+                h.GpuName = brand;   // só a marca: serve para escolher os textos e o site do driver certos
+                h.GpuMissingDriver = true;
+                f.Add(new Fact("Placa de vídeo", "Modelo", "não identificada" + (brand.Length > 0 ? " (placa " + brand + ")" : ""), 2,
+                    "O Windows está usando o Adaptador de Vídeo Básico: falta instalar o driver do fabricante. Sem ele não há aceleração de jogos."));
+                f.Add(new Fact("Placa de vídeo", "Driver", "sem driver do fabricante", 2, null));
             }
             double vram = NativeInfo.TotalVramMB();
             if (!double.IsNaN(vram)) f.Add(new Fact("Placa de vídeo", "Memória de vídeo", (vram / 1024).ToString("0.0", Pt) + " GB", -1, null));

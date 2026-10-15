@@ -101,7 +101,11 @@ namespace DiagIT
                     if ((e.Provider == "Display" && e.Id == 4101) || Has(e.Provider, "amdkmdag", "amdwddmg", "atikmdag", "nvlddmkm"))
                     { if (!DuringInstall(installs, e.Time)) add(e.Time, "Vídeo", "O driver de vídeo parou de responder e foi reiniciado (" + e.Provider + " " + e.Id + ")", 1); continue; }
                     if (e.Provider == "Windows Error Reporting" && e.Id == 1001 && e.Prop(2) == "LiveKernelEvent")
-                    { add(e.Time, "Travamento", "LiveKernelEvent 0x" + e.Prop(5), e.Prop(5) == "141" || e.Prop(5) == "117" ? 1 : 0); continue; }
+                    {
+                        bool swap = DuringInstall(installs, e.Time);
+                        add(e.Time, "Travamento", "LiveKernelEvent 0x" + e.Prop(5) + (swap ? " (durante a troca do driver de vídeo: esperado)" : ""), !swap && (e.Prop(5) == "141" || e.Prop(5) == "117") ? 1 : 0);
+                        continue;
+                    }
                     if (e.Provider == "Microsoft-Windows-Kernel-Power" && e.Id == 41 && ParseCode(e.Prop(0)) == 0)
                     { add(e.Time, "Desligamento", "O PC desligou ou reiniciou sem aviso (Kernel-Power 41)", 2); continue; }
                     if (Has(e.Provider, "WHEA"))
