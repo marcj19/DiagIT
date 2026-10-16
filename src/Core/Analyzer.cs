@@ -365,7 +365,8 @@ namespace DiagIT
                     int isolated = strong.Count - sym;
                     double w = Math.Max(0.3, Scale(strong.Count, 4)) * (sym > 0 ? 1.0 : 0.5);
                     Finding f = new Finding();
-                    f.Sev = sym >= 2 ? Sev.Crit : sym == 1 ? Sev.Warn : strong.Count >= 6 ? Sev.Warn : Sev.Info; f.Source = "Eventos do Windows";
+                    // sem sintoma é sempre informação, por mais vezes que apareça: alerta exige algo visível
+                    f.Sev = sym >= 2 ? Sev.Crit : sym == 1 ? Sev.Warn : Sev.Info; f.Source = "Eventos do Windows";
                     f.Title = "Travamentos de GPU registrados pelo Windows (LiveKernelEvent 141/117/193) — " + strong.Count + "×";
                     f.Evidence = "A GPU parou de responder e o Windows a recuperou sem tela azul. Último em " + D(strong[0].Time) + ".\n" + Recent(strong, 4) +
                         (symTxt.Count > 0 ? "\nAlgo fechou ou travou na mesma hora (" + (strongSym + weakSym) + "):\n" + string.Join("\n", symTxt.ToArray()) : "") +
@@ -373,7 +374,7 @@ namespace DiagIT
                         (isolated > 0 ? "\n" + isolated + " isolado(s): o Windows registrou o reset do vídeo, mas nada fechou nem travou na mesma hora. Isso é comum ao abrir um jogo em tela cheia ou trocar a resolução, e sozinho não prova defeito." : "") +
                         (strongInstall > 0 ? "\n(" + strongInstall + " ocorrência(s) durante a instalação de driver não entraram na conta: são esperadas quando o driver é trocado.)" : "") +
                         (strongOld > 0 ? "\n(" + strongOld + " ocorrência(s) anteriores à troca do driver (" + d.DriverSwapAt.ToString("dd/MM HH:mm", Pt) + ") ficam no histórico e não entram na conta: eram do driver antigo.)" : "");
-                    f.Advice = sym > 0 ? "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot." : "Nada a fazer agora: o Windows só registrou o reset do vídeo, sem nada travar ou fechar. Se começar a vir com tela preta, jogo fechando ou tela azul, o DiagIT avisa e mostra o plano.";
+                    f.Advice = sym > 0 ? "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot." : "Nada a fazer agora: o Windows só registrou o reset do vídeo, sem nada travar ou fechar." + (strong.Count >= 6 ? " Eles estão frequentes (" + strong.Count + "), então vale continuar observando." : "") + " Se começar a vir com tela preta, jogo fechando ou tela azul, o DiagIT avisa e mostra o plano.";
                     f.Last = strong[0].Time; f.Symptom = sym > 0;
                     f.Weigh(Comp.Gpu, 0.40 * w).Weigh(Comp.Software, 0.20 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.10 * w);
                     d.Findings.Add(f);

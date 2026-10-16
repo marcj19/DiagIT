@@ -203,6 +203,14 @@ namespace DiagIT
                 d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
                 Check(gpuF(d) != null && gpuF(d).Sev == Sev.Info && gpuF(d).Evidence.Contains("isolado"), "reset de vídeo isolado (nada fechou): só informação");
 
+                // muitos resets isolados (o seu caso): continua informação, nunca "pede atenção", e não manda refazer o DDU
+                List<WinEvent> manyIso = new List<WinEvent>();
+                for (int mi = 0; mi < 8; mi++) manyIso.Add(lke193(DateTime.Now.AddHours(-40 - mi * 7)));
+                d = Analyzer.Run(new List<SessionData>(), sorted(manyIso), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fMany = gpuF(d);
+                Check(fMany != null && fMany.Sev == Sev.Info && fMany.Advice.StartsWith("Nada a fazer agora") && fMany.Advice.Contains("frequentes (") && !fMany.Advice.Contains("DDU"),
+                      "muitos resets de vídeo isolados: continuam só informação (sem 'pede atenção'), avisam que estão frequentes e não mandam refazer o DDU");
+
                 FixEntry swap2 = new FixEntry(); swap2.Id = "t2"; swap2.Kind = "guia:driver-video-limpo"; swap2.Scope = "video"; swap2.Title = "Reinstalei o driver de vídeo do jeito certo"; swap2.When = DateTime.Now.AddHours(-3);
                 List<WinEvent> oldOnes = new List<WinEvent> { lke193(DateTime.Now.AddHours(-30)), lke193(DateTime.Now.AddHours(-26)) };
                 List<WinEvent> isoAfter = new List<WinEvent>(oldOnes); isoAfter.Add(lke193(DateTime.Now.AddHours(-1)));
