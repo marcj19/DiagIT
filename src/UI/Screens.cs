@@ -30,6 +30,15 @@ namespace DiagIT
 
         protected override void OnResize(EventArgs e) { base.OnResize(e); Relayout(); }
 
+        /// <summary>Coloca c logo depois de "after" na ordem do layout (adiciona ao painel se ainda não estiver).</summary>
+        public void Place(Control c, Control after)
+        {
+            if (!Controls.Contains(c)) Controls.Add(c);
+            order.Remove(c);
+            int i = order.IndexOf(after);
+            order.Insert(i >= 0 ? i + 1 : order.Count, c);
+        }
+
         public void Relayout()
         {
             // reserva sempre a largura da barra de rolagem: assim o conteúdo nunca passa da borda (sem barra horizontal)
@@ -778,13 +787,19 @@ namespace DiagIT
         }
     }
 
-    /// <summary>"Suas correções": cada correção com o estado do acompanhamento (resolvido / acompanhando / não resolveu).</summary>
+    /// <summary>
+    /// "Resolveu?": cada correção com o estado do acompanhamento (resolvido / acompanhando / o problema voltou), uma barra que mostra quantos dias de uso
+    /// sem problema faltam e, quando o problema voltou, o botão do próximo passo. Fica no topo do Início porque é a pergunta que todo mundo faz.
+    /// </summary>
     public class FixList : FlowControl
     {
         public readonly List<FixStatus> Items = new List<FixStatus>();
         public event Action<FixStatus> RemoveClicked;
-        readonly List<Rectangle> removeRects = new List<Rectangle>();
+        public event Action<FixStatus> ActionClicked;
+        readonly List<Rectangle> removeRects = new List<Rectangle>(), actionRects = new List<Rectangle>();
         int[] hs = new int[0];
+
+        static bool HasRow(FixStatus st) { return st.State != 1; }
 
         public override int Measure(int width)
         {
@@ -792,7 +807,7 @@ namespace DiagIT
             int h = 0, tw = width - Theme.S(36) - Theme.S(170);
             for (int i = 0; i < Items.Count; i++)
             {
-                hs[i] = Math.Max(Theme.S(78), Theme.S(52) + H(Items[i].Text, Theme.Font(9.5f), tw) + Theme.S(16));
+                hs[i] = Math.Max(Theme.S(78), Theme.S(52) + H(Items[i].Text, Theme.Font(9.5f), tw) + Theme.S(16) + (HasRow(Items[i]) ? Theme.S(40) : 0));
                 h += hs[i] + (i > 0 ? Theme.S(10) : 0);
             }
             return h;
@@ -802,15 +817,18 @@ namespace DiagIT
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            bool hit = removeRects.Exists(delegate(Rectangle r) { return r.Contains(e.Location); });
+            bool hit = removeRects.Exists(delegate(Rectangle r) { return r.Contains(e.Location); }) || actionRects.Exists(delegate(Rectangle r) { return r.Contains(e.Location); });
             Cursor = hit ? Cursors.Hand : Cursors.Default;
             base.OnMouseMove(e);
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
         {
-            for (int i = 0; i < removeRects.Count && i < Items.Count; i++)
-                if (removeRects[i].Contains(e.Location) && RemoveClicked != null) { RemoveClicked(Items[i]); break; }
+            for (int i = 0; i < Items.Count; i++)
+            {
+                if (i < actionRects.Count && !actionRects[i].IsEmpty && actionRects[i].Contains(e.Location) && ActionClicked != null) { ActionClicked(Items[i]); return; }
+                if (i < removeRects.Count && removeRects[i].Contains(e.Location) && RemoveClicked != null) { RemoveClicked(Items[i]); return; }
+            }
             base.OnMouseClick(e);
         }
 
@@ -818,7 +836,7 @@ namespace DiagIT
         {
             Graphics g = e.Graphics;
             g.Clear(Theme.Bg);
-            removeRects.Clear();
+            removeRects.Clear(); actionRects.Clear();
             int y = 0;
             for (int i = 0; i < Items.Count && i < hs.Length; i++)
             {
@@ -829,13 +847,43 @@ namespace DiagIT
                 int x = r.X + Theme.S(18), tw = r.Width - Theme.S(36) - Theme.S(170);
                 int pw = Theme.StatusPill(g, x, r.Y + Theme.S(14), look, st.Headline, Theme.Panel);
                 Theme.Text_(g, st.Fix.Title, Theme.Font(10f, FontStyle.Bold), Theme.Text, new Rectangle(x + pw + Theme.S(12), r.Y + Theme.S(14), tw - pw - Theme.S(12), Theme.S(24)), TextFormatFlags.VerticalCenter);
-                TextRenderer.DrawText(g, st.Text, Theme.Font(9.5f), new Rectangle(x, r.Y + Theme.S(48), tw, r.Height - Theme.S(52)), Theme.Muted, WB);
-                Theme.Text_(g, "Feito em " + st.Fix.When.ToString("dd/MM"), Theme.Font(8.5f), Theme.Faint, new Rectangle(r.Right - Theme.S(170), r.Y + Theme.S(16), Theme.S(152), Theme.S(20)), TextFormatFlags.Right);
+                int rowH = HasRow(st) ? Theme.S(40) : 0;
+                TextRenderer.DrawText(g, st.Text, Theme.Font(9.5f), new Rectangle(x, r.Y + Theme.S(48), tw, r.Height - Theme.S(52) - rowH), Theme.Muted, WB);
+                Theme.Text_(g, "Feito em " + st.Fix.When.ToString("dd/MM 'às' HH:mm"), Theme.Font(8.5f), Theme.Faint, new Rectangle(r.Right - Theme.S(170), r.Y + Theme.S(16), Theme.S(152), Theme.S(20)), TextFormatFlags.Right);
                 string rl = "Parar de acompanhar";
                 int rw = TextRenderer.MeasureText(rl, Theme.Font(8.5f)).Width;
                 Rectangle rr = new Rectangle(r.Right - Theme.S(18) - rw, r.Bottom - Theme.S(30), rw, Theme.S(20));
                 Theme.Text_(g, rl, Theme.Font(8.5f), Theme.AccentHover, rr, 0);
                 removeRects.Add(rr);
+
+                Rectangle ar = Rectangle.Empty;
+                int rowY = r.Bottom - Theme.S(14) - Theme.S(26);
+                if (st.State == 2 && st.NextGuide.Length > 0)
+                {
+                    // o problema voltou: o próximo passo é um botão, não um texto
+                    string bl = st.NextLabel.Length > 0 ? st.NextLabel : "Ver o plano para resolver";
+                    int bw = TextRenderer.MeasureText(bl, Theme.Font(9.5f, FontStyle.Bold)).Width + Theme.S(36);
+                    ar = new Rectangle(x, rowY - Theme.S(2), bw, Theme.S(30));
+                    using (GraphicsPath p = Theme.Round(ar, Theme.S(10))) using (SolidBrush b = new SolidBrush(Theme.Accent)) g.FillPath(b, p);
+                    Theme.Text_(g, bl, Theme.Font(9.5f, FontStyle.Bold), Theme.AccentInk, ar, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                }
+                else if (st.State != 1 && st.NeedDays > 0)
+                {
+                    // dias de uso sem problema até poder dizer "resolveu"
+                    double frac = Math.Max(0, Math.Min(1, st.AfterDays / st.NeedDays));
+                    int bw = Math.Min(tw, Theme.S(360));
+                    Rectangle track = new Rectangle(x, rowY + Theme.S(4), bw, Theme.S(8));
+                    using (GraphicsPath p = Theme.Round(track, Theme.S(4))) using (SolidBrush b = new SolidBrush(Theme.Panel3)) g.FillPath(b, p);
+                    if (frac > 0)
+                    {
+                        Rectangle fill = new Rectangle(track.X, track.Y, Math.Max(Theme.S(8), (int)(track.Width * frac)), track.Height);
+                        using (GraphicsPath p = Theme.Round(fill, Theme.S(4))) using (SolidBrush b = new SolidBrush(Theme.Accent)) g.FillPath(b, p);
+                    }
+                    int done = (int)Math.Floor(st.AfterDays);
+                    string cap = done + " de " + (int)Math.Ceiling(st.NeedDays) + " dias de uso sem problema";
+                    Theme.Text_(g, cap, Theme.Font(8.5f), Theme.Faint, new Rectangle(track.Right + Theme.S(12), rowY - Theme.S(2), Theme.S(240), Theme.S(20)), TextFormatFlags.VerticalCenter);
+                }
+                actionRects.Add(ar);
                 y += hs[i] + Theme.S(10);
             }
         }

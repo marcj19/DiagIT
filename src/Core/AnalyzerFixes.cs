@@ -12,6 +12,14 @@ namespace DiagIT
         public double BeforeDays, AfterDays;
         public DateTime FirstAfter = DateTime.MinValue;
         public string Headline = "", Text = "";
+        /// <summary>Dias sem problema que faltam para dar como resolvido (0 = já bastou) e quantos já se passaram, para a barra de progresso.</summary>
+        public double NeedDays;
+        /// <summary>Guia com o próximo passo quando o problema voltou ("" = nenhum) e o texto do botão.</summary>
+        public string NextGuide = "", NextLabel = "";
+        /// <summary>Resets de vídeo isolados (sem sintoma) depois da correção: contam como informação, não como "voltou".</summary>
+        public int Isolated;
+        /// <summary>O que estava acontecendo na hora em que o problema voltou ("RainbowSixHelper.exe fechou com erro").</summary>
+        public string Context = "";
     }
 
     /// <summary>
@@ -35,7 +43,10 @@ namespace DiagIT
         }
 
         /// <summary>Momentos em que cada tipo de problema aconteceu (eventos do Windows + partidas gravadas), mais recentes primeiro.</summary>
-        static List<DateTime> ProblemTimes(string scope, List<WinEvent> ev, List<SessionData> sessions)
+        static List<DateTime> ProblemTimes(string scope, List<WinEvent> ev, List<SessionData> sessions) { return ProblemTimes(scope, ev, sessions, false); }
+
+        /// <summary>symptomOnly: nos travamentos de vídeo, só os que vieram com algo visível (programa fechou, TDR, tela azul); os isolados ficam de fora.</summary>
+        static List<DateTime> ProblemTimes(string scope, List<WinEvent> ev, List<SessionData> sessions, bool symptomOnly)
         {
             List<DateTime> r = new List<DateTime>();
             bool all = scope == "geral";
@@ -43,7 +54,7 @@ namespace DiagIT
                 foreach (WinEvent e in ev)
                     if (BugcodeOf(e) > 0 && !r.Exists(delegate(DateTime t) { return Math.Abs((t - e.Time).TotalMinutes) < 10; })) r.Add(e.Time);
             if (scope == "video" || all)
-                foreach (DateTime t in GpuCrashTimes(ev)) if (!r.Exists(delegate(DateTime x) { return Math.Abs((x - t).TotalMinutes) < 10; })) r.Add(t);
+                foreach (DateTime t in GpuCrashTimes(ev, symptomOnly)) if (!r.Exists(delegate(DateTime x) { return Math.Abs((x - t).TotalMinutes) < 10; })) r.Add(t);
             if (scope == "desligamentos" || all)
             {
                 foreach (WinEvent e in ev)
@@ -111,6 +122,9 @@ namespace DiagIT
         /// <summary>Correção que troca o driver de vídeo (instalação limpa ou conferida pelo DiagIT).</summary>
         static bool IsDriverSwap(FixEntry fx) { return fx.Kind.StartsWith("guia:driver-video-limpo", StringComparison.Ordinal) || fx.Kind.StartsWith("auto:driver-video", StringComparison.Ordinal); }
 
+        /// <summary>O que estava acontecendo na hora do problema, em palavras ("RainbowSixHelper.exe fechou com erro"), ou "".</summary>
+        static string SymptomContext(List<WinEvent> ev, DateTime t) { return SymptomText(SymptomNear(ev, t)); }
+
         static void FixRules(Diagnosis d, List<WinEvent> ev, List<SessionData> sessions, List<FixEntry> fixes)
         {
             if (fixes == null) return;
@@ -120,36 +134,50 @@ namespace DiagIT
                 FixStatus st = new FixStatus();
                 st.Fix = fx;
                 List<DateTime> times = ProblemTimes(fx.Scope, ev, sessions);
+                List<DateTime> symTimes = ProblemTimes(fx.Scope, ev, sessions, true);   // depois da correção, só conta como "voltou" o que veio com sintoma
                 DateTime from = fx.When.AddDays(-30) > horizon ? fx.When.AddDays(-30) : horizon;
                 DateTime settled = fx.When.AddMinutes(30);   // reinícios e reinstalações da própria correção não contam
                 DateTime earliest = fx.When;
+                int allAfter = 0;
                 foreach (DateTime t in times)
                 {
                     if (t >= from && t < fx.When) { st.Before++; if (t < earliest) earliest = t; }
-                    if (t > settled) { st.After++; if (st.FirstAfter == DateTime.MinValue || t < st.FirstAfter) st.FirstAfter = t; }
+                    if (t > settled) allAfter++;
                 }
+                foreach (DateTime t in symTimes)
+                    if (t > settled) { st.After++; if (st.FirstAfter == DateTime.MinValue || t < st.FirstAfter) st.FirstAfter = t; }
+                st.Isolated = Math.Max(0, allAfter - st.After);
+                if (st.After > 0) st.Context = SymptomContext(ev, st.FirstAfter);
                 st.BeforeDays = Math.Max(1, (fx.When - (st.Before > 0 ? earliest : from)).TotalDays);   // do primeiro registro até a correção
                 st.AfterDays = (now - fx.When).TotalDays;
                 string what = ScopeName(fx.Scope);
-                string beforeTxt = st.Before == 0 ? "" : " Antes: " + st.Before + " em " + Math.Round(st.BeforeDays) + " dias.";
+                double bd = Math.Max(1, Math.Round(st.BeforeDays));
+                string beforeTxt = st.Before == 0 ? "" : " Antes: " + st.Before + " em " + bd + (bd == 1 ? " dia." : " dias.");
+                string isoTxt = st.Isolated == 0 ? "" : " O Windows registrou " + st.Isolated + (st.Isolated == 1 ? " reset de vídeo isolado" : " resets de vídeo isolados") +
+                    " desde então, mas nada fechou nem travou na mesma hora: isso não conta como \"voltou\".";
+                st.NeedDays = 7;
                 if (st.After > 0)
                 {
                     st.State = 2;
-                    st.Headline = "Ainda não resolveu";
-                    st.Text = "Os " + what + " voltaram em " + st.FirstAfter.ToString("dd/MM") + " (" + st.After + (st.After == 1 ? " vez" : " vezes") + " desde a correção)." + beforeTxt +
-                        " Veja os Resultados: o próximo passo já considera isso.";
+                    st.Headline = "O problema voltou";
+                    st.Text = "Voltou em " + st.FirstAfter.ToString("dd/MM 'às' HH:mm") + (st.After > 1 ? " (" + st.After + " vezes desde a correção)" : "") + "." +
+                        (st.Context.Length > 0 ? " Na mesma hora: " + st.Context + "." : "") + beforeTxt +
+                        " Isso não quer dizer que a correção foi em vão: o DiagIT montou um plano de testes, um passo de cada vez.";
+                    st.NextGuide = fx.Scope == "video" || fx.Scope == "geral" ? "video-voltou" : fx.Scope == "telas-azuis" ? "bios-padrao" : "";
+                    st.NextLabel = "Ver o plano para resolver";
                 }
                 else if (st.Before == 0)
                 {
                     st.State = 3;
                     st.Headline = "Acompanhando";
-                    st.Text = "Não havia " + what + " registrados antes, então não dá para comparar. O DiagIT avisa se algo aparecer.";
+                    st.Text = "Não havia " + what + " registrados antes, então não dá para comparar. O DiagIT avisa se algo aparecer." + isoTxt;
                 }
                 else
                 {
                     double interval = st.BeforeDays / st.Before;                       // a cada quantos dias acontecia
                     double need = Math.Max(7, Math.Min(21, interval * 2));
-                    if (st.AfterDays >= need)
+                    st.NeedDays = need;
+                    if (st.AfterDays >= need && st.Isolated == 0)
                     {
                         st.State = 1;
                         st.Headline = "Resolvido";
@@ -159,13 +187,18 @@ namespace DiagIT
                     {
                         st.State = 0;
                         st.Headline = "Acompanhando";
-                        int left = (int)Math.Ceiling(need - st.AfterDays);
-                        st.Text = "Nenhum registro de " + what + " desde " + fx.When.ToString("dd/MM") + "." + beforeTxt +
-                            " Mais " + left + (left == 1 ? " dia" : " dias") + " sem problemas para confirmar.";
+                        int left = Math.Max(1, (int)Math.Ceiling(need - st.AfterDays));
+                        st.Text = "Nenhum problema de verdade desde " + fx.When.ToString("dd/MM 'às' HH:mm") + "." + beforeTxt +
+                            " Faltam cerca de " + left + (left == 1 ? " dia" : " dias") + " de uso sem problemas para o DiagIT dar como resolvido." + isoTxt;
                     }
                 }
                 st.Text += PerfChange(sessions, fx.When);
                 d.Fixes.Add(st);
+
+                // o driver já foi reinstalado do jeito certo e o problema voltou: refazer o DDU não é o próximo passo, e sim o plano de testes
+                if (st.State == 2 && IsDriverSwap(fx))
+                    foreach (Finding f in d.Findings)
+                        if (f.Guide == "driver-video-limpo" && Rules.GuideById("video-voltou") != null) f.Guide = "video-voltou";
 
                 // correção que resolveu: os indícios de antes dela pesam bem menos (o problema daquela época foi tratado).
                 // Troca de driver de vídeo é um caso à parte: o que aconteceu antes foi com o driver antigo, que já não existe;

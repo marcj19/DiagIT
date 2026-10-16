@@ -89,7 +89,8 @@ namespace DiagIT
             "league of legends,valorant-win64-shipping,cs2,csgo,dota2,fortniteclient-win64-shipping,gta5,gtav,r5apex,overwatch," +
             "eldenring,witcher3,cyberpunk2077,starfield,tslgame,destiny2,rocketleague,robloxplayerbeta,fifa23,fc24,fc25,fc26," +
             "minecraft.windows,wow,wow-64,hogwartslegacy,rdr2,apex_legends,pubg,battlefield2042,bf2042,codbo6,cod,modernwarfare," +
-            "helldivers2,palworld-win64-shipping,baldursgate3,bg3,bg3_dx11,eurotrucks2,ets2,aoe2de_s,sc2_x64,diablo iv,lostark,tarkov";
+            "helldivers2,palworld-win64-shipping,baldursgate3,bg3,bg3_dx11,eurotrucks2,ets2,aoe2de_s,sc2_x64,diablo iv,lostark,tarkov," +
+            "rainbowsix,rainbowsix_vulkan,rainbowsix_be";
 
         HashSet<string> ignoreSet, gameSet;
 
@@ -130,6 +131,23 @@ namespace DiagIT
         }
 
         public void ResetCache() { ignoreSet = null; gameSet = null; }
+
+        /// <summary>"Isso não é um jogo": tira o programa da lista de jogos e põe na de ignorados, e salva.</summary>
+        public void MarkNotAGame(string proc)
+        {
+            if (string.IsNullOrEmpty(proc)) return;
+            string n = proc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? proc.Substring(0, proc.Length - 4) : proc;
+            List<string> keep = new List<string>();
+            foreach (string g in GameList.Split(new char[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string t = g.Trim();
+                if (!t.Equals(n, StringComparison.OrdinalIgnoreCase) && !t.Equals(n + ".exe", StringComparison.OrdinalIgnoreCase)) keep.Add(t);
+            }
+            GameList = string.Join(",", keep.ToArray());
+            AddIgnored(n);
+            ResetCache();
+            Save();
+        }
 
         public void AddIgnored(string proc)
         {

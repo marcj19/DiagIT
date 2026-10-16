@@ -77,6 +77,12 @@ namespace DiagIT
             // troca de driver de vídeo em acompanhamento: diz claramente em que pé está, em vez de deixar o usuário na dúvida
             foreach (FixStatus fs in d.Fixes)
             {
+                if (IsDriverSwap(fs.Fix) && fs.State == 2)
+                {
+                    sub = (sub.Length > 0 ? sub + " " : "") + "Depois da troca do driver de vídeo, o problema voltou em " + fs.FirstAfter.ToString("dd/MM 'às' HH:mm") +
+                        (fs.Context.Length > 0 ? " (" + fs.Context + ")" : "") + ". Veja o plano de testes em \"Suas correções\": um passo de cada vez, sempre com o DiagIT acompanhando.";
+                    break;
+                }
                 if (!IsDriverSwap(fs.Fix) || fs.State == 2) continue;
                 sub = (sub.Length > 0 ? sub + " " : "") + (fs.State == 1
                     ? "O driver de vídeo foi trocado em " + fs.Fix.When.ToString("dd/MM") + " e os travamentos pararam."

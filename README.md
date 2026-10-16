@@ -20,8 +20,13 @@ com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver de
    Um indício anterior ao teste aprovado não deixa a peça suspeita; se o problema voltar depois da aprovação, o DiagIT pede para repetir o teste.
 6. **Resolver**: aplica as soluções com um clique (sempre pedindo confirmação).
    Os achados principais têm **Resolver passo a passo** (guias dentro do app, ex.: reinstalar o driver de vídeo do jeito certo, voltar a BIOS
-   para o padrão) e **Já fiz isso**. Toda correção entra em **Suas correções**, no Início: o DiagIT compara antes e depois e diz se **resolveu**
-   (nenhuma ocorrência por tempo suficiente), se está **acompanhando**, ou se **não resolveu** (o problema voltou).
+   para o padrão) e **Já fiz isso**. Toda correção entra em **Resolveu?**, no topo do Início: o DiagIT compara antes e depois e diz se **resolveu**
+   (nenhuma ocorrência por pelo menos 7 dias de uso, com uma barra mostrando o progresso), se está **acompanhando**, ou se **o problema voltou**.
+   Quando volta, o cartão mostra o que estava acontecendo na hora (ex.: um jogo fechou junto) e um botão leva ao **plano de testes**: em vez de repetir o DDU,
+   ajustes reversíveis de Windows, um de cada vez (sobreposições de vídeo/MPO, HAGS, tempo do TDR, gravação em segundo plano, turbo do processador), cada um com
+   botão **Desfazer** e acompanhado separadamente. Há também guias para processador instável e processador quente.
+   Um reset de vídeo registrado pelo Windows (LiveKernelEvent) **sem nada visível na mesma hora** conta como informação; só vira "voltou" com sintoma
+   (programa que fechou, TDR, tela azul, desligamento).
    Para defeitos que aparecem de vez em quando, o **check-up à noite** (3 h ou 8 h) testa por horas e impede o PC de dormir.
 7. **Avançado**: *Ao vivo* (gráficos em tempo real), *Hardware* (tudo que foi lido do PC) e *Partidas gravadas*. Testes individuais e mais longos ficam em *Verificar peças*.
 

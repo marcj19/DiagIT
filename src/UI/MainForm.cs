@@ -682,7 +682,7 @@ namespace DiagIT
                 FixEntry e = all.Find(delegate(FixEntry x) { return x.Id == st.Fix.Id; });
                 if (e == null || e.LastState == st.State) continue;
                 if (st.State == 1) Balloon("Resolvido: " + e.Title, st.Text, ToolTipIcon.Info);
-                else if (st.State == 2) Balloon("Ainda não resolveu: " + e.Title, st.Text, ToolTipIcon.Warning);
+                else if (st.State == 2) Balloon("O problema voltou: " + e.Title, st.Text, ToolTipIcon.Warning);
                 e.LastState = st.State; changed = true;
             }
             if (changed) FixLog.Save(all);

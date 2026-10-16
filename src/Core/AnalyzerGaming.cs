@@ -40,10 +40,42 @@ namespace DiagIT
             return -1;
         }
 
+        /// <summary>Algo visível que aconteceu até 90 s de t: programa fechou com erro, TDR, tela azul ou desligamento sem aviso. null = nada.</summary>
+        static WinEvent SymptomNear(List<WinEvent> ev, DateTime t)
+        {
+            foreach (WinEvent e in ev)
+            {
+                if (Math.Abs((e.Time - t).TotalSeconds) > 90) continue;
+                if (e.Provider == "Application Error" && e.Id == 1000 && !e.Prop(0).StartsWith("DiagIT", StringComparison.OrdinalIgnoreCase)) return e;
+                if (e.Provider == "Display" && e.Id == 4101) return e;
+                if (BugcodeOf(e) > 0) return e;
+                if (e.Provider == "Microsoft-Windows-Kernel-Power" && e.Id == 41) return e;
+            }
+            return null;
+        }
+
+        /// <summary>Em palavras: "RainbowSixHelper.exe fechou com erro (o módulo que falhou é do próprio programa, não do driver de vídeo)".</summary>
+        public static string SymptomText(WinEvent e)
+        {
+            if (e == null) return "";
+            if (e.Provider == "Application Error")
+                return e.Prop(0) + " fechou com erro" + (e.Prop(3).Length > 0 ? (GpuModule(e.Prop(3)) ? " dentro do driver de vídeo (" + e.Prop(3) + ")" : " (o módulo que falhou é " + e.Prop(3) + ", do próprio programa, não do driver de vídeo)") : "");
+            if (e.Provider == "Display") return "o driver de vídeo parou de responder (TDR)";
+            if (e.Provider == "Microsoft-Windows-Kernel-Power") return "o PC desligou ou reiniciou sem aviso";
+            return "tela azul";
+        }
+
         static bool GpuModule(string m) { return Has(m, "atiu9p", "atidxx", "amdxx", "aticfx", "amdvlk", "nvwgf2", "nvd3d", "igd"); }
 
         /// <summary>Momentos em que a GPU/driver de vídeo falhou (TDR, LiveKernelEvent de vídeo, tela azul de vídeo, jogo caindo no driver), mais recentes primeiro.</summary>
-        static List<DateTime> GpuCrashTimes(List<WinEvent> ev)
+        static List<DateTime> GpuCrashTimes(List<WinEvent> ev) { return GpuCrashTimes(ev, false); }
+
+        /// <summary>
+        /// O LiveKernelEvent de vídeo (141/117/193) só registra que o Windows reiniciou o vídeo; sozinho, ele costuma aparecer ao abrir um jogo em tela cheia
+        /// ou trocar a resolução, sem nada visível. "Com sintoma" = na mesma hora (90 s) um programa fechou com erro, o vídeo travou (TDR), houve tela azul
+        /// ou o PC desligou. Com symptomOnly, só esses entram.
+        /// </summary>
+        static List<DateTime> GpuCrashTimes(List<WinEvent> ev, bool symptomOnly)
         {
             List<DateTime[]> installs = InstallWindows(ev);
             List<DateTime> r = new List<DateTime>();
@@ -53,7 +85,7 @@ namespace DiagIT
                 if (!hit && e.Provider == "Windows Error Reporting" && e.Id == 1001 && e.Prop(2) == "LiveKernelEvent")
                 {
                     string c = e.Prop(5).ToLowerInvariant();
-                    hit = (c == "141" || c == "117" || c == "193" || c == "10e") && !DuringInstall(installs, e.Time);
+                    hit = (c == "141" || c == "117" || c == "193" || c == "10e") && !DuringInstall(installs, e.Time) && (!symptomOnly || SymptomNear(ev, e.Time) != null);
                 }
                 if (!hit && Array.IndexOf(VideoBugchecks, BugcodeOf(e)) >= 0) hit = true;
                 if (!hit && e.Provider == "Application Error" && e.Id == 1000 && GpuModule(e.Prop(3))) hit = true;

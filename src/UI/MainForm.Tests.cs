@@ -392,7 +392,15 @@ namespace DiagIT
             if (r == null && refuse != null)
             {
                 if (runner.Busy) { MessageBox.Show(this, refuse, "Testes"); return false; }
-                if (MessageBox.Show(this, refuse + "\n\nTestar mesmo assim?", "Jogo aberto", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return false;
+                string gname;
+                w.GameActive(out gname);
+                Log.Write("Teste recusado (" + TestResult.KindLabel(k) + "): " + refuse);
+                DialogResult dr = MessageBox.Show(this, refuse + "\n\nSim: testar mesmo assim (a partida gravada é encerrada)" +
+                    (gname.Length > 0 ? "\nNão: \"" + gname + "\" não é um jogo (o DiagIT para de tratá-lo como jogo e testa agora)" : "") + "\nCancelar: voltar",
+                    "Jogo aberto", gname.Length > 0 ? MessageBoxButtons.YesNoCancel : MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (dr == DialogResult.Cancel || (gname.Length == 0 && dr != DialogResult.Yes)) return false;
+                if (dr == DialogResult.No) { cfg.MarkNotAGame(gname); Log.Write("Marcado como não jogo: " + gname); }
+                if (w.Current != null && w.Current.Note != "teste") w.EndSession("Encerrada para iniciar um teste");
                 r = runner.Start(k, secs, opt, true, out refuse);
             }
             if (r == null) return false;

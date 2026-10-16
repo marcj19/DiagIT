@@ -1,4 +1,4 @@
-﻿DiagIT v1.2.3 - check-up do seu PC, com testes comprovados
+﻿DiagIT v1.3.0 - check-up do seu PC, com testes comprovados
 ================================================================
 
 COMO USAR
@@ -12,7 +12,8 @@ COMO USAR
    Com algum problema? Clique em "Estou com um problema", escolha o que acontece
    e o DiagIT monta a verificacao certa (feche os jogos antes).
 5. Veja o resultado em Resultados. Use "Resolver passo a passo" ou "Ja fiz isso":
-   o DiagIT acompanha em "Suas correcoes" (Inicio) se o problema voltou ou foi resolvido.
+   o DiagIT acompanha em "Resolveu?" (topo do Inicio) se o problema voltou ou foi resolvido.
+   Se o problema voltar, o botao "Ver o plano para resolver" mostra os proximos testes, um de cada vez.
 6. Vai levar a um tecnico? Em Resultados, "Relatorio" abre um relatorio para imprimir e
    "Pacote para o tecnico" gera um .zip com o relatorio e os dados brutos (sem arquivos pessoais).
 

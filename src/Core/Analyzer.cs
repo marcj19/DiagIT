@@ -329,11 +329,24 @@ namespace DiagIT
 
                 if (strong.Count > 0)
                 {
-                    double w = Math.Max(0.3, Scale(strong.Count, 4));
+                    // com sintoma = algo visível na mesma hora (programa fechou, TDR, tela azul); isolado = o Windows só registrou o reset do vídeo
+                    List<string> symTxt = new List<string>();
+                    int sym = 0;
+                    foreach (WinEvent se in strong)
+                    {
+                        WinEvent near = SymptomNear(ev, se.Time);
+                        if (near == null) continue;
+                        sym++;
+                        if (symTxt.Count < 3) symTxt.Add("• " + se.Time.ToString("dd/MM HH:mm", Pt) + ": " + SymptomText(near));
+                    }
+                    int isolated = strong.Count - sym;
+                    double w = Math.Max(0.3, Scale(strong.Count, 4)) * (sym > 0 ? 1.0 : 0.5);
                     Finding f = new Finding();
-                    f.Sev = strong.Count >= 3 ? Sev.Crit : Sev.Warn; f.Source = "Eventos do Windows";
+                    f.Sev = sym >= 2 ? Sev.Crit : sym == 1 ? Sev.Warn : strong.Count >= 6 ? Sev.Warn : Sev.Info; f.Source = "Eventos do Windows";
                     f.Title = "Travamentos de GPU registrados pelo Windows (LiveKernelEvent 141/117/193) — " + strong.Count + "×";
                     f.Evidence = "A GPU parou de responder e o Windows a recuperou sem tela azul. Último em " + D(strong[0].Time) + ".\n" + Recent(strong, 4) +
+                        (sym > 0 ? "\nCom sintoma visível na mesma hora (" + sym + "):\n" + string.Join("\n", symTxt.ToArray()) : "") +
+                        (isolated > 0 ? "\n" + isolated + " isolado(s): o Windows registrou o reset do vídeo, mas nada fechou nem travou na mesma hora. Isso é comum ao abrir um jogo em tela cheia ou trocar a resolução, e sozinho não prova defeito." : "") +
                         (strongInstall > 0 ? "\n(" + strongInstall + " ocorrência(s) durante a instalação de driver não entraram na conta: são esperadas quando o driver é trocado.)" : "");
                     f.Advice = "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot.";
                     f.Last = strong[0].Time;

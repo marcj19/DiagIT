@@ -1,5 +1,5 @@
 {
-  "_sobre": "Soluções guiadas: passo a passo dentro do DiagIT. Ao concluir, a correção entra no acompanhamento 'corrigiu?' com o 'escopo' indicado (telas-azuis, video, desligamentos, engasgos, geral). Ações: 'abrir' abre um site ou programa do Windows; 'diagit' executa algo do próprio DiagIT (bloquear-wu, tirar-hd, reiniciar-avancado, reiniciar-bios, teste-gpu, teste-memoria). 'achados' liga cada guia aos achados pelo começo do título técnico. Textos aceitam {painel_video}, {site_driver}, {nome_ddu}, {perfil_memoria}, {ajustes_cpu}.",
+  "_sobre": "Soluções guiadas: passo a passo dentro do DiagIT. Ao concluir, a correção entra no acompanhamento 'corrigiu?' com o 'escopo' indicado (telas-azuis, video, desligamentos, engasgos, geral). Ações: 'abrir' abre um site ou programa do Windows; 'guia' abre outro guia (alvo = id); 'diagit' executa algo do próprio DiagIT (bloquear-wu, tirar-hd, reiniciar-avancado, reiniciar-bios, teste-gpu, teste-memoria, teste-cpu, verificar-driver, ver-resultados, ver-hardware, ver-aovivo, e tweak-<ajuste>-on / tweak-<ajuste>-off para os ajustes reversíveis de Windows de src/Core/Tweaks.cs). 'achados' liga cada guia aos achados pelo começo do título técnico. Textos aceitam {painel_video}, {site_driver}, {nome_ddu}, {perfil_memoria}, {ajustes_cpu}.",
   "guias": [
     {
       "id": "driver-video-limpo",
@@ -73,6 +73,69 @@
         { "titulo": "Limite a frequência máxima", "texto": "Escolha Ajuste manual, ligue Ajuste da GPU e Controle avançado e coloque a frequência máxima no valor oficial que o DiagIT mostrou no achado. Desligue também o HYPR-RX, inclusive nos perfis de cada jogo.", "acoes": [] },
         { "titulo": "Jogue por alguns dias", "texto": "Se os travamentos pararem, a causa era o clock. Se continuarem, volte ao padrão: o DiagIT acompanha e mostra o próximo passo.", "acoes": [] }
       ]
+    },
+    {
+      "id": "video-voltou",
+      "titulo": "O problema de vídeo voltou: plano de testes",
+      "resumo": "O driver já foi trocado do jeito certo e o problema voltou, então refazer o DDU não é o caminho. Aqui estão, em ordem, os testes que realmente separam as causas. Mude uma coisa por vez e jogue alguns dias entre uma e outra.",
+      "feito": "Segui o plano de testes do problema de vídeo",
+      "escopo": "video",
+      "passos": [
+        { "titulo": "Veja o que estava acontecendo", "texto": "Nos Resultados, o achado de vídeo mostra o que aconteceu na mesma hora: se um programa fechou, o vídeo travou ou foi só um reset do Windows sem nada visível. Se SÓ UM jogo fecha e o módulo que falhou é do próprio jogo (e não do driver de vídeo), o problema costuma ser o jogo: verifique os arquivos dele na Steam, Ubisoft ou Riot, atualize o jogo e feche sobreposições (Discord, Steam, gravadores). Se vários jogos caem, ou a tela fica preta ou pisca, siga os passos abaixo.",
+          "acoes": [ { "rotulo": "Ver os resultados", "tipo": "diagit", "alvo": "ver-resultados" } ] },
+        { "titulo": "Regra do plano: uma mudança por vez", "texto": "Cada passo a seguir é um teste. Aplique um, jogue 2 ou 3 dias e veja o resultado em Início, em \"Suas correções\". Se não resolver, desfaça e passe ao próximo. Mexer em tudo de uma vez esconde a causa. O DiagIT acompanha cada ajuste sozinho.", "acoes": [] },
+        { "titulo": "Desligue os extras da placa no {painel_video}", "texto": "Abra o {painel_video} e desligue, um de cada vez: gravação e repetição instantânea, perfis automáticos de desempenho, limitador de FPS, redução de latência e sincronização adaptativa. Vale também para o perfil de cada jogo. Esses recursos mexem no vídeo por baixo do jogo e são causa comum de resets.", "acoes": [] },
+        { "titulo": "Teste sem as sobreposições de vídeo do Windows (MPO)", "texto": "O Windows desenha algumas telas em camadas separadas. Em placas AMD e NVIDIA isso já causou tela preta, piscadas e reset do vídeo. Desligar é seguro e reversível. Precisa reiniciar o PC; depois jogue alguns dias.",
+          "acoes": [ { "rotulo": "Desligar o MPO", "tipo": "diagit", "alvo": "tweak-mpo-on" }, { "rotulo": "Desfazer", "tipo": "diagit", "alvo": "tweak-mpo-off" } ] },
+        { "titulo": "Teste sem o agendamento de GPU por hardware (HAGS)", "texto": "O Windows deixa a placa organizar o próprio trabalho (HAGS). Em alguns conjuntos de placa e driver isso causa travamentos. Desligar devolve a tarefa ao Windows. Só faça este passo se o anterior não resolveu (desfaça o MPO antes, para testar uma coisa por vez). Precisa reiniciar.",
+          "acoes": [ { "rotulo": "Desligar o HAGS", "tipo": "diagit", "alvo": "tweak-hags-on" }, { "rotulo": "Desfazer", "tipo": "diagit", "alvo": "tweak-hags-off" } ] },
+        { "titulo": "Dê mais tempo ao vídeo antes do Windows reiniciá-lo", "texto": "Se a placa demora para responder, o Windows a reinicia depois de 2 segundos. Com 10 segundos, cargas pesadas e pontuais passam sem reset. Se o problema era só esse, ele some; se era travamento de verdade, continua e você descarta essa causa. Precisa reiniciar.",
+          "acoes": [ { "rotulo": "Dar 10 segundos ao vídeo", "tipo": "diagit", "alvo": "tweak-tdr-on" }, { "rotulo": "Desfazer", "tipo": "diagit", "alvo": "tweak-tdr-off" } ] },
+        { "titulo": "Desligue a gravação de jogo em segundo plano do Windows", "texto": "O Xbox Game Bar pode gravar o jogo em segundo plano, usando a placa de vídeo, e já foi ligado a quedas de jogo. Desligar não perde nada que você use. Não precisa reiniciar.",
+          "acoes": [ { "rotulo": "Desligar a gravação", "tipo": "diagit", "alvo": "tweak-gamedvr-on" }, { "rotulo": "Desfazer", "tipo": "diagit", "alvo": "tweak-gamedvr-off" } ] },
+        { "titulo": "Confira cabo, porta e monitor", "texto": "O Windows registra reset de vídeo quando o monitor troca de modo: cabo ruim, porta com mau contato ou monitor que dorme e acorda. Troque o cabo DisplayPort ou HDMI e a porta da placa, use a taxa de atualização padrão do monitor (sem overclock) e desligue a economia de energia dele.", "acoes": [] },
+        { "titulo": "Teste outra versão do driver", "texto": "Se nada ajudou, instale uma versão anterior e estável do driver (no site do fabricante, em versões anteriores) usando o mesmo método limpo, com o Windows Update já impedido de trocar drivers.",
+          "acoes": [ { "rotulo": "Abrir o site do driver", "tipo": "abrir", "alvo": "{site_driver}" }, { "rotulo": "Ver o passo a passo do driver limpo", "tipo": "guia", "alvo": "driver-video-limpo" } ] },
+        { "titulo": "Atualize a BIOS e o chipset", "texto": "BIOS e chipset desatualizados causam resets de vídeo em PCs com Ryzen. Em Hardware você vê o modelo da placa-mãe e a data da BIOS; baixe a versão nova no site do fabricante da placa-mãe. Atualize a BIOS com o PC ligado na tomada e sem desligar no meio.",
+          "acoes": [ { "rotulo": "Ver o hardware", "tipo": "diagit", "alvo": "ver-hardware" } ] },
+        { "titulo": "Se continuar: confirme com o teste e leve ao técnico", "texto": "Rode o teste da placa de vídeo. Se ele reprovar, o defeito é da placa (ou do slot e da fonte): o DiagIT diz qual. Se passar e o problema continuar depois de todos os passos, gere o \"Pacote para o técnico\" nos Resultados: ele leva o histórico completo, a linha do tempo e o que já foi tentado.",
+          "acoes": [ { "rotulo": "Testar a placa de vídeo", "tipo": "diagit", "alvo": "teste-gpu" }, { "rotulo": "Ver os resultados", "tipo": "diagit", "alvo": "ver-resultados" } ] }
+      ]
+    },
+    {
+      "id": "cpu-instavel",
+      "titulo": "Processador instável: erros de cálculo ou de hardware",
+      "resumo": "O processador errou contas ou o Windows registrou erro de hardware. Quase sempre é um ajuste da BIOS, calor ou BIOS desatualizada, e raramente o processador em si. Siga em ordem e teste entre os passos.",
+      "feito": "Segui o plano de estabilidade do processador",
+      "escopo": "geral",
+      "passos": [
+        { "titulo": "Volte a BIOS ao padrão de fábrica", "texto": "É a causa mais comum: o perfil de memória e os ajustes do processador deixam o PC no limite. O guia abaixo faz isso em 5 minutos.",
+          "acoes": [ { "rotulo": "Abrir o guia da BIOS", "tipo": "guia", "alvo": "bios-padrao" } ] },
+        { "titulo": "Desligue o ajuste automático do processador", "texto": "Se {ajustes_cpu} estiver ligado (na BIOS ou em programas como o Ryzen Master e o XTU), desligue. Eles empurram o processador além do que ele aguenta de forma estável naquele PC.", "acoes": [] },
+        { "titulo": "Atualize a BIOS e o chipset", "texto": "Atualizações de BIOS corrigem estabilidade do processador e da memória. Em Hardware você vê o modelo da placa-mãe e a data da BIOS; baixe a nova no site do fabricante, com o PC na tomada.",
+          "acoes": [ { "rotulo": "Ver o hardware", "tipo": "diagit", "alvo": "ver-hardware" } ] },
+        { "titulo": "Teste sem o turbo", "texto": "Limitar o processador a 99% desliga o turbo, que é onde a instabilidade costuma aparecer. Se o problema some, a causa é o turbo ou o calor (veja o guia de temperatura). Reversível, sem reiniciar.",
+          "acoes": [ { "rotulo": "Desligar o turbo", "tipo": "diagit", "alvo": "tweak-cpu-boost-on" }, { "rotulo": "Desfazer", "tipo": "diagit", "alvo": "tweak-cpu-boost-off" } ] },
+        { "titulo": "Confirme com o teste do processador", "texto": "O teste confere cada cálculo bit a bit em todos os núcleos. Se aprovar, o processador está bom e a causa era o ajuste; se reprovar mesmo no padrão, é o processador (garantia).",
+          "acoes": [ { "rotulo": "Testar o processador", "tipo": "diagit", "alvo": "teste-cpu" } ] }
+      ]
+    },
+    {
+      "id": "cpu-quente",
+      "titulo": "Processador esquentando ou perdendo desempenho",
+      "resumo": "Temperatura alta faz o processador reduzir a velocidade e, no limite, travar ou desligar o PC. Na maioria das vezes é poeira, fluxo de ar ou cooler mal encaixado.",
+      "feito": "Tratei a temperatura do processador",
+      "escopo": "geral",
+      "passos": [
+        { "titulo": "Veja a temperatura ao vivo", "texto": "Abra o painel ao vivo, deixe um jogo ou teste rodando e observe a temperatura do processador. Acima de 85 °C por muito tempo já é motivo para agir.",
+          "acoes": [ { "rotulo": "Abrir o painel ao vivo", "tipo": "diagit", "alvo": "ver-aovivo" } ] },
+        { "titulo": "Limpe a poeira e melhore o fluxo de ar", "texto": "Com o PC desligado e desconectado da tomada, limpe filtros, ventoinhas e o dissipador com ar comprimido ou pincel. Confira se as ventoinhas giram e se o gabinete tem entrada de ar na frente e saída atrás.", "acoes": [] },
+        { "titulo": "Confira o encaixe do cooler e a pasta térmica", "texto": "O cooler precisa estar firme e bem apertado, e o plástico de proteção da base precisa ter sido retirado. Pasta térmica com mais de 3 ou 4 anos costuma ressecar: troque, usando pouca quantidade.", "acoes": [] },
+        { "titulo": "Teste sem o turbo", "texto": "Limitar o processador a 99% desliga o turbo e reduz muito o calor, perdendo pouco desempenho. Serve como solução provisória até resolver a causa e para saber se o calor é mesmo o problema. Reversível, sem reiniciar.",
+          "acoes": [ { "rotulo": "Desligar o turbo", "tipo": "diagit", "alvo": "tweak-cpu-boost-on" }, { "rotulo": "Desfazer", "tipo": "diagit", "alvo": "tweak-cpu-boost-off" } ] },
+        { "titulo": "Confirme com o teste do processador", "texto": "O teste coloca todos os núcleos no máximo e registra a temperatura. Ele mostra se a refrigeração dá conta de carga máxima.",
+          "acoes": [ { "rotulo": "Testar o processador", "tipo": "diagit", "alvo": "teste-cpu" } ] }
+      ]
     }
   ],
   "achados": [
@@ -84,7 +147,12 @@
     { "inicio_do_titulo": "REPRODUZIDO: o watchdog do kernel", "guia": "driver-video-limpo" },
     { "inicio_do_titulo": "Erros FATAIS de hardware", "guia": "bios-padrao" },
     { "inicio_do_titulo": "Erros de hardware corrigidos", "guia": "bios-padrao" },
-    { "inicio_do_titulo": "Processador ERRA CÁLCULOS", "guia": "bios-padrao" },
+    { "inicio_do_titulo": "Processador ERRA CÁLCULOS", "guia": "cpu-instavel" },
+    { "inicio_do_titulo": "CPU chegou ao limite térmico", "guia": "cpu-quente" },
+    { "inicio_do_titulo": "CPU muito quente em jogo", "guia": "cpu-quente" },
+    { "inicio_do_titulo": "CPU passa", "guia": "cpu-quente" },
+    { "inicio_do_titulo": "A CPU perde desempenho sob carga prolongada", "guia": "cpu-quente" },
+    { "inicio_do_titulo": "A BIOS/firmware limitou a velocidade da CPU", "guia": "cpu-quente" },
     { "inicio_do_titulo": "Memória virtual também no HD", "guia": "paginacao-hd" },
     { "inicio_do_titulo": "Placa de rede ", "guia": "realtek-desativar" },
     { "inicio_do_titulo": "A GPU trabalha acima do clock oficial", "guia": "limitar-clock-amd" }

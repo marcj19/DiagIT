@@ -171,10 +171,51 @@ namespace DiagIT
                 Finding fCooler = dCooler.Findings.Find(delegate(Finding f) { return f.Title.Contains("dispositivo(s) com problema"); });
                 Check(fCooler != null && fCooler.Sev == Sev.Info && fCooler.W.Count == 0, "conexão USB do cooler sem driver só informa, não vira suspeita de driver");
                 Check(d.Fixes.Count == 1 && d.Fixes[0].State != 2 && swapS.Contains("Você trocou o driver de vídeo"), "o veredito diz que a troca está em acompanhamento");
-                List<WinEvent> again = new List<WinEvent>(before); again.Add(lke193(DateTime.Now.AddMinutes(-20))); sorted(again);
+                List<WinEvent> again = new List<WinEvent>(before); again.Add(lke193(DateTime.Now.AddMinutes(-20)));
+                WinEvent crashAgain = new WinEvent(); crashAgain.Provider = "Application Error"; crashAgain.Id = 1000; crashAgain.Time = DateTime.Now.AddMinutes(-20).AddSeconds(1);
+                crashAgain.P = new string[] { "jogo.exe", "1.0.0.0", "0x1", "jogo.exe" }; again.Add(crashAgain);   // com programa fechando junto: é sintoma de verdade
+                sorted(again);
                 d = Analyzer.Run(new List<SessionData>(), again, new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swapFix });
                 Analyzer.PlainVerdict(d, out swapT, out swapS);
                 Check(d.Fixes[0].State == 2 && !swapS.Contains("Você trocou o driver de vídeo") && !(gpuF(d).Evidence.Contains("antes do driver novo")), "travamento depois da troca: não esconde nada e avisa que não resolveu");
+
+                Say("== 4f. Reset de vídeo isolado x com sintoma; o problema voltou depois da troca do driver");
+                Func<DateTime, string, WinEvent> appCrash = delegate(DateTime t, string app)
+                {
+                    WinEvent e = new WinEvent(); e.Provider = "Application Error"; e.Id = 1000; e.Time = t;
+                    e.P = new string[] { app, "1.0.0.0", "0x1", app, "1.0.0.0", "0x1", "0xc0000005" }; return e;
+                };
+                DateTime tSym = DateTime.Now.AddHours(-20);
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym), appCrash(tSym.AddSeconds(2), "jogo.exe") }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fSym = gpuF(d);
+                Say("  " + (fSym == null ? "(nenhum)" : fSym.Sev + " | " + fSym.Evidence.Replace("\n", " / ")));
+                Check(fSym != null && fSym.Sev == Sev.Warn && fSym.Evidence.Contains("Com sintoma") && fSym.Evidence.Contains("jogo.exe fechou com erro") && fSym.Evidence.Contains("do próprio programa"),
+                      "reset de vídeo com programa fechando junto: com sintoma, e diz que o módulo que falhou é do programa");
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(gpuF(d) != null && gpuF(d).Sev == Sev.Info && gpuF(d).Evidence.Contains("isolado"), "reset de vídeo isolado (nada fechou): só informação");
+
+                FixEntry swap2 = new FixEntry(); swap2.Id = "t2"; swap2.Kind = "guia:driver-video-limpo"; swap2.Scope = "video"; swap2.Title = "Reinstalei o driver de vídeo do jeito certo"; swap2.When = DateTime.Now.AddHours(-3);
+                List<WinEvent> oldOnes = new List<WinEvent> { lke193(DateTime.Now.AddHours(-30)), lke193(DateTime.Now.AddHours(-26)) };
+                List<WinEvent> isoAfter = new List<WinEvent>(oldOnes); isoAfter.Add(lke193(DateTime.Now.AddHours(-1)));
+                d = Analyzer.Run(new List<SessionData>(), sorted(isoAfter), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swap2 });
+                Check(d.Fixes.Count == 1 && d.Fixes[0].State == 0 && d.Fixes[0].Isolated == 1 && d.Fixes[0].NextGuide.Length == 0 && d.Fixes[0].Text.Contains("isolado"),
+                      "reset de vídeo isolado depois da troca: continua acompanhando e explica que não conta como 'voltou'");
+                List<WinEvent> symAfter = new List<WinEvent>(oldOnes); DateTime tBack = DateTime.Now.AddHours(-1);
+                symAfter.Add(lke193(tBack)); symAfter.Add(appCrash(tBack.AddSeconds(1), "RainbowSixHelper.exe"));
+                d = Analyzer.Run(new List<SessionData>(), sorted(symAfter), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swap2 });
+                Finding fBack = gpuF(d);
+                string backT, backS; Analyzer.PlainVerdict(d, out backT, out backS);
+                Say("  " + d.Fixes[0].Headline + ": " + d.Fixes[0].Text);
+                Check(d.Fixes[0].State == 2 && d.Fixes[0].NextGuide == "video-voltou" && d.Fixes[0].Context.Contains("RainbowSixHelper.exe fechou com erro") && d.Fixes[0].Headline == "O problema voltou",
+                      "programa fechou junto com o reset depois da troca: 'o problema voltou', com o contexto e o plano como próximo passo");
+                Check(fBack != null && fBack.Guide == "video-voltou" && backS.Contains("o problema voltou"), "o achado deixa de mandar refazer o DDU e aponta o plano de testes; o veredito diz que voltou");
+                Check(Rules.GuideById("video-voltou") != null && Rules.GuideById("cpu-instavel") != null && Rules.GuideById("cpu-quente") != null, "guias novos carregados (vídeo voltou, CPU instável, CPU quente)");
+
+                Say("== 4g. Ajustes reversíveis de Windows (só leitura aqui)");
+                bool tweaksOk = Tweaks.All.Count >= 5;
+                foreach (Tweak tw in Tweaks.All) { try { bool on = tw.IsOn(); Say("  " + tw.Id + ": " + (on ? "ligado" : "padrão")); } catch (Exception ex) { tweaksOk = false; Say("  " + tw.Id + " falhou: " + ex.Message); } }
+                int cpuMax = Tweaks.CpuMaxPercent();
+                Check(tweaksOk && cpuMax >= 1 && cpuMax <= 100, "todos os ajustes sabem dizer se estão ligados (estado máximo do processador: " + cpuMax + "%)");
 
                 Say("== 4e. Testes do próprio DiagIT não viram 'pouca RAM' nem 'picos de disco'");
                 Func<string, SessionData> stress = delegate(string name)
@@ -275,7 +316,7 @@ namespace DiagIT
                 foreach (DriverRule dr in Rules.Drivers) if (!Rules.DriverTypes.ContainsKey(dr.Type) || dr.File.Length < 2 || dr.Name.Length == 0) drvOk = false;
                 Check(drvOk, "drivers: todo driver tem nome e aponta para um tipo existente (" + Rules.Drivers.Count + " drivers)");
                 bool guiasOk = Rules.Guides.Count >= 5;
-                string[] acoesValidas = { "bloquear-wu", "tirar-hd", "reiniciar-avancado", "reiniciar-bios", "teste-gpu", "teste-memoria", "verificar-driver" };
+                string[] acoesValidas = { "bloquear-wu", "tirar-hd", "reiniciar-avancado", "reiniciar-bios", "teste-gpu", "teste-memoria", "teste-cpu", "verificar-driver", "ver-resultados", "ver-hardware", "ver-aovivo" };
                 foreach (Guide gu in Rules.Guides)
                 {
                     if (gu.Id.Length == 0 || gu.Title.Length == 0 || gu.Done.Length == 0 || gu.Steps.Count == 0 || Array.IndexOf(Analyzer.Scopes, gu.Scope) < 0) guiasOk = false;
@@ -283,7 +324,12 @@ namespace DiagIT
                     {
                         if (st.Title.Length == 0 || st.Text.Length == 0 || Rules.Fill(st.Text).Contains("{")) guiasOk = false;
                         foreach (GuideAction ga in st.Actions)
-                            if (ga.Label.Length == 0 || (ga.Type != "abrir" && ga.Type != "diagit") || (ga.Type == "diagit" && Array.IndexOf(acoesValidas, ga.Target) < 0)) guiasOk = false;
+                        {
+                            bool tweakOk = ga.Target.StartsWith("tweak-", StringComparison.Ordinal) && (ga.Target.EndsWith("-on", StringComparison.Ordinal) || ga.Target.EndsWith("-off", StringComparison.Ordinal)) &&
+                                Tweaks.ById(ga.Target.Substring(6, ga.Target.Length - 6 - (ga.Target.EndsWith("-on", StringComparison.Ordinal) ? 3 : 4))) != null;
+                            if (ga.Label.Length == 0 || (ga.Type != "abrir" && ga.Type != "diagit" && ga.Type != "guia") ||
+                                (ga.Type == "diagit" && Array.IndexOf(acoesValidas, ga.Target) < 0 && !tweakOk) || (ga.Type == "guia" && Rules.GuideById(ga.Target) == null)) guiasOk = false;
+                        }
                     }
                 }
                 foreach (KeyValuePair<string, string> gl in Rules.GuideLinks) if (Rules.GuideById(gl.Value) == null) guiasOk = false;

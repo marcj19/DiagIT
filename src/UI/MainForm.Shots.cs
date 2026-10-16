@@ -24,11 +24,13 @@ namespace DiagIT
                 switch (step)
                 {
                     case 0:
-                        // só para a imagem: exemplos de "Suas correções" (nada é gravado)
+                        // só para a imagem: exemplos de "Resolveu?" (nada é gravado). DIAGIT_SAMPLES=1 troca as correções reais pelos exemplos.
+                        if (Environment.GetEnvironmentVariable("DIAGIT_SAMPLES") == "1") lastDiag.Fixes.Clear();
                         if (lastDiag.Fixes.Count == 0)
                         {
-                            lastDiag.Fixes.Add(SampleFix(1, "Reinstalei o driver de vídeo do jeito certo", "Resolvido", "Nenhum registro de travamentos de vídeo em 12 dias desde a correção. Antes: 3 em 6 dias.", 12));
-                            lastDiag.Fixes.Add(SampleFix(0, "Tirei a memória virtual do HD", "Acompanhando", "Nenhum registro de congelamentos e engasgos desde 11/10. Antes: 2 em 4 dias. Mais 4 dias sem problemas para confirmar.", 3));
+                            lastDiag.Fixes.Add(SampleFix(2, "Reinstalei o driver de vídeo do jeito certo", "O problema voltou", "Voltou em 15/10 às 22:00. Na mesma hora: RainbowSixHelper.exe fechou com erro (o módulo que falhou é RainbowSixHelper.exe, do próprio programa, não do driver de vídeo). Antes: 4 em 1 dias. Isso não quer dizer que a correção foi em vão: o DiagIT montou um plano de testes, um passo de cada vez.", 1, 7, "video-voltou"));
+                            lastDiag.Fixes.Add(SampleFix(0, "Tirei a memória virtual do HD", "Acompanhando", "Nenhum problema de verdade desde 11/10 às 20:10. Antes: 2 em 4 dias. Faltam cerca de 4 dias de uso sem problemas para o DiagIT dar como resolvido.", 3, 7, ""));
+                            lastDiag.Fixes.Add(SampleFix(1, "Impedi o Windows Update de trocar drivers", "Resolvido", "Nenhum registro de travamentos de vídeo em 12 dias desde a correção. Antes: 3 em 6 dias.", 12, 7, ""));
                         }
                         RefreshHome();
                         Navigate(P_HOME); break;
@@ -49,7 +51,7 @@ namespace DiagIT
                         Navigate(P_HOME);
                         homeFlow.AutoScrollPosition = new Point(0, homeFlow.AutoScrollMinSize.Height);
                         break;
-                    case 11: Shot(dir, "11-inicio-correcoes"); OpenGuide("driver-video-limpo", null); guideDone[0] = true; guideDone[1] = true; guideStep = 2; LayoutGuide(); break;
+                    case 11: Shot(dir, "11-inicio-correcoes"); OpenGuide("video-voltou", null); guideDone[0] = true; guideDone[1] = true; guideStep = 3; LayoutGuide(); break;
                     case 12:
                         Shot(dir, "12-guia");
                         curGuide = null; ClearGuideProgress();
@@ -78,11 +80,12 @@ namespace DiagIT
             t.Start();
         }
 
-        static FixStatus SampleFix(int state, string title, string head, string text, int daysAgo)
+        static FixStatus SampleFix(int state, string title, string head, string text, int daysAgo, double needDays, string nextGuide)
         {
             FixStatus st = new FixStatus();
             st.Fix = new FixEntry(); st.Fix.Title = title; st.Fix.When = DateTime.Now.AddDays(-daysAgo); st.Fix.Id = "amostra" + daysAgo;
             st.State = state; st.Headline = head; st.Text = text;
+            st.AfterDays = daysAgo; st.NeedDays = needDays; st.NextGuide = nextGuide; st.NextLabel = nextGuide.Length > 0 ? "Ver o plano para resolver" : "";
             return st;
         }
 

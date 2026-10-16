@@ -76,8 +76,9 @@ namespace DiagIT
             parts.TileClicked += delegate(int c) { OpenComponent(c); };
             homeFlow.Controls.Add(parts);
             homeFlow.Controls.Add(new SectionTitle("O que fazer agora", false));
-            fixesTitle = new SectionTitle("Suas correções", false);
+            fixesTitle = new SectionTitle("Resolveu? O que o DiagIT está acompanhando", false);
             fixList = new FixList();
+            fixList.ActionClicked += delegate(FixStatus st) { if (st.NextGuide.Length > 0) OpenGuide(st.NextGuide, null); };
             fixList.RemoveClicked += delegate(FixStatus st)
             {
                 if (MessageBox.Show(this, "Parar de acompanhar \"" + st.Fix.Title + "\"?", "Suas correções", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
@@ -226,7 +227,8 @@ namespace DiagIT
             homeFlow.Controls.Remove(fixesTitle); homeFlow.Controls.Remove(fixList);
             fixList.Items.Clear();
             if (d != null) fixList.Items.AddRange(d.Fixes);
-            if (fixList.Items.Count > 0) { homeFlow.Controls.Add(fixesTitle); homeFlow.Controls.Add(fixList); }
+            // "Resolveu?" logo abaixo do resumo: é a primeira pergunta de quem fez uma correção
+            if (fixList.Items.Count > 0) { homeFlow.Place(fixesTitle, hero); homeFlow.Place(fixList, fixesTitle); }
             fixList.Invalidate();
             homeFlow.Relayout();
         }

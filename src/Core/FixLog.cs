@@ -69,6 +69,13 @@ namespace DiagIT
             return f;
         }
 
+        /// <summary>Tira do acompanhamento as correções de um tipo (ex.: ao desfazer um ajuste).</summary>
+        public static void RemoveKind(string kind)
+        {
+            List<FixEntry> l = Load();
+            if (l.RemoveAll(delegate(FixEntry x) { return x.Kind == kind; }) > 0) Save(l);
+        }
+
         public static void Remove(string id)
         {
             List<FixEntry> l = Load();
