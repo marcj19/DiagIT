@@ -50,6 +50,7 @@ namespace DiagIT
         ListView lvTests;
         TextBox txtTest;
         readonly Queue<object[]> testQueue = new Queue<object[]>();
+        bool betweenSteps;   // uma etapa terminou e a próxima começa em segundos (pausa para o PC esfriar): não é interrupção
         TableLayoutPanel testsRoot;
         // verificação em andamento (mostrada na página "Verificando")
         readonly List<object[]> runPlan = new List<object[]>();
@@ -128,7 +129,7 @@ namespace DiagIT
             runPanel.Controls.Add(lblRunStats);
             FlatButton stop = new FlatButton("Parar teste", false);
             stop.Location = new Point(Theme.S(14), Theme.S(150) - stop.Height + Theme.S(4));
-            stop.Click += delegate { testQueue.Clear(); runner.Stop(); };
+            stop.Click += delegate { testQueue.Clear(); runner.Stop(); if (betweenSteps) { betweenSteps = false; EndRunUi(); RefreshRun(); } };
             runPanel.Controls.Add(stop);
             runTemps = new LineChart();
             runTemps.Title = "Temperaturas (°C)"; runTemps.Unit = "°C";
@@ -482,10 +483,15 @@ namespace DiagIT
                 t.Tick += delegate
                 {
                     t.Stop(); t.Dispose();
+                    if (!betweenSteps) return;   // a pessoa clicou em Parar durante a pausa
+                    betweenSteps = false;
                     if (!StartTest((TestKind)next[0], (int)next[1], next[2], false)) { testQueue.Clear(); EndRunUi(); }
+                    RefreshRun();
                 };
+                betweenSteps = true;
                 t.Start();
                 lblRunPhase.Text = "Próximo teste em 5 s (resfriando)...";
+                RefreshRun();
                 return;
             }
             testQueue.Clear();

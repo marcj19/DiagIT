@@ -679,6 +679,7 @@ namespace DiagIT
     {
         public double Progress;
         public string Title = "", Text_ = "", TimeLeft = "", Total = "";
+        public string RingLabel = "desta etapa";   // o anel mostra a etapa durante o teste e o check-up inteiro fora dele
         public bool ErrorState;
         int hT, hX;
         public override int Measure(int width)
@@ -704,7 +705,7 @@ namespace DiagIT
             if (sweep > 0.5f)
                 using (Pen p = new Pen(ErrorState ? Theme.Bad : Theme.Accent, thick)) { p.StartCap = LineCap.Round; p.EndCap = LineCap.Round; g.DrawArc(p, rr, -90, sweep); }
             Theme.Text_(g, (int)Math.Round(Progress * 100) + "%", Theme.Display(22f), Theme.Text, new Rectangle(rx, ry + ring / 2 - Theme.S(30), ring, Theme.S(40)), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            Theme.Text_(g, "desta etapa", Theme.Font(8.5f), Theme.Muted, new Rectangle(rx, ry + ring / 2 + Theme.S(10), ring, Theme.S(18)), TextFormatFlags.HorizontalCenter);
+            Theme.Text_(g, RingLabel, Theme.Font(8.5f), Theme.Muted, new Rectangle(rx, ry + ring / 2 + Theme.S(10), ring, Theme.S(18)), TextFormatFlags.HorizontalCenter);
             int tx = stacked ? Theme.S(28) : rx + ring + Theme.S(32), tw = Width - tx - Theme.S(28);
             int y = stacked ? ry + ring + Theme.S(20) : (Height - (hT + Theme.S(12) + hX + Theme.S(14) + Theme.S(22))) / 2;
             TextRenderer.DrawText(g, Title, Theme.Display(16f), new Rectangle(tx, y, tw, hT), Theme.Text, WB);

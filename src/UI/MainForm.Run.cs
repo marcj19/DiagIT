@@ -93,7 +93,7 @@ namespace DiagIT
 
             runButtons = new ButtonRow();
             runStop = new FlatButton("Parar verificação", false);
-            runStop.Click += delegate { testQueue.Clear(); runner.Stop(); };
+            runStop.Click += delegate { testQueue.Clear(); runner.Stop(); if (betweenSteps) { betweenSteps = false; EndRunUi(); RefreshRun(); } };
             runButtons.Controls.Add(runStop);
             runSeeResults = new FlatButton("Ver os resultados", true);
             runSeeResults.Click += delegate { Navigate(P_DIAG); };
@@ -128,10 +128,11 @@ namespace DiagIT
             TestResult r = runner.Current;
             TestContext c = runner.Ctx;
             bool busy = r != null && c != null;
+            bool pause = !busy && betweenSteps;   // entre uma etapa e outra
 
-            bool halted = !busy && runPlan.Count > 0 && runResults.Count < runPlan.Count;
-            runHead.Set(runLong ? "TESTE LONGO" : runGuided ? "PASSO 3 DE 3" : "VERIFICAÇÃO", busy ? "Verificando seu PC" : halted ? "Verificação interrompida" : runResults.Count > 0 ? "Verificação concluída" : "Nenhuma verificação em andamento",
-                busy ? (runLong ? "Pode ir dormir: o PC não vai entrar em suspensão e o DiagIT mostra o resultado quando terminar." : "Pode sair de perto. O DiagIT avisa quando terminar.") :
+            bool halted = !busy && !pause && runPlan.Count > 0 && runResults.Count < runPlan.Count;
+            runHead.Set(runLong ? "TESTE LONGO" : runGuided ? "PASSO 3 DE 3" : "VERIFICAÇÃO", busy || pause ? "Verificando seu PC" : halted ? "Verificação interrompida" : runResults.Count > 0 ? "Verificação concluída" : "Nenhuma verificação em andamento",
+                busy || pause ? (runLong ? "Pode ir dormir: o PC não vai entrar em suspensão e o DiagIT mostra o resultado quando terminar." : "Pode sair de perto. O DiagIT avisa quando terminar.") :
                 halted ? "As peças que já passaram continuam valendo. Recomece quando quiser." :
                 runResultsList().Count > 0 ? (goResultsAfterRun ? "Analisando o resultado..." : "Veja o que foi encontrado em Resultados.") :
                 "Escolha o que verificar em Verificar peças, ou faça o check-up pelo Início.");
@@ -139,7 +140,7 @@ namespace DiagIT
             // etapas
             runStepper.Items.Clear();
             List<TestResult> done = runResultsList();
-            bool stopped = !busy && runPlan.Count > 0 && (done.Count < runPlan.Count || done.Exists(delegate(TestResult t) { return t.Status == "aborted" || t.Status == "error"; }));
+            bool stopped = !busy && !pause && runPlan.Count > 0 && (done.Count < runPlan.Count || done.Exists(delegate(TestResult t) { return t.Status == "aborted" || t.Status == "error"; }));
             int next = 0;
             for (int i = 0; i < runPlan.Count; i++)
             {
@@ -153,7 +154,8 @@ namespace DiagIT
                     it.Note = t.Status == "passed" ? "Passou" : t.Status == "aborted" ? "Interrompido" : t.Status == "error" ? "Não conseguiu testar" : "Falhou";
                 }
                 else if (busy && i == done.Count) { it.State = 1; it.Note = "Agora"; }
-                else if (!busy) { it.State = 0; it.Note = "Não feito"; }
+                else if (pause && i == done.Count) { it.State = 1; it.Note = "Começa em instantes"; }
+                else if (!busy && !pause) { it.State = 0; it.Note = "Não feito"; }
                 else { it.State = 0; it.Note = (next++ == 0 ? "Em seguida" : "Depois") + " · " + Minutes((int)runPlan[i][1]); }
                 runStepper.Items.Add(it);
             }
@@ -172,6 +174,20 @@ namespace DiagIT
                 runCard.ErrorState = c.Errors > 0;
                 runCard.TimeLeft = "Faltam cerca de " + Minutes(leftStep) + " nesta etapa";
                 runCard.Total = testQueue.Count > 0 ? "cerca de " + Minutes(leftAll) + " no total" : "";
+            }
+            else if (pause)
+            {
+                TestResult last = done.Count > 0 ? done[done.Count - 1] : null;
+                int leftAll = 0;
+                foreach (object[] q in testQueue) leftAll += (int)q[1] + 15;
+                if (runPlan.Count > done.Count) leftAll += (int)runPlan[done.Count][1];
+                runCard.Title = last == null ? "Preparando o próximo teste" :
+                    "Etapa concluída: " + KindName(last.Kind) + (last.Status == "passed" ? " passou" : last.Status == "error" ? " não rodou" : last.Status == "failed" ? " falhou" : "");
+                runCard.Text_ = "O próximo teste começa em alguns segundos, depois de uma pausa curta para o PC esfriar. Não precisa fazer nada." + (last != null && last.Status == "error" ? ErroredNote(new List<TestResult> { last }) : "");
+                runCard.Progress = runPlan.Count > 0 ? done.Count / (double)runPlan.Count : 0;
+                runCard.ErrorState = last != null && (last.Status == "failed" || last.Status == "crashed");
+                runCard.TimeLeft = "";
+                runCard.Total = "cerca de " + Minutes(leftAll) + " no total";
             }
             else if (stopped)
             {
@@ -243,13 +259,14 @@ namespace DiagIT
             }
 
             runStepper.Visible = runPlan.Count > 0;
-            runStop.Visible = busy;
-            runSeeResults.Visible = !busy && done.Count > 0;
+            runStop.Visible = busy || pause;
+            runSeeResults.Visible = !busy && !pause && done.Count > 0;
+            runCard.RingLabel = busy ? "desta etapa" : "do check-up";
             runRead.Visible = busy;
             runTechToggle.Visible = busy;
             if (!busy) runTech.Visible = false;
 
-            string key = runPlan.Count + "|" + runStepper.Visible + "|" + busy + "|" + done.Count + "|" + runTech.Visible + "|" + runCard.Title;
+            string key = runPlan.Count + "|" + runStepper.Visible + "|" + busy + "|" + pause + "|" + done.Count + "|" + runTech.Visible + "|" + runCard.Title;
             if (key != runLayoutKey) { runLayoutKey = key; runFlow.Relayout(); }
             else { runHead.Invalidate(); runStepper.Invalidate(); runCard.Invalidate(); runRead.Invalidate(); }
         }

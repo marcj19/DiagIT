@@ -65,6 +65,16 @@ namespace DiagIT
                         for (int i = 0; i < 700; i++) ft.Add(i == 300 ? 58 : i == 520 ? 71 : 6.2 + rnd.NextDouble() * 1.6);
                         w.Frames.InjectPreview(ft);
                         try { overlay.SavePreview(System.IO.Path.Combine(dir, "16-painel-no-jogo.png")); } catch (Exception e) { Log.Write("Prévia do painel: " + e.Message); }
+                        // pausa entre duas etapas do check-up (o processador passou, a memória começa em instantes)
+                        runPlan.Clear(); runPlan.AddRange(QuickPlan(new System.Collections.Generic.List<TestKind> { TestKind.Cpu, TestKind.Ram, TestKind.Gpu }));
+                        TestResult pr = new TestResult(); pr.Kind = TestKind.Cpu; pr.Status = "passed"; pr.Start = DateTime.Now.AddMinutes(-2);
+                        runResults.Clear(); runResults.Add(pr); runGuided = true;
+                        testQueue.Clear(); testQueue.Enqueue(runPlan[2]);
+                        betweenSteps = true; Navigate(P_RUN); runLayoutKey = ""; RefreshRun();
+                        break;
+                    case 14:
+                        Shot(dir, "13a-entre-etapas");
+                        betweenSteps = false; runResults.Clear(); runPlan.Clear(); testQueue.Clear();
                         if (!withRun) { t.Stop(); ExitApp(); return; }
                         // verificação real e curta (processador, 60 s) só para fotografar a tela "Verificando"
                         runPlan.Clear(); runPlan.AddRange(QuickPlan(new System.Collections.Generic.List<TestKind> { TestKind.Cpu, TestKind.Gpu }));
@@ -72,7 +82,7 @@ namespace DiagIT
                         testQueue.Clear(); testQueue.Enqueue(runPlan[1]);
                         if (StartTest(TestKind.Cpu, 60, runPlan[0][2], false)) Navigate(P_RUN);
                         break;
-                    case 14: case 15: case 16: case 17: case 18: case 19: break;   // deixa o teste andar
+                    case 15: case 16: case 17: case 18: case 19: break;   // deixa o teste andar
                     case 20: Shot(dir, "13-verificando-ativo"); runTechToggle.Open = true; runTech.Visible = true; runLayoutKey = ""; RefreshRun(); break;
                     case 21: Shot(dir, "14-verificando-tecnico"); testQueue.Clear(); runner.Stop(); break;
                     case 22: case 23: case 24: break;
