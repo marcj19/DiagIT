@@ -87,7 +87,7 @@ namespace DiagIT
             mpo.Id = "mpo"; mpo.Reboot = true;
             mpo.Name = "Sobreposições de vídeo do Windows (MPO) desligadas";
             mpo.Done = "Desliguei as sobreposições de vídeo do Windows (MPO)";
-            mpo.What = "O Windows desenha algumas telas em camadas separadas (MPO). Em alguns PCs com placas AMD e NVIDIA isso causa tela preta, piscadas e reset do vídeo. Desligar é um teste clássico e seguro.";
+            mpo.What = "O Windows desenha algumas telas em camadas separadas (MPO). Há muitos relatos de que isso causa tela preta, piscadas e reset do vídeo, e desligar é um contorno conhecido. Mas a chave usada (OverlayTestMode) não é documentada oficialmente pela Microsoft: trate como um teste, reversível com o botão Desfazer.";
             mpo.IsOn = delegate { return HklmInt(Dwm, "OverlayTestMode", 0) == 5; };
             mpo.Apply = delegate { HklmSet(Dwm, "OverlayTestMode", 5); };
             mpo.Undo = delegate { HklmDel(Dwm, "OverlayTestMode"); };
@@ -97,7 +97,7 @@ namespace DiagIT
             hags.Id = "hags"; hags.Reboot = true;
             hags.Name = "Agendamento de GPU acelerado por hardware (HAGS) desligado";
             hags.Done = "Desliguei o agendamento de GPU por hardware (HAGS)";
-            hags.What = "O Windows deixa a própria placa organizar o trabalho dela (HAGS). Em alguns conjuntos de placa e driver isso causa travamentos; desligar devolve essa tarefa ao Windows.";
+            hags.What = "O Windows deixa a própria placa organizar o trabalho dela (HAGS). Em alguns conjuntos de placa e driver isso causa travamentos; desligar devolve essa tarefa ao Windows. O caminho oficial é Configurações > Sistema > Tela > Gráficos > Alterar configurações gráficas padrão; este botão grava o mesmo ajuste direto no registro (valor que os guias usam, mas que a Microsoft não documenta). Reversível.";
             hags.IsOn = delegate { return HklmInt(Gfx, "HwSchMode", 0) == 1; };
             hags.Apply = delegate { HklmSet(Gfx, "HwSchMode", 1); };
             hags.Undo = delegate { HklmDel(Gfx, "HwSchMode"); };
@@ -107,7 +107,7 @@ namespace DiagIT
             tdr.Id = "tdr"; tdr.Reboot = true;
             tdr.Name = "Mais tempo para o vídeo responder antes do Windows reiniciá-lo (TDR 10 s)";
             tdr.Done = "Dei mais tempo para o vídeo responder antes do Windows reiniciá-lo (TDR)";
-            tdr.What = "Se a placa demora para responder, o Windows a reinicia depois de 2 segundos (o \"driver parou de responder\"). Com 10 segundos, cargas pesadas e pontuais passam sem reset. Se o problema era só esse, ele some; se era travamento de verdade, continua.";
+            tdr.What = "Se a placa demora para responder, o Windows a reinicia depois de 2 segundos (padrão documentado pela Microsoft). Com 10 segundos, cargas pesadas e pontuais passam sem reset. Atenção: a Microsoft documenta essa configuração só para desenvolvedores de driver e não a recomenda como correção para usuários. Use apenas como teste curto e desfaça se não ajudar; ela pode esconder um defeito real em vez de resolvê-lo.";
             tdr.IsOn = delegate { return HklmInt(Gfx, "TdrDelay", 2) >= 8; };
             tdr.Apply = delegate { HklmSet(Gfx, "TdrDelay", 10); };
             tdr.Undo = delegate { HklmDel(Gfx, "TdrDelay"); };

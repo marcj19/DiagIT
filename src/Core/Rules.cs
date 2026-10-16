@@ -29,7 +29,7 @@ namespace DiagIT
     public class GuideStep { public string Title = "", Text = ""; public List<GuideAction> Actions = new List<GuideAction>(); }
     public class Guide { public string Id = "", Title = "", Summary = "", Done = "", Scope = ""; public List<GuideStep> Steps = new List<GuideStep>(); }
     /// <summary>Plataforma de processador: soquete, memória aceita, PCIe do processador e upgrades que encaixam sem trocar a placa-mãe (data/compatibilidade.json).</summary>
-    public class CompatFamily { public string Name = "", Socket = "", MemType = "", Note = ""; public int MemMaxMts, Pcie; public string[] Detect = new string[0], Upgrades = new string[0]; }
+    public class CompatFamily { public string Name = "", Socket = "", MemType = "", Note = "", Source = ""; public bool Verified; public int MemMaxMts, MemMaxDdr4, Pcie; public string[] Detect = new string[0], Upgrades = new string[0]; }
 
     /// <summary>
     /// Regras de conhecimento em dados (pasta data/ do repositório, embutidas no executável).
@@ -243,7 +243,7 @@ namespace DiagIT
                         Dictionary<string, object> x = Obj(o);
                         CompatFamily cf = new CompatFamily();
                         cf.Name = Str(x, "nome"); cf.Detect = Strs(x, "detectar"); cf.Socket = Str(x, "soquete"); cf.MemType = Str(x, "memoria");
-                        cf.MemMaxMts = (int)Num(x["memoria_oficial_mts"]); cf.Pcie = (int)Num(x["pcie"]); cf.Upgrades = Strs(x, "melhores_no_mesmo_soquete"); cf.Note = Str(x, "nota");
+                        cf.MemMaxMts = (int)Num(x["memoria_oficial_mts"]); cf.MemMaxDdr4 = x.ContainsKey("memoria_oficial_ddr4_mts") ? (int)Num(x["memoria_oficial_ddr4_mts"]) : 0; cf.Pcie = (int)Num(x["pcie"]); cf.Upgrades = Strs(x, "melhores_no_mesmo_soquete"); cf.Note = Str(x, "nota"); cf.Verified = Bool(x, "verificado"); cf.Source = Str(x, "fonte");
                         Compat.Add(cf);
                     }
                 }

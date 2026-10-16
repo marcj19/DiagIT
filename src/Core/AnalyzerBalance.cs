@@ -22,6 +22,9 @@ namespace DiagIT
         }
 
         /// <summary>Taxa de memória em MT/s: algumas versões do Windows informam em MHz (metade).</summary>
+        /// <summary>Velocidade oficial de memória do processador para o tipo de memória instalado (DDR4 pode ter limite diferente do DDR5).</summary>
+        static int OfficialMem(CompatFamily f, int ramType) { return ramType == 26 && f.MemMaxDdr4 > 0 ? f.MemMaxDdr4 : f.MemMaxMts; }
+
         static int Mts(int v, int smType) { return (smType == 26 || smType == 34) && v > 0 && v < 1300 ? v * 2 : v; }
 
         public static List<Finding> BalanceTips(HwSnapshot h, List<SessionData> sessions, List<TestResult> tests, DisplayMode dm)
@@ -81,8 +84,8 @@ namespace DiagIT
                         "ram-perfil", "Como fazer"));
                 else if (conf > 0 && h.RamType == 26 && conf <= 2666)
                     tips.Add(Tip(Sev.Info, BCheap, "A memória é lenta para um processador atual: DDR4 a " + conf + " MT/s",
-                        "Não há perfil mais rápido para ativar: " + conf + " MT/s é o que o pente foi feito para entregar." + (fam != null && fam.MemMaxMts > conf ? " O seu processador aceita oficialmente até " + fam.MemMaxMts + " MT/s." : ""),
-                        "Kits DDR4-3200 ou 3600 custam pouco e costumam dar um ganho perceptível, principalmente em jogos que dependem do processador. Antes de comprar, confira no site do fabricante da placa-mãe a velocidade máxima de memória que ela e o processador aceitam." +
+                        "Não há perfil mais rápido para ativar: " + conf + " MT/s é o que o pente foi feito para entregar." + (fam != null && OfficialMem(fam, h.RamType) > conf ? " O seu processador aceita oficialmente até " + OfficialMem(fam, h.RamType) + " MT/s." : ""),
+                        "Kits DDR4-3200 ou 3600 custam pouco. Testes de imprensa costumam mostrar ganho em jogos que dependem do processador, mas o tamanho varia muito por jogo e o DiagIT não mediu isso no seu PC. Antes de comprar, confira no site do fabricante da placa-mãe a velocidade máxima de memória que ela e o processador aceitam." +
                         (lap ? " Em notebook, confira antes se a memória é trocável." : ""), null, null));
                 else if (conf > 0)
                     tips.Add(Tip(Sev.Ok, "", "Memória rodando na velocidade do pente: " + conf + " MT/s", "", "", null, null));
@@ -112,7 +115,7 @@ namespace DiagIT
                         tips.Add(Tip(Sev.Info, BLimit, "A placa de vídeo suporta PCIe " + h.PcieMaxGen + ".0, mas o conjunto entrega PCIe " + gen + ".0",
                             "O teste de placa mediu " + up.ToString("0.0", Pt) + " GB/s com " + N0(lanes) + " pistas (" + perLane.ToString("0.0", Pt) + " GB/s por pista, que é PCIe " + gen + ".0). Medido em " + Dt(gpuTest) + ".",
                             (fam != null && fam.Pcie == gen ? "O limite é do seu processador (" + fam.Name + "): ele só entrega PCIe " + gen + ".0 para a placa de vídeo, não é defeito. " : "O limite vem do processador ou da placa-mãe, não de defeito. ") +
-                            "Em placas de 8 pistas como esta o efeito costuma ser pequeno na maioria dos jogos, e maior só quando o jogo passa da memória de vídeo. Não vale trocar peças só por isso; considere apenas se for trocar processador e placa-mãe por outro motivo." +
+                            "Testes de imprensa costumam mostrar efeito pequeno em placas de 8 pistas como esta na maioria dos jogos, e maior quando o jogo passa da memória de vídeo; varia por jogo e o DiagIT não mediu o efeito no seu PC. Não vale trocar peças só por isso; considere apenas se for trocar processador e placa-mãe por outro motivo." +
                             (fam == null ? " (Alguns processadores, como as séries com G e o Ryzen 5 5500, só têm PCIe 3.0.)" : ""), null, null));
                     else
                         tips.Add(Tip(Sev.Ok, "", "Placa de vídeo com o link PCIe no máximo do conjunto", "Banda medida: " + up.ToString("0.0", Pt) + " GB/s com " + N0(lanes) + " pistas.", "", null, null));
@@ -155,8 +158,11 @@ namespace DiagIT
             if (fam != null && !lap)
             {
                 StringBuilder ev = new StringBuilder();
-                ev.Append("Processador detectado: " + h.CpuName.Trim() + ". Plataforma: " + fam.Name + ". Soquete " + fam.Socket + ". Memória aceita: " + fam.MemType + ", oficialmente até " + fam.MemMaxMts + " MT/s. ");
-                ev.Append("O processador entrega PCIe " + fam.Pcie + ".0 para a placa de vídeo.");
+                string memSpeed = fam.MemMaxDdr4 > 0 ? "até " + fam.MemMaxMts + " MT/s em DDR5 e até " + fam.MemMaxDdr4 + " MT/s em DDR4" : "até " + fam.MemMaxMts + " MT/s";
+                ev.Append("Processador detectado: " + h.CpuName.Trim() + ". Plataforma: " + fam.Name + ". Soquete " + fam.Socket + ". Memória aceita: " + fam.MemType + ", oficialmente " + memSpeed + " (com dois pentes). ");
+                ev.Append("O processador entrega PCIe " + fam.Pcie + ".0 para a placa de vídeo. ");
+                // de onde vem cada número: a página oficial do fabricante, ou o aviso de que ainda não foi conferido
+                ev.Append(fam.Verified && fam.Source.Length > 0 ? "Fonte dos números: " + fam.Source + "." : "Atenção: estes números desta plataforma ainda não foram conferidos em fonte oficial; confirme no site do fabricante.");
                 StringBuilder adv = new StringBuilder();
                 if (fam.Upgrades.Length > 0)
                     adv.Append("Para ganhar desempenho SEM trocar a placa-mãe nem a memória, os processadores mais fortes que encaixam no mesmo soquete são, por exemplo: " + string.Join(", ", fam.Upgrades) + ". ");

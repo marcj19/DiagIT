@@ -300,20 +300,28 @@ namespace DiagIT
 
                 // compatibilidade: a plataforma vem de data/compatibilidade.json
                 Func<string, CompatFamily> fam0 = delegate(string cpu) { return Rules.CompatFor(cpu); };
-                Check(fam0("AMD Ryzen 5 5500 6-Core Processor").Pcie == 3 && fam0("AMD Ryzen 5 5600G with Radeon Graphics").Pcie == 3 && fam0("AMD Ryzen 5 5600X 6-Core Processor").Pcie == 4 &&
-                      fam0("AMD Ryzen 5 5600 6-Core Processor").Pcie == 4 && fam0("AMD Ryzen 7 5800X3D 8-Core Processor").Socket == "AM4" && fam0("AMD Ryzen 5 3600 6-Core Processor").Name == "Ryzen 3000" &&
-                      fam0("AMD Ryzen 7 7800X3D 8-Core Processor").Socket == "AM5" && fam0("12th Gen Intel(R) Core(TM) i5-12400F").Socket == "LGA1700" && fam0("13th Gen Intel(R) Core(TM) i7-13700K").Note.Contains("0x12B") &&
+                Check(fam0("AMD Ryzen 5 5500 6-Core Processor").Pcie == 3 && fam0("AMD Ryzen 5 5600G with Radeon Graphics").Pcie == 3 && fam0("AMD Ryzen 7 5700 8-Core Processor").Pcie == 3 &&
+                      fam0("AMD Ryzen 5 5600X 6-Core Processor").Pcie == 4 && fam0("AMD Ryzen 5 5600 6-Core Processor").Pcie == 4 && fam0("AMD Ryzen 7 5700X 8-Core Processor").Pcie == 4 &&
+                      fam0("AMD Ryzen 7 5800X3D 8-Core Processor").Socket == "AM4",
+                      "compatibilidade (AM4 5000): 5500, 5600G e 5700 sem X são PCIe 3.0; 5600, 5600X e 5700X são PCIe 4.0 (conferido na AMD)");
+                Check(fam0("AMD Ryzen 5 5500F 6-Core Processor").Pcie == 4 && fam0("AMD Ryzen 5 5500X3D 6-Core Processor").Pcie == 4 && fam0("AMD Ryzen 5 3400G with Radeon Vega Graphics").Pcie == 3 &&
+                      fam0("AMD Ryzen 5 3600 6-Core Processor").Pcie == 4 && fam0("AMD Ryzen 7 8700G w/ Radeon 780M Graphics").Pcie == 4 && fam0("AMD Ryzen 7 8700G w/ Radeon 780M Graphics").Socket == "AM5",
+                      "compatibilidade (casos que eu tinha errado): 5500F e 5500X3D são PCIe 4.0, Ryzen 3000 G é PCIe 3.0, Ryzen 8000 G é PCIe 4.0");
+                Check(fam0("AMD Ryzen 7 7800X3D 8-Core Processor").MemMaxMts == 5200 && fam0("AMD Ryzen 7 9800X3D 8-Core Processor").MemMaxMts == 5600 && fam0("12th Gen Intel(R) Core(TM) i5-12400F").Socket == "LGA1700" &&
+                      fam0("12th Gen Intel(R) Core(TM) i5-12400F").MemMaxDdr4 == 3200 && fam0("13th Gen Intel(R) Core(TM) i7-13700K").Note.Contains("0x12F") && fam0("10th Gen Intel(R) Core(TM) i7-10700K").MemMaxMts == 2933 &&
                       fam0("Processador Desconhecido X9") == null,
-                      "compatibilidade: cada processador cai na plataforma certa (PCIe, soquete) e o desconhecido não inventa nada");
+                      "compatibilidade (AM5 e Intel): memória oficial por geração, DDR4 separado do DDR5, microcódigo recomendado pela Intel; o desconhecido não inventa nada");
                 Check(Rules.NeverGames.Contains("teamspeak") && Rules.NeverGames.Contains("discord") && Rules.BenignNames.Contains("corsair") && Rules.BenignClasses.Contains("usb") &&
                       !Rules.BenignClasses.Contains("display") && !Rules.BenignClasses.Contains("system") && !Rules.BenignClasses.Contains("net"),
                       "normal.json: lista do que nunca é jogo e dos dispositivos inofensivos; vídeo, sistema e rede nunca entram");
                 bool compatOk = Rules.Compat.Count >= 8;
-                foreach (CompatFamily cfm in Rules.Compat) if (cfm.Name.Length == 0 || cfm.Detect.Length == 0 || cfm.Socket.Length == 0 || cfm.MemMaxMts <= 0 || cfm.Pcie < 3 || cfm.Note.Length == 0) compatOk = false;
+                foreach (CompatFamily cfm in Rules.Compat)
+                    if (cfm.Name.Length == 0 || cfm.Detect.Length == 0 || cfm.Socket.Length == 0 || cfm.MemMaxMts <= 0 || cfm.Pcie < 3 || cfm.Note.Length == 0 ||
+                        (cfm.Verified && !cfm.Source.StartsWith("http", StringComparison.Ordinal))) compatOk = false;   // "verificado" exige a fonte oficial
                 Check(compatOk, "compatibilidade.json: toda família tem nome, trechos para detectar, soquete, memória, PCIe e nota (" + Rules.Compat.Count + " famílias)");
                 List<Finding> tPlat = Analyzer.BalanceTips(hBad, new List<SessionData> { playSess(40, 95, 400) }, new List<TestResult>(), dmLow);
                 Finding platTip = tPlat.Find(delegate(Finding f) { return f.Title.StartsWith("Sua plataforma"); });
-                Check(platTip != null && platTip.Title.Contains("AM4 com DDR4") && platTip.Advice.Contains("Ryzen 7 5700X3D") && platTip.Advice.Contains("lista de processadores suportados") && platTip.Advice.Contains("o upgrade que mais rende") && platTip.Badge == "ONDE O UPGRADE RENDE" &&
+                Check(platTip != null && platTip.Title.Contains("AM4 com DDR4") && platTip.Advice.Contains("Ryzen 7 5700X3D") && platTip.Advice.Contains("lista de processadores suportados") && platTip.Evidence.Contains("Fonte dos números: https://www.amd.com") && platTip.Advice.Contains("o upgrade que mais rende") && platTip.Badge == "ONDE O UPGRADE RENDE" &&
                       tPlat[0].Advice.IndexOf("Sua plataforma") < 0,
                       "plataforma AM4: diz o que encaixa sem trocar placa-mãe, manda conferir a lista do fabricante e liga ao processador ser o limite");
                 hBad.RamRatedMts = 2400;   // sem perfil para ativar: cai na dica de memória lenta, que cita o máximo oficial do processador

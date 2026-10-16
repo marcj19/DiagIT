@@ -24,10 +24,10 @@ namespace DiagIT
                 switch (step)
                 {
                     case 0:
-                        // só para a imagem: exemplos de "Resolveu?" (nada é gravado). DIAGIT_SAMPLES=1 troca as correções reais pelos exemplos.
-                        if (Environment.GetEnvironmentVariable("DIAGIT_SAMPLES") == "1") lastDiag.Fixes.Clear();
-                        if (lastDiag.Fixes.Count == 0)
+                        // Dados de exemplo só com pedido explícito (DIAGIT_SAMPLES=1), para ilustrar a documentação. Sem a variável, as imagens mostram apenas dados reais.
+                        if (Environment.GetEnvironmentVariable("DIAGIT_SAMPLES") == "1")
                         {
+                            lastDiag.Fixes.Clear();
                             lastDiag.Fixes.Add(SampleFix(2, "Reinstalei o driver de vídeo do jeito certo", "O problema voltou", "Voltou em 15/10 às 22:00. Na mesma hora: RainbowSixHelper.exe fechou com erro (o módulo que falhou é RainbowSixHelper.exe, do próprio programa, não do driver de vídeo). Antes: 4 em 1 dias. Isso não quer dizer que a correção foi em vão: o DiagIT montou um plano de testes, um passo de cada vez.", 1, 7, "video-voltou"));
                             lastDiag.Fixes.Add(SampleFix(0, "Tirei a memória virtual do HD", "Acompanhando", "Nenhum problema de verdade desde 11/10 às 20:10. Antes: 2 em 4 dias. Faltam cerca de 4 dias de uso sem problemas para o DiagIT dar como resolvido.", 3, 7, ""));
                             lastDiag.Fixes.Add(SampleFix(1, "Impedi o Windows Update de trocar drivers", "Resolvido", "Nenhum registro de travamentos de vídeo em 12 dias desde a correção. Antes: 3 em 6 dias.", 12, 7, ""));
