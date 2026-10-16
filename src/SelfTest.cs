@@ -22,12 +22,15 @@ namespace DiagIT
         {
             Paths.Ensure();
             List<WinEvent> ev = EventScanner.ScanAll(30, null);
-            HwSnapshot hw = HwFacts.Collect(null);
+            SensorHub hub = new SensorHub();
+            hub.Poll(); Thread.Sleep(1500); hub.Poll();
+            HwSnapshot hw = HwFacts.Collect(hub);
             List<SessionData> sds = new List<SessionData>();
             foreach (SessionInfo si in SessionStore.ListAll())
                 if (si.Start > DateTime.Now.AddDays(-30)) { SessionData sd = new SessionData(); sd.Info = si; sd.S = SessionStore.LoadSamples(si); sds.Add(sd); }
             Diagnosis d = Analyzer.Run(sds, ev, DiskInfo.Read(), 30, TestStore.ListAll(), hw, FixLog.Load());
-            ReportExtras x = ReportExtras.Collect(ev);
+            ReportExtras x = ReportExtras.Collect(ev, hub);
+            hub.Close();
             string html = Report.Build(d, MachineInfo.Read(double.NaN), sds, x);
             File.WriteAllText(htmlPath, html, new UTF8Encoding(true));
             if (zipPath != null) TechPackage.Build(zipPath, html, d, x, sds);

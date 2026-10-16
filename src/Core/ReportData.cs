@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Management;
 using System.Text.RegularExpressions;
@@ -17,10 +17,20 @@ namespace DiagIT
         public List<DriverRow> Drivers = new List<DriverRow>();
         public List<FixEntry> Fixes = new List<FixEntry>();
         public string Windows = "";
+        public List<SensorItem> Sensors = new List<SensorItem>();   // leitura crua de todos os sensores (para conferir cada plataforma)
+        public string SensorSources = "";
 
-        public static ReportExtras Collect(List<WinEvent> events)
+        public static ReportExtras Collect(List<WinEvent> events) { return Collect(events, null); }
+
+        public static ReportExtras Collect(List<WinEvent> events, SensorHub hub)
         {
             ReportExtras x = new ReportExtras();
+            if (hub != null)
+            {
+                List<SensorItem> l = hub.Latest;   // a lista é trocada inteira a cada leitura: a referência é segura
+                if (l != null) x.Sensors = new List<SensorItem>(l);
+                x.SensorSources = hub.ActiveName ?? "";
+            }
             if (events != null) x.Events = events;
             x.Windows = WindowsVersion();
             x.Drivers = InstalledDrivers();

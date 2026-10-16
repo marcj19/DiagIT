@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -18,7 +18,10 @@ namespace DiagIT
             "relatorio.html — o relatório completo (abre no navegador, dá para imprimir)",
             "linha-do-tempo.csv e eventos.csv — o que o Windows registrou nos últimos 30 dias",
             "telas-azuis.txt — código, driver culpado e pilha de cada tela azul (os arquivos .dmp não vão)",
-            "drivers.csv e sistema.txt — drivers instalados e tudo que foi lido do hardware",
+            "drivers.csv e sistema.txt — drivers instalados e tudo que foi lido do hardware (inclui se é notebook)",
+            "desempenho.txt — as dicas da página Desempenho e os números por trás delas",
+            "sensores.txt — todos os sensores que o DiagIT encontrou (temperaturas, ventoinhas, tensões) com o valor na hora",
+            "diagit.log — o registro do próprio DiagIT (erros de sensores, FPS e testes)",
             "partidas e testes — as medições gravadas (inclui o nome dos jogos)",
             "correcoes.json — as correções que você marcou e o acompanhamento"
         };
@@ -98,7 +101,37 @@ namespace DiagIT
                         sy.AppendLine(f.Name + ": " + f.Value + (f.Note.Length > 0 ? "  (" + f.Note + ")" : ""));
                     }
                 }
-                Text(z, "sistema.txt", "Windows: " + x.Windows + "\r\n" + sy.ToString());
+                Text(z, "sistema.txt", "Windows: " + x.Windows + "\r\n" +
+                    "Tipo de computador: " + (d.Hw == null ? "não lido" : d.Hw.IsLaptop ? "notebook (dicas de troca de peça desligadas)" : "desktop") + "\r\n" + sy.ToString());
+
+                StringBuilder pf = new StringBuilder();
+                foreach (Finding f in d.Tips)
+                {
+                    pf.AppendLine("[" + (f.Sev == Sev.Ok ? "OK" : f.Badge) + "] " + f.Title);
+                    if (f.Evidence.Length > 0) pf.AppendLine("  " + f.Evidence.Replace("\n", "\r\n  "));
+                    if (f.Advice.Length > 0) pf.AppendLine("  > " + f.Advice.Replace("\n", "\r\n    "));
+                    pf.AppendLine();
+                }
+                Text(z, "desempenho.txt", pf.Length > 0 ? pf.ToString() : "Nenhuma dica gerada.");
+
+                StringBuilder se = new StringBuilder("Fontes: " + (x.SensorSources.Length > 0 ? x.SensorSources : "nenhuma") + (SysUtil.IsAdmin() ? "" : " (DiagIT sem administrador: CPU e placa-mãe não são lidas)") + "\r\n");
+                se.Append("categoria;tipo;chip;sensor;valor;unidade\r\n");
+                foreach (SensorItem it in x.Sensors)
+                    se.Append(it.Cat + ";" + it.Typ + ";" + Csv(it.Hw) + ";" + Csv(it.Name) + ";" + it.Val.ToString("0.###", CultureInfo.InvariantCulture) + ";" + Csv(it.Unit) + "\r\n");
+                Text(z, "sensores.txt", se.ToString());
+
+                // o log está aberto pelo próprio DiagIT: lê compartilhado e leva só o fim (os últimos ~2 MB)
+                try
+                {
+                    string lp = Path.Combine(Paths.Root, "diagit.log");
+                    if (File.Exists(lp))
+                        using (FileStream fs = new FileStream(lp, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                        {
+                            if (fs.Length > 2000000) fs.Seek(-2000000, SeekOrigin.End);
+                            using (StreamReader r = new StreamReader(fs, Encoding.UTF8)) Text(z, "diagit.log", r.ReadToEnd());
+                        }
+                }
+                catch (Exception e) { Log.Write("Pacote (log): " + e.Message); }
 
                 foreach (SessionData sd in sessions)
                 {

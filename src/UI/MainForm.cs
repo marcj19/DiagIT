@@ -732,7 +732,7 @@ namespace DiagIT
             {
                 try
                 {
-                    ReportExtras x = ReportExtras.Collect(events);
+                    ReportExtras x = ReportExtras.Collect(events, w.Sensors);
                     string html = certificate ? Report.BuildCertificate(d, m, x) : Report.Build(d, m, sds, x);
                     Post(delegate { done(html, x); });
                 }
