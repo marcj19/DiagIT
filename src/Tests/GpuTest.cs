@@ -235,7 +235,7 @@ void Err(uint idx, uint expect, uint got) {
 }";
 
         const uint BURN_GROUPS = 16384;           // 4,2 milhões de threads por despacho
-        const uint CHUNK = 256u * 1024 * 1024;    // blocos de VRAM de 256 MB
+        uint chunk = 256u * 1024 * 1024;          // blocos de VRAM: 256 MB, ou 64 MB em placas com pouca memória livre
         const uint SPAN_GROUPS = 8192;
 
         Dx11 dx;
@@ -270,16 +270,20 @@ void Err(uint idx, uint expect, uint got) {
                     ctx.Phase = "Reservando memória de vídeo";
                     double total = NativeInfo.TotalVramMB();
                     double used = UsedVramMB(ctx);
-                    double targetMb = double.IsNaN(total) ? 2048 : total - (double.IsNaN(used) ? 1024 : used) - 700;
+                    // margem para o Windows não mover a VRAM para a RAM: 700 MB em placas grandes, 256 MB nas de até 4 GB
+                    // (numa GTX 750 Ti de 2 GB com 1,2 GB em uso pela área de trabalho, a margem fixa de 700 MB não deixava nada para testar)
+                    double margin = !double.IsNaN(total) && total <= 4096 ? 256 : 700;
+                    double targetMb = double.IsNaN(total) ? 2048 : total - (double.IsNaN(used) ? 1024 : used) - margin;
                     if (opt.VramMaxMB > 0) targetMb = Math.Min(targetMb, opt.VramMaxMB);
+                    if (targetMb < 1024) chunk = 64u * 1024 * 1024;
                     long target = (long)Math.Max(0, targetMb) * 1024 * 1024;
                     long got = 0;
-                    while (got + CHUNK <= target && !ctx.Cancel)
+                    while (got + chunk <= target && !ctx.Cancel)
                     {
                         IntPtr b, u;
-                        if (!dx.RawBuffer(CHUNK, out b, out u)) break;
+                        if (!dx.RawBuffer(chunk, out b, out u)) break;
                         vram.Add(new IntPtr[] { b, u });
-                        got += CHUNK;
+                        got += chunk;
                     }
                     r.Set("vram_total_mb", total);
                     r.Set("vram_tested_mb", got / 1048576.0);
@@ -334,7 +338,7 @@ void Err(uint idx, uint expect, uint got) {
                         {
                             uint pass = (uint)(vramPasses * 0x9E3779B9u) ^ (uint)i;
                             uint vseed = (uint)(i * 0x85EBCA6Bu + 17);
-                            SetCb(pass, vseed, CHUNK / 4, SPAN_GROUPS * 256, 0);
+                            SetCb(pass, vseed, chunk / 4, SPAN_GROUPS * 256, 0);
                             dx.Run(csFill, cb, new IntPtr[] { vram[i][1], burnBU, errUav }, SPAN_GROUPS);
                         }
                         ClearErrors();
@@ -342,7 +346,7 @@ void Err(uint idx, uint expect, uint got) {
                         {
                             uint pass = (uint)(vramPasses * 0x9E3779B9u) ^ (uint)i;
                             uint vseed = (uint)(i * 0x85EBCA6Bu + 17);
-                            SetCb(pass, vseed, CHUNK / 4, SPAN_GROUPS * 256, 0);
+                            SetCb(pass, vseed, chunk / 4, SPAN_GROUPS * 256, 0);
                             dx.Run(csCheck, cb, new IntPtr[] { vram[i][1], burnBU, errUav }, SPAN_GROUPS);
                         }
                         hr = SyncErrors();
@@ -380,7 +384,8 @@ void Err(uint idx, uint expect, uint got) {
                 {
                     r.Status = ctx.Cancel ? "aborted" : "passed";
                     r.Summary = "Nenhum erro: GPU em carga total por " + min.ToString("0.#") + " min sem travar, " + cycles + " cálculos idênticos conferidos" +
-                        (vramPasses > 0 ? " e " + vramPasses + " passadas em " + (r.Get("vram_tested_mb") / 1024).ToString("0.0") + " GB de VRAM sem erro." : ".");
+                        (vramPasses > 0 ? " e " + vramPasses + " passadas em " + (r.Get("vram_tested_mb") / 1024).ToString("0.0") + " GB de VRAM sem erro." :
+                         !opt.ComputeOnly ? ". A memória de vídeo (VRAM) não foi testada: estava quase toda em uso. Feche jogos, navegador e outros programas e rode de novo." : ".");
                 }
             }
             finally

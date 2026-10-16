@@ -309,8 +309,16 @@ namespace DiagIT
                 if (!double.IsNaN(s[F.V12])) f.Add(new Fact("Energia", "+12 V (placa-mãe)", s[F.V12].ToString("0.000", Pt) + " V", (s[F.V12] < 11.4 || s[F.V12] > 12.6) ? 1 : 0, null));
                 if (!double.IsNaN(s[F.V5])) f.Add(new Fact("Energia", "+5 V", s[F.V5].ToString("0.000", Pt) + " V", (s[F.V5] < 4.75 || s[F.V5] > 5.25) ? 1 : 0, null));
                 if (!double.IsNaN(s[F.V33])) f.Add(new Fact("Energia", "+3,3 V", s[F.V33].ToString("0.000", Pt) + " V", (s[F.V33] < 3.135 || s[F.V33] > 3.465) ? 1 : 0, null));
-                if (!double.IsNaN(s[F.CpuFan])) f.Add(new Fact("Refrigeração", "Ventoinha da CPU", s[F.CpuFan].ToString("0") + " RPM", s[F.CpuFan] < 200 ? 2 : 0,
-                    s[F.CpuFan] < 200 ? "A ventoinha do cooler da CPU parece parada. Verifique o cabo no conector CPU_FAN." : null));
+                if (!double.IsNaN(s[F.CpuFan]))
+                {
+                    // conector CPU_FAN em 0, mas outra ventoinha girando e a CPU fria: o cooler está ligado em outro conector (SYS_FAN, bomba ou hub)
+                    double other = SensorHub.OtherFanRpm;
+                    bool elsewhere = s[F.CpuFan] < 200 && !double.IsNaN(other) && other >= 300 && (double.IsNaN(s[F.CpuTemp]) || s[F.CpuTemp] < 80);
+                    f.Add(new Fact("Refrigeração", "Ventoinha da CPU", s[F.CpuFan].ToString("0") + " RPM", s[F.CpuFan] >= 200 ? 0 : elsewhere ? 1 : 2,
+                        s[F.CpuFan] >= 200 ? null : elsewhere
+                            ? "O conector CPU_FAN marca 0 RPM, mas outra ventoinha está girando (" + other.ToString("0") + " RPM). O cooler deve estar ligado em outro conector: se a CPU fica abaixo de 90 °C nos testes, está tudo bem. Algumas placas mostram \"CPU Fan Error\" ao ligar por causa disso."
+                            : "A ventoinha do cooler da CPU parece parada. Verifique o cabo no conector CPU_FAN."));
+                }
                 if (!double.IsNaN(s[F.CpuTemp])) f.Add(new Fact("Refrigeração", "Temperatura da CPU agora", s[F.CpuTemp].ToString("0") + " °C", s[F.CpuTemp] >= 90 ? 2 : s[F.CpuTemp] >= 80 ? 1 : 0, null));
                 if (!double.IsNaN(s[F.GpuTemp])) f.Add(new Fact("Refrigeração", "Temperatura da GPU agora", s[F.GpuTemp].ToString("0") + " °C" +
                     (double.IsNaN(s[F.GpuHot]) ? "" : " (hotspot " + s[F.GpuHot].ToString("0") + " °C)") + (double.IsNaN(s[F.GpuMemTemp]) ? "" : ", VRAM " + s[F.GpuMemTemp].ToString("0") + " °C"),

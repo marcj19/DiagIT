@@ -370,6 +370,8 @@ namespace DiagIT
         public NvmlSource Nvml;
         public LhmDllSource Lhm;
         public static string BoardVendor = "";
+        /// <summary>RPM da ventoinha mais rápida fora do conector CPU_FAN (o cooler pode estar ligado em SYS_FAN ou na bomba).</summary>
+        public static double OtherFanRpm = double.NaN;
         readonly object gate = new object();
 
         public SensorHub()
@@ -541,7 +543,7 @@ namespace DiagIT
         {
             int bestCpuT = -1, bestGpuT = -1, bestGpuH = -1, bestCpuP = -1, bestGpuP = -1, bestGpuC = -1, bestFan = -1;
             double coreClkSum = 0; int coreClkN = 0; double avgClk = double.NaN;
-            double diskT = double.NaN, boardT = double.NaN;
+            double diskT = double.NaN, boardT = double.NaN, otherFan = double.NaN;
             bool gigaIte = Has(BoardVendor, "gigabyte");
 
             foreach (SensorItem it in items)
@@ -628,7 +630,8 @@ namespace DiagIT
                         else if (Rail33.IsMatch(n) && it.Val > 2.8 && it.Val < 3.8) s.V[F.V33] = it.Val;
                         else if (Has(n, "vcore", "cpu core") && double.IsNaN(s.V[F.Vcore]) && it.Val > 0.3 && it.Val < 1.7) s.V[F.Vcore] = it.Val;
                     }
-                    else if (it.Typ == STyp.Temp && ValidTemp(it.Val))
+                    // o chip da placa-mãe também lê a temperatura da CPU ("CPU", "CPU Core"): não é a placa
+                    else if (it.Typ == STyp.Temp && ValidTemp(it.Val) && (!Has(n, "cpu", "core", "peci", "package") || Has(n, "socket")))
                     {
                         if (double.IsNaN(boardT) || it.Val > boardT) boardT = it.Val;
                     }
@@ -636,6 +639,7 @@ namespace DiagIT
                     {
                         int sc = Has(n, "cpu") ? 3 : n == "Fan #1" ? 2 : 0;
                         if (sc > bestFan) { bestFan = sc; s.V[F.CpuFan] = it.Val; }
+                        if (!Has(n, "cpu") && (double.IsNaN(otherFan) || it.Val > otherFan)) otherFan = it.Val;
                     }
                 }
             }
@@ -644,6 +648,7 @@ namespace DiagIT
             else if (coreClkN > 0) s.V[F.CpuClock] = coreClkSum / coreClkN;
             if (!double.IsNaN(diskT)) s.V[F.DiskTemp] = diskT;
             if (!double.IsNaN(boardT)) s.V[F.BoardTemp] = boardT;
+            if (bestFan == 3) OtherFanRpm = otherFan;
         }
     }
 }

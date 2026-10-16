@@ -685,6 +685,17 @@ namespace DiagIT
                 string html = Report.Build(dRep, new MachineInfo(), perf, rx);
                 Check(html.Contains("Detalhes para o técnico") && html.Contains("Linha do tempo") && html.Contains("Suas correções") && html.Contains("1% low"),
                     "relatório: resumo para o dono, parte técnica, correções e FPS");
+
+                Say("== 15. Sensores de placa-mãe MSI (Nuvoton NCT6687D, lidos num i7-11700 + GTX 750 Ti)");
+                Func<STyp, string, double, SensorItem> bi = delegate(STyp ty, string name, double v)
+                { SensorItem it = new SensorItem(); it.Cat = SCat.Board; it.Typ = ty; it.Name = name; it.Val = v; it.Hw = "Nuvoton NCT6687D"; it.Unit = ty == STyp.Fan ? "RPM" : "°C"; return it; };
+                List<SensorItem> msiSens = new List<SensorItem> {
+                    bi(STyp.Temp, "CPU", 86), bi(STyp.Temp, "System", 37), bi(STyp.Temp, "VRM MOS", 58), bi(STyp.Temp, "PCH", 45), bi(STyp.Temp, "CPU Socket", 52),
+                    bi(STyp.Fan, "CPU Fan", 0), bi(STyp.Fan, "Pump Fan", 0), bi(STyp.Fan, "System Fan #1", 2139), bi(STyp.Fan, "System Fan #2", 0) };
+                Sample sm = new Sample();
+                SensorHub.Map(msiSens, sm);
+                Check(sm[F.BoardTemp] == 58, "temperatura da placa-mãe não usa o sensor \"CPU\" do chip da placa (" + sm[F.BoardTemp] + " °C)");
+                Check(sm[F.CpuFan] == 0 && SensorHub.OtherFanRpm == 2139, "CPU_FAN em 0 RPM com outra ventoinha girando é reconhecido");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;
