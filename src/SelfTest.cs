@@ -163,8 +163,7 @@ namespace DiagIT
                 d = Analyzer.Run(new List<SessionData>(), before, new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swapFix });
                 string swapT, swapS; Analyzer.PlainVerdict(d, out swapT, out swapS);
                 Say("  " + swapT + " | " + swapS);
-                Check(wBefore > 0 && gpuF(d) != null && gpuF(d).Sev == Sev.Info && gpuF(d).W.Count == 0 && gpuF(d).Plain.EndsWith("antes da troca do driver") && gpuF(d).Guide == null &&
-                      gpuF(d).Evidence.Contains("antes do driver novo"), "troca de driver sem nada novo: o que veio antes vira informação, sem botão de resolver");
+                Check(wBefore > 0 && gpuF(d) == null, "troca de driver sem nada novo: os resets de antes da troca ficam no histórico e não entram na conta (o achado some da lista atual)");
                 HwSnapshot hwCooler = new HwSnapshot();
                 ProblemDevice cooler = new ProblemDevice(); cooler.Name = "Corsair H100i Platinum"; cooler.Class = "USB"; cooler.Code = 28; hwCooler.Problems.Add(cooler);
                 Diagnosis dCooler = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), hwCooler);
@@ -173,24 +172,33 @@ namespace DiagIT
                 Check(d.Fixes.Count == 1 && d.Fixes[0].State != 2 && swapS.Contains("Você trocou o driver de vídeo"), "o veredito diz que a troca está em acompanhamento");
                 List<WinEvent> again = new List<WinEvent>(before); again.Add(lke193(DateTime.Now.AddMinutes(-20)));
                 WinEvent crashAgain = new WinEvent(); crashAgain.Provider = "Application Error"; crashAgain.Id = 1000; crashAgain.Time = DateTime.Now.AddMinutes(-20).AddSeconds(1);
-                crashAgain.P = new string[] { "jogo.exe", "1.0.0.0", "0x1", "jogo.exe" }; again.Add(crashAgain);   // com programa fechando junto: é sintoma de verdade
+                crashAgain.P = new string[] { "jogo.exe", "1.0.0.0", "0x1", "atidxx64.dll" }; again.Add(crashAgain);   // com programa fechando junto: é sintoma de verdade
                 sorted(again);
                 d = Analyzer.Run(new List<SessionData>(), again, new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swapFix });
                 Analyzer.PlainVerdict(d, out swapT, out swapS);
                 Check(d.Fixes[0].State == 2 && !swapS.Contains("Você trocou o driver de vídeo") && !(gpuF(d).Evidence.Contains("antes do driver novo")), "travamento depois da troca: não esconde nada e avisa que não resolveu");
 
                 Say("== 4f. Reset de vídeo isolado x com sintoma; o problema voltou depois da troca do driver");
-                Func<DateTime, string, WinEvent> appCrash = delegate(DateTime t, string app)
+                // appCrash: o programa caiu no módulo dele mesmo (sintoma fraco); appCrashGpu: caiu dentro do driver de vídeo (sintoma forte)
+                Func<DateTime, string, string, WinEvent> crashIn = delegate(DateTime t, string app, string module)
                 {
                     WinEvent e = new WinEvent(); e.Provider = "Application Error"; e.Id = 1000; e.Time = t;
-                    e.P = new string[] { app, "1.0.0.0", "0x1", app, "1.0.0.0", "0x1", "0xc0000005" }; return e;
+                    e.P = new string[] { app, "1.0.0.0", "0x1", module, "1.0.0.0", "0x1", "0xc0000005" }; return e;
                 };
+                Func<DateTime, string, WinEvent> appCrash = delegate(DateTime t, string app) { return crashIn(t, app, app); };
+                Func<DateTime, string, WinEvent> appCrashGpu = delegate(DateTime t, string app) { return crashIn(t, app, "atidxx64.dll"); };
                 DateTime tSym = DateTime.Now.AddHours(-20);
-                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym), appCrash(tSym.AddSeconds(2), "jogo.exe") }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym), appCrashGpu(tSym.AddSeconds(2), "jogo.exe") }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
                 Finding fSym = gpuF(d);
                 Say("  " + (fSym == null ? "(nenhum)" : fSym.Sev + " | " + fSym.Evidence.Replace("\n", " / ")));
-                Check(fSym != null && fSym.Sev == Sev.Warn && fSym.Evidence.Contains("Com sintoma") && fSym.Evidence.Contains("jogo.exe fechou com erro") && fSym.Evidence.Contains("do próprio programa"),
-                      "reset de vídeo com programa fechando junto: com sintoma, e diz que o módulo que falhou é do programa");
+                Check(fSym != null && fSym.Sev == Sev.Warn && fSym.Evidence.Contains("Algo fechou ou travou na mesma hora") && fSym.Evidence.Contains("jogo.exe fechou com erro dentro do driver de vídeo"),
+                      "reset de vídeo com o programa caindo DENTRO do driver de vídeo: sintoma forte, alerta");
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym), appCrash(tSym.AddSeconds(2), "jogo.exe") }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(gpuF(d) != null && gpuF(d).Sev == Sev.Info && gpuF(d).Evidence.Contains("só um defeito do programa") && gpuF(d).Evidence.Contains("do próprio programa"),
+                      "reset de vídeo com o programa caindo no módulo DELE, uma vez só: pode ser defeito do programa, só informa");
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym), appCrash(tSym.AddSeconds(2), "jogo.exe"), lke193(tSym.AddHours(3)), appCrash(tSym.AddHours(3).AddSeconds(2), "jogo.exe") }),
+                    new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(gpuF(d) != null && gpuF(d).Sev == Sev.Crit, "o mesmo programa caindo junto com o reset duas vezes: passa a contar (crítico)");
                 d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { lke193(tSym) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
                 Check(gpuF(d) != null && gpuF(d).Sev == Sev.Info && gpuF(d).Evidence.Contains("isolado"), "reset de vídeo isolado (nada fechou): só informação");
 
@@ -198,10 +206,14 @@ namespace DiagIT
                 List<WinEvent> oldOnes = new List<WinEvent> { lke193(DateTime.Now.AddHours(-30)), lke193(DateTime.Now.AddHours(-26)) };
                 List<WinEvent> isoAfter = new List<WinEvent>(oldOnes); isoAfter.Add(lke193(DateTime.Now.AddHours(-1)));
                 d = Analyzer.Run(new List<SessionData>(), sorted(isoAfter), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swap2 });
-                Check(d.Fixes.Count == 1 && d.Fixes[0].State == 0 && d.Fixes[0].Isolated == 1 && d.Fixes[0].NextGuide.Length == 0 && d.Fixes[0].Text.Contains("isolado"),
+                Check(d.Fixes.Count == 1 && d.Fixes[0].State != 2 && d.Fixes[0].State != 1 && d.Fixes[0].Isolated == 1 && d.Fixes[0].NextGuide.Length == 0 && d.Fixes[0].Text.Contains("isolado"),
                       "reset de vídeo isolado depois da troca: continua acompanhando e explica que não conta como 'voltou'");
                 List<WinEvent> symAfter = new List<WinEvent>(oldOnes); DateTime tBack = DateTime.Now.AddHours(-1);
-                symAfter.Add(lke193(tBack)); symAfter.Add(appCrash(tBack.AddSeconds(1), "RainbowSixHelper.exe"));
+                // um programa fechando uma vez no módulo dele, junto com o reset: ainda não é "voltou"
+                List<WinEvent> weakAfter = new List<WinEvent>(oldOnes); weakAfter.Add(lke193(tBack)); weakAfter.Add(appCrash(tBack.AddSeconds(1), "RainbowSixHelper.exe"));
+                d = Analyzer.Run(new List<SessionData>(), sorted(weakAfter), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swap2 });
+                Check(d.Fixes[0].State != 2 && d.Fixes[0].State != 1 && d.Fixes[0].Isolated == 1, "um programa caindo uma vez no módulo dele junto com o reset: continua acompanhando, não é 'voltou'");
+                symAfter.Add(lke193(tBack)); symAfter.Add(appCrashGpu(tBack.AddSeconds(1), "RainbowSixHelper.exe"));
                 d = Analyzer.Run(new List<SessionData>(), sorted(symAfter), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot(), new List<FixEntry> { swap2 });
                 Finding fBack = gpuF(d);
                 string backT, backS; Analyzer.PlainVerdict(d, out backT, out backS);
@@ -210,6 +222,48 @@ namespace DiagIT
                       "programa fechou junto com o reset depois da troca: 'o problema voltou', com o contexto e o plano como próximo passo");
                 Check(fBack != null && fBack.Guide == "video-voltou" && backS.Contains("o problema voltou"), "o achado deixa de mandar refazer o DDU e aponta o plano de testes; o veredito diz que voltou");
                 Check(Rules.GuideById("video-voltou") != null && Rules.GuideById("cpu-instavel") != null && Rules.GuideById("cpu-quente") != null, "guias novos carregados (vídeo voltou, CPU instável, CPU quente)");
+
+                Say("== 4h. PC saudável com ruído: tudo aprovado nos testes + sinais fracos = verde, e os sinais continuam visíveis como informação");
+                Func<TestKind, TestResult> okTest = delegate(TestKind kind)
+                {
+                    TestResult tr = new TestResult(); tr.Id = "ok" + kind; tr.Kind = kind; tr.Status = "passed"; tr.Start = DateTime.Now.AddHours(-2); tr.End = tr.Start.AddMinutes(3); tr.Summary = "Nenhum erro.";
+                    tr.Set("t_cpu_temp_max", 62); tr.Set("t_gpu_hot_max", 88); tr.Set("t_gpu_temp_max", 66); tr.Set("t_v12_min", 11.9); tr.Set("pcie_up_gbs", 12);
+                    return tr;
+                };
+                TestResult combo = okTest(TestKind.Combined); combo.Set("t_cpu_fan_min", 0);   // bomba de water cooler: não usa o conector CPU_FAN
+                List<TestResult> allOk = new List<TestResult> { okTest(TestKind.Cpu), okTest(TestKind.Ram), okTest(TestKind.Gpu), okTest(TestKind.Disk), combo };
+                HwSnapshot hwNoise = new HwSnapshot(); hwNoise.GpuName = "AMD Radeon RX 7600"; hwNoise.GpuDriver = "31.0.21921.1000"; hwNoise.PagefileAuto = true;
+                ProblemDevice cooler2 = new ProblemDevice(); cooler2.Name = "Corsair H100i Platinum"; cooler2.Class = "USB"; cooler2.Code = 28; hwNoise.Problems.Add(cooler2);
+                WinEvent wuNoise = new WinEvent(); wuNoise.Provider = "Microsoft-Windows-WindowsUpdateClient"; wuNoise.Id = 19; wuNoise.Time = DateTime.Now.AddDays(-5);
+                wuNoise.P = new string[] { "Advanced Micro Devices, Inc. - Display - 31.0.21921.1000" };
+                List<WinEvent> noise = sorted(new List<WinEvent> { wuNoise, lke193(DateTime.Now.AddDays(-3)), lke193(DateTime.Now.AddDays(-2)) });   // dois resets de vídeo isolados
+                d = Analyzer.Run(new List<SessionData>(), noise, new List<DiskHealth>(), 30, allOk, hwNoise);
+                string nt, ns; Analyzer.PlainVerdict(d, out nt, out ns);
+                int suspectOrFailed = 0; foreach (CompState cs in d.States) if (cs != null && (cs.Status == CompStatus.Suspect || cs.Status == CompStatus.Failed)) suspectOrFailed++;
+                int indicios = d.Findings.FindAll(delegate(Finding f) { return Analyzer.Confidence(f) == "INDÍCIO"; }).Count;
+                Say("  " + nt + " | " + ns + " | suspeitas: " + suspectOrFailed + " | indícios: " + indicios);
+                Check(suspectOrFailed == 0 && indicios == 0 && nt == "Seu PC está saudável", "tudo aprovado + ruído (reset isolado, driver do Windows Update, ventoinha 0 RPM em water cooler, USB do cooler): saudável, zero indícios");
+                Check(d.Findings.Exists(delegate(Finding f) { return Analyzer.Confidence(f) == "INFORMAÇÃO" && f.Title.StartsWith("Travamentos de GPU"); }), "o reset isolado continua visível, como informação");
+                // e o problema real não some: 3 resets com programa fechando junto + tela azul de vídeo continuam alarmando
+                List<WinEvent> real = new List<WinEvent>(); DateTime tr0 = DateTime.Now.AddMinutes(-30);
+                for (int k2 = 0; k2 < 3; k2++) { DateTime tk = tr0.AddMinutes(-k2 * 10); real.Add(lke193(tk)); real.Add(appCrash(tk.AddSeconds(1), "jogo.exe")); }
+                d = Analyzer.Run(new List<SessionData>(), sorted(real), new List<DiskHealth>(), 30, allOk, hwNoise);
+                Finding fReal = gpuF(d);
+                Check(fReal != null && fReal.Sev == Sev.Crit && Analyzer.Confidence(fReal) == "INDÍCIO", "3 resets com programa fechando junto, depois dos testes: continua alarmando (crítico)");
+
+                Say("== 4i. Programas que não são jogo (TeamSpeak, Discord...) não viram 'jogo que trava'");
+                Func<string, SessionData> chat = delegate(string name)
+                {
+                    SessionData sd = new SessionData(); sd.Info = new SessionInfo(); sd.Info.Id = "c" + name; sd.Info.Game = name; sd.Info.Status = "ok";
+                    sd.Info.Start = DateTime.Now.AddHours(-3); sd.Info.End = sd.Info.Start.AddMinutes(30);
+                    sd.Info.FpsAvg = 70; sd.Info.FpsLow = 12; sd.Info.Stutters = 130; sd.Info.Frames = 22000;
+                    return sd;
+                };
+                Predicate<Finding> fpsAny = delegate(Finding f) { return f.Source.StartsWith("Medição de FPS"); };
+                d = Analyzer.Run(new List<SessionData> { chat("TeamSpeak") }, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Diagnosis dGameFps = Analyzer.Run(new List<SessionData> { chat("jogo.exe") }, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(d.Findings.Find(fpsAny) == null && dGameFps.Findings.Find(fpsAny) != null && AppSettings.IsNeverGame("TeamSpeak") && AppSettings.IsNeverGame("Discord.exe") && !AppSettings.IsNeverGame("cs2"),
+                      "TeamSpeak/Discord/navegadores nunca são jogo; um jogo de verdade com os mesmos números continua sendo analisado");
 
                 Say("== 4g. Ajustes reversíveis de Windows (só leitura aqui)");
                 bool tweaksOk = Tweaks.All.Count >= 5;
@@ -451,7 +505,7 @@ namespace DiagIT
                 Say("  " + d.Fixes[0].Headline + ": " + d.Fixes[0].Text);
                 Finding old = d.Findings.Find(delegate(Finding f) { return f.BugCode == 0x116; });
                 Check(d.Fixes[0].State == 1, "20 dias sem tela azul depois da correção: resolvido");
-                Check(old != null && old.W[Comp.Software] < 0.2 && old.Evidence.Contains("antes da correção"), "resolvido: telas azuis antigas pesam bem menos");
+                Check(old != null && old.Sev == Sev.Info && old.W.Count == 0 && old.Evidence.Contains("antes da correção"), "resolvido: telas azuis antigas viram histórico (informação, sem peso)");
                 d = runFix(new int[] { 10, 2 }, 5);
                 Say("  " + d.Fixes[0].Headline + ": " + d.Fixes[0].Text);
                 Check(d.Fixes[0].State == 2 && d.Fixes[0].After == 1, "voltou depois da correção: não resolveu");

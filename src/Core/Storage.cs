@@ -132,6 +132,23 @@ namespace DiagIT
 
         public void ResetCache() { ignoreSet = null; gameSet = null; }
 
+        /// <summary>Programas de comunicação, navegação e produtividade que nunca são tratados como jogo, mesmo usando a placa de vídeo (a lista salva do usuário não precisa conhecê-los).</summary>
+        static readonly HashSet<string> NeverGames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "teamspeak", "teamspeak3", "ts3client_win64", "ts3client_win32", "teamspeak 3", "discord", "discordptb", "discordcanary", "slack", "teams", "ms-teams", "msteams", "zoom",
+            "skype", "telegram", "signal", "whatsapp", "telegramdesktop", "obs", "obs64", "obs32", "streamlabs obs", "spotify", "chrome", "msedge", "firefox", "brave", "opera", "vivaldi",
+            "steamwebhelper", "explorer", "dwm", "vlc", "outlook", "onenote", "notion", "figma", "code", "devenv", "claude", "wallpaper32", "wallpaper64", "msedgewebview2"
+        };
+
+        /// <summary>true = esse programa nunca é um jogo (comunicação, navegador, produtividade).</summary>
+        public static bool IsNeverGame(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.Trim();
+            if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) n = n.Substring(0, n.Length - 4);
+            return NeverGames.Contains(n);
+        }
+
         /// <summary>"Isso não é um jogo": tira o programa da lista de jogos e põe na de ignorados, e salva.</summary>
         public void MarkNotAGame(string proc)
         {

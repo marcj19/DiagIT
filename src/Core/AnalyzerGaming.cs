@@ -13,7 +13,7 @@ namespace DiagIT
     {
         static void GamingRules(Diagnosis d, List<SessionData> sessions, List<WinEvent> ev)
         {
-            List<DateTime> gpuCrashes = GpuCrashTimes(ev);
+            List<DateTime> gpuCrashes = GpuCrashTimes(ev, true);   // só com sintoma: reset de vídeo isolado não conta como "travamento" nas regras de driver e de clock
             WuDriverRule(d, ev, gpuCrashes);
             GpuClockRule(d, sessions, gpuCrashes);
             BackgroundAppRules(d, sessions, ev, gpuCrashes);
@@ -43,15 +43,44 @@ namespace DiagIT
         /// <summary>Algo visível que aconteceu até 90 s de t: programa fechou com erro, TDR, tela azul ou desligamento sem aviso. null = nada.</summary>
         static WinEvent SymptomNear(List<WinEvent> ev, DateTime t)
         {
+            WinEvent weak = null;
             foreach (WinEvent e in ev)
             {
                 if (Math.Abs((e.Time - t).TotalSeconds) > 90) continue;
-                if (e.Provider == "Application Error" && e.Id == 1000 && !e.Prop(0).StartsWith("DiagIT", StringComparison.OrdinalIgnoreCase)) return e;
+                if (e.Provider == "Application Error" && e.Id == 1000 && !e.Prop(0).StartsWith("DiagIT", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (GpuModule(e.Prop(3))) return e;   // caiu dentro do driver de vídeo: sintoma forte
+                    if (weak == null) weak = e;           // caiu no módulo do próprio programa: pode ser só um bug dele
+                    continue;
+                }
                 if (e.Provider == "Display" && e.Id == 4101) return e;
                 if (BugcodeOf(e) > 0) return e;
                 if (e.Provider == "Microsoft-Windows-Kernel-Power" && e.Id == 41) return e;
             }
-            return null;
+            return weak;
+        }
+
+        /// <summary>
+        /// Sintoma fraco: um programa fechou com erro no módulo dele mesmo (não no driver de vídeo). Isso sozinho pode ser só um defeito do programa;
+        /// só passa a pesar contra o driver quando se repete.
+        /// </summary>
+        static bool IsWeakSymptom(WinEvent e)
+        {
+            return e != null && e.Provider == "Application Error" && !GpuModule(e.Prop(3));
+        }
+
+        /// <summary>Quantos resets de vídeo (LiveKernelEvent) vieram só com um sintoma fraco ao lado, fora de instalações.</summary>
+        static int WeakResetCount(List<WinEvent> ev, List<DateTime[]> installs)
+        {
+            int n = 0;
+            foreach (WinEvent e in ev)
+            {
+                if (e.Provider != "Windows Error Reporting" || e.Id != 1001 || e.Prop(2) != "LiveKernelEvent") continue;
+                string c = e.Prop(5).ToLowerInvariant();
+                if (!(c == "141" || c == "117" || c == "193" || c == "10e") || DuringInstall(installs, e.Time)) continue;
+                if (IsWeakSymptom(SymptomNear(ev, e.Time))) n++;
+            }
+            return n;
         }
 
         /// <summary>Em palavras: "RainbowSixHelper.exe fechou com erro (o módulo que falhou é do próprio programa, não do driver de vídeo)".</summary>
@@ -79,13 +108,15 @@ namespace DiagIT
         {
             List<DateTime[]> installs = InstallWindows(ev);
             List<DateTime> r = new List<DateTime>();
+            bool weakCounts = symptomOnly && WeakResetCount(ev, installs) >= 2;   // um programa que fecha uma vez junto com um reset pode ser só o programa; repetido, conta
             foreach (WinEvent e in ev)
             {
                 bool hit = ((e.Provider == "Display" && e.Id == 4101) || Has(e.Provider, "amdkmdag", "amdwddmg", "atikmdag", "nvlddmkm", "igfx")) && !DuringInstall(installs, e.Time);
                 if (!hit && e.Provider == "Windows Error Reporting" && e.Id == 1001 && e.Prop(2) == "LiveKernelEvent")
                 {
                     string c = e.Prop(5).ToLowerInvariant();
-                    hit = (c == "141" || c == "117" || c == "193" || c == "10e") && !DuringInstall(installs, e.Time) && (!symptomOnly || SymptomNear(ev, e.Time) != null);
+                    hit = (c == "141" || c == "117" || c == "193" || c == "10e") && !DuringInstall(installs, e.Time);
+                    if (hit && symptomOnly) { WinEvent near = SymptomNear(ev, e.Time); hit = near != null && (!IsWeakSymptom(near) || weakCounts); }
                 }
                 if (!hit && Array.IndexOf(VideoBugchecks, BugcodeOf(e)) >= 0) hit = true;
                 if (!hit && e.Provider == "Application Error" && e.Id == 1000 && GpuModule(e.Prop(3))) hit = true;
@@ -212,7 +243,7 @@ namespace DiagIT
         }
 
         // ================================================================ 3. Programas em segundo plano e placa de rede
-        static bool GameSession(SessionData sd) { return sd.Info.Note != "teste" && !sd.Info.Game.StartsWith("[Teste]"); }
+        static bool GameSession(SessionData sd) { return sd.Info.Note != "teste" && !sd.Info.Game.StartsWith("[Teste]") && !AppSettings.IsNeverGame(sd.Info.Game); }
 
         static int Stalls(SessionData sd)
         {

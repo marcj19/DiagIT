@@ -150,7 +150,7 @@ namespace DiagIT
                 if (n.Length == 0) continue;
                 double eff = kv.Value;
                 if (Cfg.Games.Contains(n)) { if (kv.Value >= 1) eff = Math.Max(eff, Cfg.MinGpuForGame); }
-                else if (Cfg.Ignored.Contains(n)) continue;
+                else if (Cfg.Ignored.Contains(n) || AppSettings.IsNeverGame(n)) continue;
                 else if (kv.Key == fgPid && fgFull && kv.Value >= 3) eff = Math.Max(eff, Cfg.MinGpuForGame);
                 if (eff > candEff) { cand = kv.Key; candEff = eff; candRaw = kv.Value; candName = n; }
             }
@@ -260,7 +260,7 @@ namespace DiagIT
         {
             name = "";
             SessionInfo cur = Current;
-            if (cur != null && cur.Note != "teste" && !cur.Game.StartsWith("[Teste]")) { name = cur.Game; return true; }
+            if (cur != null && cur.Note != "teste" && !cur.Game.StartsWith("[Teste]") && !AppSettings.IsNeverGame(cur.Game)) { name = cur.Game; return true; }
             try
             {
                 foreach (Process p in Process.GetProcesses())

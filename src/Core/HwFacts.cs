@@ -336,7 +336,17 @@ namespace DiagIT
         public static bool IsBenignDevice(ProblemDevice d)
         {
             string n = d.Name.ToLowerInvariant();
-            return n.Contains("h80i") || n.Contains("h100i") || n.Contains("h115i") || n.Contains("h150i") || n.Contains("corsair");
+            if (n.Contains("h80i") || n.Contains("h100i") || n.Contains("h115i") || n.Contains("h150i") || n.Contains("corsair") ||
+                n.Contains("nzxt") || n.Contains("kraken") || n.Contains("lian li") || n.Contains("rgb")) return true;
+            // periféricos sem driver (USB, controles, Bluetooth, câmera, áudio USB...) funcionam em modo básico e não causam travamento nem tela azul;
+            // vídeo, sistema, armazenamento e rede continuam contando
+            switch ((d.Class ?? "").ToLowerInvariant())
+            {
+                case "usb": case "hidclass": case "bluetooth": case "media": case "camera": case "image": case "keyboard": case "mouse":
+                case "ports": case "wpd": case "printer": case "smartcardreader": case "biometric": case "swdevice":
+                    return true;
+            }
+            return false;
         }
 
         public static string DeviceHint(ProblemDevice d)

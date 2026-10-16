@@ -138,14 +138,14 @@ namespace DiagIT
                 DateTime from = fx.When.AddDays(-30) > horizon ? fx.When.AddDays(-30) : horizon;
                 DateTime settled = fx.When.AddMinutes(30);   // reinícios e reinstalações da própria correção não contam
                 DateTime earliest = fx.When;
+                // antes e depois contam o mesmo tipo de ocorrência (só com sintoma); os isolados ficam à parte e só são mostrados, nunca favorecem nem prejudicam a comparação
                 int allAfter = 0;
-                foreach (DateTime t in times)
+                foreach (DateTime t in times) if (t > settled) allAfter++;
+                foreach (DateTime t in symTimes)
                 {
                     if (t >= from && t < fx.When) { st.Before++; if (t < earliest) earliest = t; }
-                    if (t > settled) allAfter++;
-                }
-                foreach (DateTime t in symTimes)
                     if (t > settled) { st.After++; if (st.FirstAfter == DateTime.MinValue || t < st.FirstAfter) st.FirstAfter = t; }
+                }
                 st.Isolated = Math.Max(0, allAfter - st.After);
                 if (st.After > 0) st.Context = SymptomContext(ev, st.FirstAfter);
                 st.BeforeDays = Math.Max(1, (fx.When - (st.Before > 0 ? earliest : from)).TotalDays);   // do primeiro registro até a correção
@@ -154,7 +154,7 @@ namespace DiagIT
                 double bd = Math.Max(1, Math.Round(st.BeforeDays));
                 string beforeTxt = st.Before == 0 ? "" : " Antes: " + st.Before + " em " + bd + (bd == 1 ? " dia." : " dias.");
                 string isoTxt = st.Isolated == 0 ? "" : " O Windows registrou " + st.Isolated + (st.Isolated == 1 ? " reset de vídeo isolado" : " resets de vídeo isolados") +
-                    " desde então, mas nada fechou nem travou na mesma hora: isso não conta como \"voltou\".";
+                    " desde então, mas sem sinal claro de defeito do driver (nenhuma tela travou, nem tela azul, nem programa caiu dentro do driver de vídeo): isso não conta como \"voltou\".";
                 st.NeedDays = 7;
                 if (st.After > 0)
                 {
@@ -177,7 +177,7 @@ namespace DiagIT
                     double interval = st.BeforeDays / st.Before;                       // a cada quantos dias acontecia
                     double need = Math.Max(7, Math.Min(21, interval * 2));
                     st.NeedDays = need;
-                    if (st.AfterDays >= need && st.Isolated == 0)
+                    if (st.AfterDays >= need)   // resets de vídeo isolados não impedem "Resolvido": só problema com sintoma conta
                     {
                         st.State = 1;
                         st.Headline = "Resolvido";
@@ -219,8 +219,9 @@ namespace DiagIT
                             f.Evidence += "\nAconteceu antes do driver novo (" + fx.When.ToString("dd/MM HH:mm") + "), com o driver antigo. Nada novo desde então: o DiagIT acompanha e só dá como resolvido depois de alguns dias de uso. Se voltar, este alerta volta a valer.";
                             continue;
                         }
-                        List<Comp> keys = new List<Comp>(f.W.Keys);
-                        foreach (Comp c in keys) f.W[c] = f.W[c] * 0.3;
+                        // resolvido: o achado antigo vira histórico (informação), sem botão de resolver
+                        f.Sev = Sev.Info; f.W.Clear(); f.Guide = null;
+                        f.Simple = f.Plain + ", antes da correção";
                         f.Evidence += "\nAconteceu antes da correção de " + fx.When.ToString("dd/MM") + " (\"" + fx.Title + "\"), e não voltou desde então.";
                     }
             }

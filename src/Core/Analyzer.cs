@@ -31,6 +31,11 @@ namespace DiagIT
         public int CulpritCount, CulpritOf;
         /// <summary>Guia passo a passo que resolve este achado (data/guias.json), ou null.</summary>
         public string Guide;
+        /// <summary>
+        /// Sintoma real, visível para o usuário (tela azul, PC desligou, jogo ou app fechou no driver de vídeo, TDR, reset de vídeo com algo fechando junto).
+        /// Só achados com sintoma passam a suspeita para "Drivers e Windows" quando o teste da peça não reproduz o problema.
+        /// </summary>
+        public bool Symptom;
         /// <summary>O mesmo achado em linguagem do dia a dia (camada simples da interface). Vazio = usa o Title.</summary>
         public string Simple = "";
 
@@ -70,6 +75,8 @@ namespace DiagIT
         public List<TestResult> Tests = new List<TestResult>();
         public HwSnapshot Hw;
         public List<FixStatus> Fixes = new List<FixStatus>();   // acompanhamento das correções ("corrigiu?")
+        /// <summary>Quando o driver de vídeo foi trocado pela última vez (correção registrada); eventos de vídeo anteriores a isso são do driver antigo e não entram na conta atual. MinValue = sem troca.</summary>
+        public DateTime DriverSwapAt = DateTime.MinValue;
     }
 
     public static class CompInfo
@@ -161,6 +168,7 @@ namespace DiagIT
         {
             Diagnosis d = new Diagnosis();
             d.Hw = hw;
+            if (fixes != null) foreach (FixEntry fx0 in fixes) if (IsDriverSwap(fx0) && fx0.When > d.DriverSwapAt) d.DriverSwapAt = fx0.When;
             Rules.SetContext(hw != null ? hw.GpuName : null, hw != null ? hw.CpuName : null);   // textos conforme a marca do PC
             if (tests != null) d.Tests = tests;
             bool nativeSmart = false;
@@ -292,7 +300,7 @@ namespace DiagIT
                 f.Advice = "Causas comuns: driver corrompido (reinstale com DDU em modo seguro), GPU superaquecendo, " +
                     "undervolt/overclock instável, cabos PCIe mal encaixados ou fonte sem folga. Desative também o " +
                     "overclock automático e os ajustes de desempenho no {painel_video} para testar.";
-                f.Last = tdr[0].Time;
+                f.Last = tdr[0].Time; f.Symptom = true;
                 f.Weigh(Comp.Gpu, 0.35 * w).Weigh(Comp.Software, 0.30 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.12 * w);
                 d.Findings.Add(f);
             }
@@ -306,18 +314,19 @@ namespace DiagIT
             if (lke.Count > 0)
             {
                 // travamentos de GPU que a própria troca de driver (DDU, instalador do fabricante) provoca não contam: o vídeo é reiniciado de propósito
-                int strongInstall = 0;
+                int strongInstall = 0, strongOld = 0;
                 List<WinEvent> strong = Where(lke, delegate(WinEvent e)
                 {
                     string c = e.Prop(5).ToLowerInvariant();
                     if (!(c == "141" || c == "117" || c == "193" || c == "10e")) return false;
                     if (DuringInstall(installs, e.Time)) { strongInstall++; return false; }
+                    if (d.DriverSwapAt > DateTime.MinValue && e.Time < d.DriverSwapAt) { strongOld++; return false; }   // do driver antigo
                     return true;
                 });
                 List<WinEvent> soft = Where(lke, delegate(WinEvent e)
                 {
                     string c = e.Prop(5).ToLowerInvariant();
-                    return c == "1a8" || c == "1b8";
+                    return (c == "1a8" || c == "1b8") && !(d.DriverSwapAt > DateTime.MinValue && e.Time < d.DriverSwapAt);
                 });
                 Dictionary<string, int> codes = new Dictionary<string, int>();
                 foreach (WinEvent e in lke) { string k = e.Prop(5); int n; codes.TryGetValue(k, out n); codes[k] = n + 1; }
@@ -331,45 +340,56 @@ namespace DiagIT
                 {
                     // com sintoma = algo visível na mesma hora (programa fechou, TDR, tela azul); isolado = o Windows só registrou o reset do vídeo
                     List<string> symTxt = new List<string>();
-                    int sym = 0;
+                    int strongSym = 0, weakSym = 0;
                     foreach (WinEvent se in strong)
                     {
                         WinEvent near = SymptomNear(ev, se.Time);
                         if (near == null) continue;
-                        sym++;
+                        if (IsWeakSymptom(near)) weakSym++; else strongSym++;
                         if (symTxt.Count < 3) symTxt.Add("• " + se.Time.ToString("dd/MM HH:mm", Pt) + ": " + SymptomText(near));
                     }
+                    // programa que fechou no módulo dele mesmo, uma vez só, pode ser defeito do programa: só conta contra o vídeo se se repetir
+                    int sym = strongSym + (weakSym >= 2 ? weakSym : 0);
                     int isolated = strong.Count - sym;
                     double w = Math.Max(0.3, Scale(strong.Count, 4)) * (sym > 0 ? 1.0 : 0.5);
                     Finding f = new Finding();
                     f.Sev = sym >= 2 ? Sev.Crit : sym == 1 ? Sev.Warn : strong.Count >= 6 ? Sev.Warn : Sev.Info; f.Source = "Eventos do Windows";
                     f.Title = "Travamentos de GPU registrados pelo Windows (LiveKernelEvent 141/117/193) — " + strong.Count + "×";
                     f.Evidence = "A GPU parou de responder e o Windows a recuperou sem tela azul. Último em " + D(strong[0].Time) + ".\n" + Recent(strong, 4) +
-                        (sym > 0 ? "\nCom sintoma visível na mesma hora (" + sym + "):\n" + string.Join("\n", symTxt.ToArray()) : "") +
+                        (symTxt.Count > 0 ? "\nAlgo fechou ou travou na mesma hora (" + (strongSym + weakSym) + "):\n" + string.Join("\n", symTxt.ToArray()) : "") +
+                        (weakSym == 1 && strongSym == 0 ? "\nUm programa fechando uma vez, com erro no módulo dele, pode ser só um defeito do programa. Só passa a contar contra o vídeo se se repetir." : "") +
                         (isolated > 0 ? "\n" + isolated + " isolado(s): o Windows registrou o reset do vídeo, mas nada fechou nem travou na mesma hora. Isso é comum ao abrir um jogo em tela cheia ou trocar a resolução, e sozinho não prova defeito." : "") +
-                        (strongInstall > 0 ? "\n(" + strongInstall + " ocorrência(s) durante a instalação de driver não entraram na conta: são esperadas quando o driver é trocado.)" : "");
+                        (strongInstall > 0 ? "\n(" + strongInstall + " ocorrência(s) durante a instalação de driver não entraram na conta: são esperadas quando o driver é trocado.)" : "") +
+                        (strongOld > 0 ? "\n(" + strongOld + " ocorrência(s) anteriores à troca do driver (" + d.DriverSwapAt.ToString("dd/MM HH:mm", Pt) + ") ficam no histórico e não entram na conta: eram do driver antigo.)" : "");
                     f.Advice = "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot.";
-                    f.Last = strong[0].Time;
+                    f.Last = strong[0].Time; f.Symptom = sym > 0;
                     f.Weigh(Comp.Gpu, 0.40 * w).Weigh(Comp.Software, 0.20 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.10 * w);
                     d.Findings.Add(f);
                 }
                 if (soft.Count > 0)
                 {
                     // separa episódios durante instalação de drivers/atualizações (esperados) dos que aconteceram em uso normal
-                    int instEp = 0, runEp = 0; DateTime lt = DateTime.MinValue; bool lastInst = false;
+                    int instEp = 0, runEp = 0, symEp = 0; DateTime lt = DateTime.MinValue; bool lastInst = false;
                     List<WinEvent> softAsc = new List<WinEvent>(soft); softAsc.Reverse();
                     foreach (WinEvent e in softAsc)
                     {
-                        if ((e.Time - lt).TotalMinutes > 5) { lastInst = DuringInstall(installs, e.Time); if (lastInst) instEp++; else runEp++; }
+                        if ((e.Time - lt).TotalMinutes > 5)
+                        {
+                            lastInst = DuringInstall(installs, e.Time);
+                            if (lastInst) instEp++;
+                            else { runEp++; if (SymptomNear(ev, e.Time) != null) symEp++; }   // com sintoma = algo fechou ou travou na mesma hora
+                        }
                         lt = e.Time;
                     }
                     episodes = instEp + runEp;
-                    double w = runEp == 0 ? 0.1 : Math.Max(0.25, Scale(runEp, 4));
+                    // sem nada visível na mesma hora, o watchdog é só o registro do reset do vídeo (como o 193): informação, não alerta
+                    double w = symEp == 0 ? 0.1 : Math.Max(0.25, Scale(symEp, 4));
                     Finding f = new Finding();
-                    f.Sev = runEp >= 2 ? Sev.Warn : Sev.Info; f.Source = "Eventos do Windows";
+                    f.Sev = symEp >= 2 ? Sev.Warn : Sev.Info; f.Source = "Eventos do Windows"; f.Symptom = symEp > 0;
                     f.Title = "Watchdog do kernel disparou (LiveKernelEvent 0x1a8/0x1b8) — " + runEp + " episódio(s) em uso normal" +
                         (instEp > 0 ? " e " + instEp + " durante instalação de drivers/atualizações" : "");
-                    f.Evidence = "Códigos: " + string.Join(", ", cl.ToArray()) + ". Último em " + D(soft[0].Time) + ". " +
+                    f.Evidence = (runEp > 0 ? symEp + " de " + runEp + " episódio(s) em uso normal vieram com algo visível na mesma hora (programa fechando, tela travando); os outros foram só o registro do Windows. " : "") +
+                        "Códigos: " + string.Join(", ", cl.ToArray()) + ". Último em " + D(soft[0].Time) + ". " +
                         "Não há documentação oficial desses códigos; relatos de usuários os ligam a falha de modo de vídeo/timeout do agendador da GPU, " +
                         "mas também a driver de Wi-Fi e a overclock/XMP instável. O dump fica em C:\\Windows\\LiveKernelReports\\WATCHDOG." +
                         (instEp > 0 ? " Episódios durante a instalação de drivers são esperados (o driver de vídeo reinicia a tela ao ser instalado) e pesam pouco." : "") + "\n" + Recent(soft, 4);
@@ -399,7 +419,7 @@ namespace DiagIT
                 f.Advice = "Esse é o padrão clássico de fonte falhando/sem potência, superaquecimento (proteção térmica corta tudo), " +
                     "ou falha de hardware que trava o sistema inteiro. Descarte antes: queda de energia, régua/filtro de linha e o botão " +
                     "de energia sendo pressionado. Se acontece em jogo, a fonte e a temperatura são as primeiras suspeitas.";
-                f.Last = noBsod[0].Time;
+                f.Last = noBsod[0].Time; f.Symptom = true;
                 f.Weigh(Comp.Psu, 0.32 * w).Weigh(Comp.Cooling, 0.22 * w).Weigh(Comp.Gpu, 0.14 * w)
                  .Weigh(Comp.Cpu, 0.10 * w).Weigh(Comp.Ram, 0.10 * w).Weigh(Comp.Board, 0.10 * w);
                 d.Findings.Add(f);
@@ -518,7 +538,7 @@ namespace DiagIT
                     f.Title = "Jogos/apps travaram dentro do driver de vídeo — " + gpuMod + "×";
                     f.Evidence = "O módulo que falhou pertence ao driver gráfico (atiu9p64, atidxx64, amdxx64, nvwgf2umx...).";
                     f.Advice = "Reinstale o driver com DDU. Se persistir com driver limpo, suspeite da própria GPU, VRAM ou energia.";
-                    f.Last = crashes[0].Time;
+                    f.Last = crashes[0].Time; f.Symptom = true;
                     f.Weigh(Comp.Gpu, 0.22 * w).Weigh(Comp.Software, 0.30 * w);
                     d.Findings.Add(f);
                 }
@@ -563,7 +583,8 @@ namespace DiagIT
                 if (commit >= 90)
                 {
                     Finding f = new Finding();
-                    f.Sev = commit >= 96 ? Sev.Warn : Sev.Info; f.Source = "Estado atual do sistema";
+                    // foto do instante da análise (que também roda logo depois de cada partida): só é alerta quando está realmente no limite
+                    f.Sev = commit >= 98 ? Sev.Warn : Sev.Info; f.Source = "Estado atual do sistema";
                     f.Title = "Memória virtual (commit) quase esgotada: " + N0(commit) + "% do limite de " + N1(limitGb) + " GB";
                     f.Evidence = "Quando o commit chega a 100%, o Windows recusa novas alocações: jogos fecham sozinhos, o sistema congela ou aparece o aviso " +
                         "\"memória insuficiente\" — mesmo com RAM física livre. Costuma ocorrer com muitos programas abertos (jogo + launcher + navegador) e arquivo de paginação pequeno.";
@@ -675,15 +696,21 @@ namespace DiagIT
                 return;
             }
 
-            double[] cpuT = Stat.Vals(all, F.CpuTemp), gpuT = Stat.Vals(all, F.GpuTemp), gpuH = Stat.Vals(all, F.GpuHot);
-            d.HasCpuTemp = cpuT.Length > 0; d.HasGpuTemp = gpuT.Length > 0;
+            // Só as partidas de jogo julgam o PC no dia a dia. Os testes do DiagIT levam peças ao máximo de propósito (calor, VRAM cheia, CPU a 100%,
+            // RAM travada, disco lido inteiro): isso é medido e julgado no próprio teste, e aqui apareceria como falso alarme.
+            List<Sample> play = new List<Sample>();
+            foreach (SessionData sd in sessions) if (GameSession(sd)) play.AddRange(sd.S);
+
+            // disponibilidade dos sensores: vale qualquer sessão; o julgamento de temperatura usa só as partidas
+            d.HasCpuTemp = Stat.Vals(all, F.CpuTemp).Length > 0; d.HasGpuTemp = Stat.Vals(all, F.GpuTemp).Length > 0;
+            double[] cpuT = Stat.Vals(play, F.CpuTemp), gpuT = Stat.Vals(play, F.GpuTemp), gpuH = Stat.Vals(play, F.GpuHot);
             double[] v12 = Stat.Vals(all, F.V12);
             d.HasPower = v12.Length > 0;
 
             if (!d.HasCpuTemp && !d.HasGpuTemp)
             {
                 Finding f = new Finding();
-                f.Sev = Sev.Warn; f.Source = "Telemetria";
+                f.Sev = Sev.Info; f.Source = "Telemetria";   // limitação do app, não problema do PC
                 f.Title = "Sem leitura de temperatura — a análise térmica está cega";
                 f.Evidence = "O Windows não expõe a temperatura do processador (e de algumas placas de vídeo) sem um leitor de sensores. Superaquecimento é uma das causas mais comuns de travamentos em jogos.";
                 f.Advice = "Instale o HWiNFO64 (modo 'sensors only') e ative 'Shared Memory Support' em Settings; o DiagIT passa a ler tudo automaticamente. " +
@@ -692,7 +719,7 @@ namespace DiagIT
             }
 
             // ---------- Temperatura CPU
-            if (d.HasCpuTemp)
+            if (cpuT.Length > 0)
             {
                 double mx = Stat.Max(cpuT), p95 = Stat.Percentile(cpuT, 0.95), f85 = Stat.FracAbove(cpuT, 85);
                 Finding f = new Finding(); f.Source = "Telemetria";
@@ -723,9 +750,9 @@ namespace DiagIT
             }
 
             // ---------- Temperatura GPU
-            if (d.HasGpuTemp || gpuH.Length > 0)
+            if (gpuT.Length > 0 || gpuH.Length > 0)
             {
-                double mx = d.HasGpuTemp ? Stat.Max(gpuT) : double.NaN;
+                double mx = gpuT.Length > 0 ? Stat.Max(gpuT) : double.NaN;
                 double hx = gpuH.Length > 0 ? Stat.Max(gpuH) : double.NaN;
                 Finding f = new Finding(); f.Source = "Telemetria";
                 bool crit = (!double.IsNaN(mx) && mx >= 95) || (!double.IsNaN(hx) && hx >= 110);
@@ -757,16 +784,17 @@ namespace DiagIT
                 d.Findings.Add(f);
 
                 // ventoinha parada com GPU quente
-                double[] fan = Stat.Vals(all, F.GpuFan);
-                if (fan.Length > 0 && d.HasGpuTemp)
+                // só vale se o sensor de ventoinha mostrou rotação de verdade em algum momento: sensor sem suporte devolve sempre 0 e não prova ventoinha parada
+                double[] fan = Stat.Vals(play, F.GpuFan);
+                if (fan.Length > 0 && gpuT.Length > 0 && Stat.Max(fan) > 100)
                 {
                     int hotStopped = 0, hot = 0;
-                    foreach (Sample s in all)
+                    foreach (Sample s in play)
                     {
                         if (double.IsNaN(s.V[F.GpuTemp]) || double.IsNaN(s.V[F.GpuFan])) continue;
                         if (s.V[F.GpuTemp] > 70) { hot++; if (s.V[F.GpuFan] < 100) hotStopped++; }
                     }
-                    if (hot > 10 && hotStopped > hot * 0.1)
+                    if (hot > 10 && hotStopped > hot * 0.3)
                     {
                         Finding g = new Finding();
                         g.Sev = Sev.Crit; g.Source = "Telemetria";
@@ -779,50 +807,56 @@ namespace DiagIT
                 }
             }
 
-            // ---------- Throttling de CPU (queda progressiva sob carga)
-            List<double> early = new List<double>(), late = new List<double>();
-            List<double> loadFreqs = new List<double>();
-            List<Sample> loaded = new List<Sample>();
-            foreach (Sample s in all)
-                if (!double.IsNaN(s.V[F.Cpu]) && s.V[F.Cpu] >= 85 && !double.IsNaN(Actual(s))) loaded.Add(s);
-            if (loaded.Count >= 40)
+            // ---------- Throttling de CPU e de GPU (queda progressiva sob carga), partida por partida
+            // Juntar partidas de dias diferentes compara condições diferentes (outro jogo, um ajuste do usuário) e acusa queda que não existe.
+            // Com mais de uma partida avaliável, a queda precisa se repetir em pelo menos duas.
+            int cpuDrops = 0, cpuSess = 0, gpuDrops = 0, gpuSess = 0;
+            double cpuWorst = 1, cpuE = 0, cpuL = 0, gpuWorst = 1, gpuE = 0, gpuL = 0;
+            foreach (SessionData sd in sessions)
             {
-                int q = loaded.Count / 4;
-                for (int i = 0; i < q; i++) early.Add(Actual(loaded[i]));
-                for (int i = loaded.Count - q; i < loaded.Count; i++) late.Add(Actual(loaded[i]));
-                double me = Median(early), ml = Median(late);
-                if (me > 0 && ml / me < 0.88)
+                if (!GameSession(sd)) continue;
+                List<Sample> loaded = sd.S.FindAll(delegate(Sample s) { return !double.IsNaN(s.V[F.Cpu]) && s.V[F.Cpu] >= 85 && !double.IsNaN(Actual(s)); });
+                if (loaded.Count >= 40)
                 {
-                    Finding f = new Finding();
-                    f.Sev = Sev.Warn; f.Source = "Telemetria";
-                    f.Title = "A CPU perde desempenho sob carga prolongada (" + N0((1 - ml / me) * 100) + "% menos clock)";
-                    f.Evidence = "Com carga ≥85%, a frequência passou de ~" + N0(me) + " MHz no início para ~" + N0(ml) + " MHz no fim.";
-                    f.Advice = "Típico de throttling térmico ou de limite de energia (VRM/BIOS). Compare com a temperatura da CPU e reveja pasta térmica e refrigeração.";
-                    f.Weigh(Comp.Cooling, 0.30).Weigh(Comp.Cpu, 0.08).Weigh(Comp.Psu, 0.05).Weigh(Comp.Board, 0.08);
-                    d.Findings.Add(f);
+                    cpuSess++;
+                    int q = loaded.Count / 4;
+                    List<double> early = new List<double>(), late = new List<double>();
+                    for (int i = 0; i < q; i++) early.Add(Actual(loaded[i]));
+                    for (int i = loaded.Count - q; i < loaded.Count; i++) late.Add(Actual(loaded[i]));
+                    double me = Median(early), ml = Median(late);
+                    if (me > 0 && ml / me < 0.88) { cpuDrops++; if (ml / me < cpuWorst) { cpuWorst = ml / me; cpuE = me; cpuL = ml; } }
+                }
+                List<Sample> gl = sd.S.FindAll(delegate(Sample s) { return !double.IsNaN(s.V[F.Gpu]) && s.V[F.Gpu] >= 90 && !double.IsNaN(s.V[F.GpuClock]); });
+                if (gl.Count >= 40)
+                {
+                    gpuSess++;
+                    int q = gl.Count / 4;
+                    List<double> a = new List<double>(), b = new List<double>();
+                    for (int i = 0; i < q; i++) a.Add(gl[i].V[F.GpuClock]);
+                    for (int i = gl.Count - q; i < gl.Count; i++) b.Add(gl[i].V[F.GpuClock]);
+                    double ma = Median(a), mb = Median(b);
+                    if (ma > 0 && mb / ma < 0.90) { gpuDrops++; if (mb / ma < gpuWorst) { gpuWorst = mb / ma; gpuE = ma; gpuL = mb; } }
                 }
             }
-
-            // ---------- Throttling da GPU
-            List<Sample> gl = new List<Sample>();
-            foreach (Sample s in all) if (!double.IsNaN(s.V[F.Gpu]) && s.V[F.Gpu] >= 90 && !double.IsNaN(s.V[F.GpuClock])) gl.Add(s);
-            if (gl.Count >= 40)
+            if (cpuDrops > 0 && cpuDrops >= Math.Min(2, cpuSess))
             {
-                int q = gl.Count / 4;
-                List<double> a = new List<double>(), b = new List<double>();
-                for (int i = 0; i < q; i++) a.Add(gl[i].V[F.GpuClock]);
-                for (int i = gl.Count - q; i < gl.Count; i++) b.Add(gl[i].V[F.GpuClock]);
-                double ma = Median(a), mb = Median(b);
-                if (ma > 0 && mb / ma < 0.90)
-                {
-                    Finding f = new Finding();
-                    f.Sev = Sev.Warn; f.Source = "Telemetria";
-                    f.Title = "O clock da GPU cai com o tempo sob carga total (" + N0((1 - mb / ma) * 100) + "%)";
-                    f.Evidence = "Clock mediano de ~" + N0(ma) + " MHz no início para ~" + N0(mb) + " MHz no fim com GPU ≥90%.";
-                    f.Advice = "A GPU está reduzindo clock por temperatura ou limite de energia. Veja a temperatura e o consumo; confira cabos PCIe e a fonte.";
-                    f.Weigh(Comp.Cooling, 0.25).Weigh(Comp.Gpu, 0.10).Weigh(Comp.Psu, 0.10);
-                    d.Findings.Add(f);
-                }
+                Finding f = new Finding();
+                f.Sev = Sev.Warn; f.Source = "Telemetria";
+                f.Title = "A CPU perde desempenho sob carga prolongada (" + N0((1 - cpuWorst) * 100) + "% menos clock)";
+                f.Evidence = "Com carga ≥85%, a frequência passou de ~" + N0(cpuE) + " MHz no início para ~" + N0(cpuL) + " MHz no fim (em " + cpuDrops + " de " + cpuSess + " partida" + (cpuSess == 1 ? "" : "s") + ").";
+                f.Advice = "Típico de throttling térmico ou de limite de energia (VRM/BIOS). Compare com a temperatura da CPU e reveja pasta térmica e refrigeração.";
+                f.Weigh(Comp.Cooling, 0.30).Weigh(Comp.Cpu, 0.08).Weigh(Comp.Psu, 0.05).Weigh(Comp.Board, 0.08);
+                d.Findings.Add(f);
+            }
+            if (gpuDrops > 0 && gpuDrops >= Math.Min(2, gpuSess))
+            {
+                Finding f = new Finding();
+                f.Sev = Sev.Warn; f.Source = "Telemetria";
+                f.Title = "O clock da GPU cai com o tempo sob carga total (" + N0((1 - gpuWorst) * 100) + "%)";
+                f.Evidence = "Clock mediano de ~" + N0(gpuE) + " MHz no início para ~" + N0(gpuL) + " MHz no fim com GPU ≥90% (em " + gpuDrops + " de " + gpuSess + " partida" + (gpuSess == 1 ? "" : "s") + ").";
+                f.Advice = "A GPU está reduzindo clock por temperatura ou limite de energia. Veja a temperatura e o consumo; confira cabos PCIe e a fonte.";
+                f.Weigh(Comp.Cooling, 0.25).Weigh(Comp.Gpu, 0.10).Weigh(Comp.Psu, 0.10);
+                d.Findings.Add(f);
             }
 
             // ---------- Tensão de +12V
@@ -852,7 +886,7 @@ namespace DiagIT
 
             // ---------- Travamentos do próprio sistema (lacunas de amostragem)
             int stalls = 0; double worst = 0; DateTime worstAt = DateTime.MinValue;
-            foreach (Sample s in all)
+            foreach (Sample s in play)
             {
                 double g = s.V[F.Gap];
                 if (double.IsNaN(g)) continue;
@@ -872,7 +906,7 @@ namespace DiagIT
 
             // ---------- DPC / interrupções
             List<double> dpc = new List<double>();
-            foreach (Sample s in all) if (!double.IsNaN(s.V[F.Dpc]) && !double.IsNaN(s.V[F.Intr])) dpc.Add(s.V[F.Dpc] + s.V[F.Intr]);
+            foreach (Sample s in play) if (!double.IsNaN(s.V[F.Dpc]) && !double.IsNaN(s.V[F.Intr])) dpc.Add(s.V[F.Dpc] + s.V[F.Intr]);
             if (dpc.Count > 20)
             {
                 double[] arr = dpc.ToArray();
@@ -889,11 +923,6 @@ namespace DiagIT
                 }
             }
 
-            // RAM e disco: sÃ³ as partidas de jogo. Os testes do DiagIT enchem a memÃ³ria e leem o disco inteiro de propÃ³sito,
-            // e isso nÃ£o Ã© problema do PC (aparecia como "pouca RAM livre" e "picos de latÃªncia no disco" logo depois de rodar os testes).
-            List<Sample> play = new List<Sample>();
-            foreach (SessionData sd in sessions) if (GameSession(sd)) play.AddRange(sd.S);
-
             // ---------- RAM
             double[] avail = Stat.Vals(play, F.Avail), commit = Stat.Vals(play, F.Commit), hard = Stat.Vals(play, F.Hard);
             if (avail.Length > 0)
@@ -903,7 +932,8 @@ namespace DiagIT
                 if (lowFrac > 0.05 || cp > 92)
                 {
                     Finding f = new Finding();
-                    f.Sev = Sev.Warn; f.Source = "Telemetria";
+                    // com a memória virtual automática o Windows aumenta o arquivo sozinho quando precisa: commit alto, com RAM livre, só informa
+                    f.Sev = lowFrac > 0.05 || !(d.Hw != null && d.Hw.PagefileAuto) ? Sev.Warn : Sev.Info; f.Source = "Telemetria";
                     f.Title = cp > 92 ? "Memória virtual (commit) quase no limite durante o jogo — p95 " + N0(cp) + "%" : "Pouca memória RAM livre durante o jogo (mínimo " + N0(mn) + " MB livres)";
                     f.Evidence = N0(lowFrac * 100) + "% do tempo com menos de 1 GB livre; memória comprometida p95 = " + N0(cp) + "%.";
                     f.Advice = "Não é defeito de hardware, e sim falta de capacidade: aumente o arquivo de paginação (ex.: 16384–32768 MB em SSD), feche programas em segundo plano ou adicione RAM.";
@@ -930,7 +960,17 @@ namespace DiagIT
                 if (mx >= 1000 || p99 >= 100)
                 {
                     Finding f = new Finding();
-                    f.Sev = mx >= 2000 ? Sev.Crit : Sev.Warn; f.Source = "Telemetria";
+                    // um pico isolado (carregar o jogo, um HD secundário acordando, o Windows Update) não é defeito: só vira alerta se for constante
+                    // (p99 alto) ou se se repetir em pelo menos duas partidas
+                    int spikeSessions = 0;
+                    foreach (SessionData sd in sessions)
+                    {
+                        if (!GameSession(sd)) continue;
+                        double[] sl = Stat.Vals(sd.S, F.DiskLat);
+                        if (sl.Length > 20 && Stat.Max(sl) >= 1000) spikeSessions++;
+                    }
+                    bool sustained = p99 >= 100;
+                    f.Sev = sustained ? (mx >= 2000 ? Sev.Crit : Sev.Warn) : spikeSessions >= 2 ? Sev.Warn : Sev.Info; f.Source = "Telemetria";
                     f.Title = "Disco com picos de latência — máx " + N0(mx) + " ms, p99 " + N0(p99) + " ms";
                     f.Evidence = "Um SSD saudável responde em poucos ms. Picos acima de 100–1000 ms congelam o jogo enquanto ele lê arquivos.";
                     f.Advice = "Verifique SMART/saúde do disco, espaço livre (SSD cheio fica lento), cabos SATA e firmware. Se for HDD, mova o jogo para SSD.";
@@ -938,7 +978,7 @@ namespace DiagIT
                     d.Findings.Add(f);
                 }
             }
-            double[] dt = Stat.Vals(all, F.DiskTemp);
+            double[] dt = Stat.Vals(play, F.DiskTemp);
             if (dt.Length > 0 && Stat.Max(dt) >= 70)
             {
                 Finding f = new Finding();
@@ -951,7 +991,7 @@ namespace DiagIT
             }
 
             // ---------- VRAM
-            double[] vram = Stat.Vals(all, F.GpuMemPct);
+            double[] vram = Stat.Vals(play, F.GpuMemPct);
             if (vram.Length > 20 && Stat.FracAbove(vram, 95) > 0.10)
             {
                 Finding f = new Finding();
@@ -964,7 +1004,7 @@ namespace DiagIT
             }
 
             // ---------- Gargalo de CPU (informativo)
-            double[] gpuU = Stat.Vals(all, F.Gpu), core = Stat.Vals(all, F.CoreMax);
+            double[] gpuU = Stat.Vals(play, F.Gpu), core = Stat.Vals(play, F.CoreMax);
             if (gpuU.Length > 30 && core.Length > 30 && Stat.Avg(gpuU) < 75 && Stat.Percentile(core, 0.9) >= 92)
             {
                 Finding f = new Finding();
@@ -1059,6 +1099,7 @@ namespace DiagIT
             for (int i = 0; i < prod.Length; i++) prod[i] = 1;
             foreach (Finding f in d.Findings)
             {
+                if (f.Sev == Sev.Info && !f.Confirmed) continue;   // informação não pontua: várias pistas fracas não somam um alarme
                 foreach (KeyValuePair<Comp, double> kv in f.W)
                     prod[(int)kv.Key] *= 1 - Math.Max(0, Math.Min(0.92, kv.Value));
             }

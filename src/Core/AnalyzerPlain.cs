@@ -136,7 +136,10 @@ namespace DiagIT
             if (ok >= 4 && untested.Count == 0)
             {
                 title = "Seu PC está saudável";
-                sub = "As peças passaram nos testes e não há sinais de problema nos registros do Windows.";
+                int routine = d.Findings.FindAll(delegate(Finding f) { return f.Sev == Sev.Info && !f.Confirmed; }).Count;
+                sub = routine == 0
+                    ? "As peças passaram nos testes e não há sinais de problema nos registros do Windows."
+                    : "As peças passaram nos testes e nada pede ação. Há " + routine + (routine == 1 ? " aviso de rotina" : " avisos de rotina") + " em Resultados, só para você saber.";
                 return;
             }
             if (ok >= 4)
@@ -209,7 +212,7 @@ namespace DiagIT
         {
             if (f.Confirmed) return "COMPROVADO";
             if (f.Sev == Sev.Ok) return "OK";
-            if (f.Sev == Sev.Info && f.W.Count == 0) return "INFORMAÇÃO";
+            if (f.Sev == Sev.Info) return "INFORMAÇÃO";   // informação nunca é "indício", mesmo com peso interno
             return "INDÍCIO";
         }
     }

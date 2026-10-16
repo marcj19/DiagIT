@@ -154,27 +154,37 @@ namespace DiagIT
             if ((t.Kind == TestKind.Cpu || t.Kind == TestKind.Combined) && !double.IsNaN(ce) && !double.IsNaN(cl) && ce > 0 && cl / ce < 0.88 && !double.IsNaN(cpuT) && cpuT >= 85)
                 d.Findings.Add(New(Sev.Warn, "CPU reduz a velocidade por temperatura sob carga" + where,
                     "Clock médio caiu de " + N0(ce) + " MHz para " + N0(cl) + " MHz enquanto a temperatura chegou a " + N0(cpuT) + " °C.",
-                    "Isso derruba o FPS em jogos pesados. Melhore a refrigeração da CPU (pasta térmica, cooler, fluxo de ar).", true, Comp.Cooling));
-            else if (!double.IsNaN(cpuT) && cpuT >= 90 && (t.Kind == TestKind.Cpu || t.Kind == TestKind.Combined))
+                    "Isso derruba o FPS em jogos pesados. Melhore a refrigeração da CPU (pasta térmica, cooler, fluxo de ar).", false, Comp.Cooling).Weigh(Comp.Cooling, 0.35));
+            else if (!double.IsNaN(cpuT) && cpuT >= 96 && (t.Kind == TestKind.Cpu || t.Kind == TestKind.Combined))
+                // Ryzen 7000/9000 trabalham a ~95 °C por projeto e Intel recentes chegam a 100 °C: abaixo disso não é defeito. Superaquecimento de verdade
+                // (o teste abortou por temperatura ou o PC caiu) continua comprovado em outro ponto.
                 d.Findings.Add(New(Sev.Warn, "CPU chegou a " + N0(cpuT) + " °C" + where, "Valor medido sob carga máxima controlada.",
-                    "Está no limite térmico do processador; melhore a refrigeração.", true, Comp.Cooling));
+                    "Está no limite térmico do processador; melhore a refrigeração.", false, Comp.Cooling).Weigh(Comp.Cooling, 0.35));
 
-            if ((t.Kind == TestKind.Gpu || t.Kind == TestKind.Combined) && ((!double.IsNaN(hot) && hot >= 105) || (!double.IsNaN(gpuT) && gpuT >= 92)))
+            // GPU: hotspot de placas Radeon e GeForce sobe até ~110 °C por projeto
+            if ((t.Kind == TestKind.Gpu || t.Kind == TestKind.Combined) && ((!double.IsNaN(hot) && hot >= 110) || (!double.IsNaN(gpuT) && gpuT >= 95)))
                 d.Findings.Add(New(Sev.Warn, "GPU muito quente sob carga" + where,
-                    "Núcleo máx " + N0(gpuT) + " °C, hotspot máx " + N0(hot) + " °C.", "Limpe a placa, ajuste a curva das ventoinhas e melhore o fluxo de ar.", true, Comp.Cooling));
+                    "Núcleo máx " + N0(gpuT) + " °C, hotspot máx " + N0(hot) + " °C.", "Limpe a placa, ajuste a curva das ventoinhas e melhore o fluxo de ar.", false, Comp.Cooling).Weigh(Comp.Cooling, 0.35));
 
+            // sensor de ventoinha sem suporte devolve sempre 0 RPM: por isso é indício (não comprovado) e só com a placa realmente quente
             double gpuFanMax = t.Get("t_gpu_fan_max");
-            if ((t.Kind == TestKind.Gpu || t.Kind == TestKind.Combined) && !double.IsNaN(hot) && hot >= 85 && !double.IsNaN(gpuFanMax) && gpuFanMax < 100)
-                d.Findings.Add(New(Sev.Crit, "Ventoinhas da GPU NÃO giraram com a placa quente" + where,
-                    "Hotspot chegou a " + N0(hot) + " °C e a ventoinha ficou em " + N0(gpuFanMax) + " RPM.",
-                    "Ventoinha travada/defeituosa ou curva de ventoinha zerada no {painel_video}. Verifique visualmente e restaure a curva padrão.", true, Comp.Cooling));
+            if ((t.Kind == TestKind.Gpu || t.Kind == TestKind.Combined) && !double.IsNaN(hot) && hot >= 95 && !double.IsNaN(gpuT) && gpuT >= 80 && !double.IsNaN(gpuFanMax) && gpuFanMax < 100)
+                d.Findings.Add(New(Sev.Warn, "Ventoinhas da GPU não apareceram girando com a placa quente" + where,
+                    "Hotspot chegou a " + N0(hot) + " °C e a leitura da ventoinha ficou em " + N0(gpuFanMax) + " RPM.",
+                    "Pode ser ventoinha travada/defeituosa, curva zerada no {painel_video}, ou apenas um sensor de ventoinha que o app não consegue ler nesta placa. Olhe a placa durante um jogo: se as ventoinhas giram, ignore.", false, Comp.Cooling)
+                    .Weigh(Comp.Cooling, 0.35).Weigh(Comp.Gpu, 0.10));
 
+            // bomba de water cooler e hubs não usam o conector CPU_FAN: só importa se a CPU esquentou de verdade
             double cpuFanMin = t.Get("t_cpu_fan_min");
             if ((t.Kind == TestKind.Cpu || t.Kind == TestKind.Combined) && !double.IsNaN(cpuFanMin) && cpuFanMin < 150 && !double.IsNaN(cpuT) && cpuT >= 75)
-                d.Findings.Add(New(Sev.Warn, "Ventoinha da CPU parada ou desconectada durante a carga" + where,
+            {
+                bool hotCpu = cpuT >= 90;
+                Finding ff = New(hotCpu ? Sev.Warn : Sev.Info, "Ventoinha da CPU parada ou desconectada durante a carga" + where,
                     "Leitura mínima de " + N0(cpuFanMin) + " RPM no conector CPU_FAN com a CPU a " + N0(cpuT) + " °C.",
-                    "Confirme se o cooler está ligado no conector CPU_FAN e girando. (Se o cooler estiver em outro conector, este alerta pode ser ignorado.)", false, Comp.Cooling)
-                    .Weigh(Comp.Cooling, 0.3));
+                    "Confirme se o cooler está ligado no conector CPU_FAN e girando. " + (hotCpu ? "" : "Com water cooler ou cooler em outro conector, essa leitura é normal e a temperatura estava boa: pode ignorar."), false, Comp.Cooling);
+                if (hotCpu) ff.Weigh(Comp.Cooling, 0.3);
+                d.Findings.Add(ff);
+            }
 
             double v12 = t.Get("t_v12_min");
             if (!double.IsNaN(v12) && (t.Kind == TestKind.Combined || t.Kind == TestKind.Gpu || t.Kind == TestKind.Cpu))
@@ -190,8 +200,10 @@ namespace DiagIT
 
             double lanes = t.Get("t_pcie_lanes_max");
             if (d.Hw != null && d.Hw.PcieMaxLanes > 0 && !double.IsNaN(lanes) && lanes > 0 && lanes < d.Hw.PcieMaxLanes)
-                d.Findings.Add(New(Sev.Crit, "GPU conectada com menos pistas PCIe (x" + N0(lanes) + " de x" + d.Hw.PcieMaxLanes + ")" + where, "Medido pela própria GPU sob carga.",
-                    "Desligue o PC, retire e reencaixe a placa de vídeo, limpe o slot e não use riser. Persistindo, o slot da placa-mãe está com defeito.", true, Comp.Board));
+                // compara com o máximo da PLACA DE VÍDEO, não com o do slot: em slots ligados em x4 (segundo slot, algumas placas-mãe) isso é normal, por isso é indício
+                d.Findings.Add(New(Sev.Warn, "GPU conectada com menos pistas PCIe (x" + N0(lanes) + " de x" + d.Hw.PcieMaxLanes + ")" + where, "Medido pela própria GPU sob carga.",
+                    "Veja se a placa está no slot principal. Se estiver, desligue o PC, reencaixe a placa de vídeo, limpe o slot e não use riser. Persistindo, o slot da placa-mãe pode estar com defeito. (Em slots secundários ligados em x4, isso é normal.)", false, Comp.Board)
+                    .Weigh(Comp.Board, 0.45));
 
             double up = t.Get("pcie_up_gbs");
             if (!double.IsNaN(up) && t.Kind == TestKind.Gpu)
@@ -459,7 +471,7 @@ namespace DiagIT
                     if (f.Confirmed && f.Primary == i && conf == null) conf = f;
                     if (f.Sev == Sev.Ok && f.Primary == i && ok == null) ok = f;
                     double w;
-                    if (!f.Confirmed && f.Sev != Sev.Ok && f.W.TryGetValue(c, out w) && w > topW) { topW = w; top = f; }
+                    if (!f.Confirmed && f.Sev != Sev.Ok && f.Sev != Sev.Info && f.W.TryGetValue(c, out w) && w > topW) { topW = w; top = f; }
                 }
                 // refrigeração "OK" quando os testes de carga passaram sem temperatura crítica
                 if (c == Comp.Cooling && ok == null)
@@ -488,7 +500,7 @@ namespace DiagIT
                     if (f.Last == DateTime.MinValue) undated = true;
                     else if (f.Last > lastEv) lastEv = f.Last;
                 }
-                bool suspicious = d.Score[i] >= 20 && top != null;
+                bool suspicious = d.Score[i] >= 20 && top != null && topW >= 0.15;   // várias pistas fracas não bastam: precisa de pelo menos uma evidência de peso
                 // o teste aprovado veio depois de todos os indícios datados: sob carga controlada o problema não se reproduziu
                 bool clearedByTest = ok != null && s.Passed != null && suspicious && !undated && s.Passed.Start > lastEv;
                 s.Retest = suspicious && s.Passed != null && lastEv > s.Passed.Start;
@@ -532,7 +544,7 @@ namespace DiagIT
             // Telas azuis/travamentos que nenhum teste de hardware reproduziu continuam sem explicação: com as peças
             // aprovadas, a causa mais provável passa a ser driver, BIOS ou ajustes (EXPO/PBO/undervolt), que o DiagIT não testa.
             CompState sw = d.States[(int)Comp.Software];
-            Finding unexplained = cleared.Find(delegate(Finding f) { return f.BugCode >= 0; }) ?? (cleared.Count > 0 ? cleared[0] : null);
+            Finding unexplained = cleared.Find(delegate(Finding f) { return f.BugCode >= 0; }) ?? cleared.Find(delegate(Finding f) { return f.Symptom; });   // só sintoma real passa a suspeita para drivers; indício fraco que o teste descartou fica descartado
             if (unexplained != null && sw.Status == CompStatus.Untested)
             {
                 sw.Status = CompStatus.Suspect;

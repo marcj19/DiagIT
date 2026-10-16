@@ -422,14 +422,21 @@ namespace DiagIT
                 {
                     EnsureEvents(false);
                     List<SessionData> sds = LoadData(one);
-                    Diagnosis d = Analyzer.Run(sds, events, disks, 30, TestStore.ListAll(), hw);
-                    int crit = 0, warn = 0;
-                    foreach (Finding f in d.Findings) { if (f.Sev == Sev.Crit) crit++; else if (f.Sev == Sev.Warn) warn++; }
-                    string msg = crit + warn == 0
-                        ? "Nenhum problema encontrado nesta partida."
-                        : crit + " alerta(s) crítico(s) e " + warn + " de atenção. " + d.Verdict;
-                    Balloon("Partida encerrada: " + s.Game, msg + (s.Note.Length > 0 ? "\n" + s.Note : ""),
-                        crit + warn == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning);
+                    Diagnosis d = Analyzer.Run(sds, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load());
+                    // só o que é novo desta partida: telemetria da própria partida e eventos do Windows ocorridos durante ela.
+                    // Antes o balão contava os alertas de 30 dias e repetia o mesmo alarme depois de cada jogo.
+                    List<string> fresh = new List<string>();
+                    foreach (Finding f in d.Findings)
+                    {
+                        if (f.Sev != Sev.Warn && f.Sev != Sev.Crit) continue;
+                        if (f.Source == "Telemetria" || (f.Last != DateTime.MinValue && f.Last >= s.Start.AddMinutes(-2))) fresh.Add(f.Plain);
+                    }
+                    string fps = !double.IsNaN(s.FpsAvg) && s.Frames > 600 ? " FPS médio " + s.FpsAvg.ToString("0") + (!double.IsNaN(s.FpsLow) ? ", 1% low " + s.FpsLow.ToString("0") : "") + "." : "";
+                    string msg = fresh.Count == 0
+                        ? "Partida sem problemas." + fps
+                        : fresh.Count + (fresh.Count == 1 ? " ponto de atenção nesta partida: " : " pontos de atenção nesta partida: ") + string.Join("; ", fresh.GetRange(0, Math.Min(2, fresh.Count)).ToArray()) + ". Veja os Resultados.";
+                    Balloon("Partida encerrada: " + s.Game, msg + (s.Note.Length > 0 && s.Note != "Gravação manual encerrada" ? "\n" + s.Note : ""),
+                        fresh.Count == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning);
                 }
                 catch (Exception e) { Log.Write("Análise pós-sessão: " + e.Message); }
             });

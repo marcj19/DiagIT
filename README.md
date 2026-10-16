@@ -26,7 +26,21 @@ com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver de
    ajustes reversíveis de Windows, um de cada vez (sobreposições de vídeo/MPO, HAGS, tempo do TDR, gravação em segundo plano, turbo do processador), cada um com
    botão **Desfazer** e acompanhado separadamente. Há também guias para processador instável e processador quente.
    Um reset de vídeo registrado pelo Windows (LiveKernelEvent) **sem nada visível na mesma hora** conta como informação; só vira "voltou" com sintoma
-   (programa que fechou, TDR, tela azul, desligamento).
+   (TDR, tela azul, desligamento ou programa que caiu dentro do driver de vídeo). Um programa que fecha **uma vez** com erro no módulo dele mesmo pode ser só
+   um defeito do programa: só passa a contar se se repetir.
+
+### Verde com prova, sem alarme à toa
+
+O DiagIT mostra "Seu PC está saudável" quando as peças passaram nos testes e nada pede ação, mesmo havendo avisos de rotina, que continuam visíveis como **Informação**.
+Regras que mantêm o verde honesto (e o alarme verdadeiro quando há problema real):
+- **Informação nunca pontua** nem vira "indício"; uma peça só fica em "Precisa verificar" com pelo menos uma evidência de peso, e só um sintoma real (tela azul, TDR, queda no driver, desligamento) passa a suspeita para "Drivers e Windows" quando o teste da peça não reproduz o problema.
+- **Os testes do próprio DiagIT não julgam o dia a dia**: calor, VRAM cheia, CPU a 100%, RAM travada e disco lido inteiro são esperados num teste. Temperatura, ventoinha, VRAM, congelamentos e gargalo usam só partidas de jogo; o clock é comparado partida por partida e precisa se repetir.
+- **Limites por projeto do chip**: processadores atuais trabalham a ~95 °C e placas de vídeo chegam a ~110 °C no hotspot; abaixo disso não é defeito. Superaquecimento comprovado continua sendo o teste abortado por temperatura. Ventoinha lida como 0 RPM (sensor sem suporte, water cooler) e pistas PCIe reduzidas são indício, não "comprovado".
+- **Depois de uma troca de driver**, o que aconteceu antes dela é histórico do driver antigo e não entra na conta atual.
+- **Picos isolados** de disco, memória virtual instantânea (com paginação automática), dispositivos USB/HID/Bluetooth sem driver e a falta de sensor de temperatura são informação.
+- **Programas que não são jogo** (TeamSpeak, Discord, navegadores...) nunca são tratados como jogo.
+- O aviso no fim de cada partida mostra só o que é novo **dessa** partida (e o FPS), não os alertas dos últimos 30 dias.
+- "Resolveu?" conta antes e depois do mesmo jeito (só com sintoma) e um achado resolvido vira histórico.
    Para defeitos que aparecem de vez em quando, o **check-up à noite** (3 h ou 8 h) testa por horas e impede o PC de dormir.
 7. **Avançado**: *Ao vivo* (gráficos em tempo real), *Hardware* (tudo que foi lido do PC) e *Partidas gravadas*. Testes individuais e mais longos ficam em *Verificar peças*.
 
