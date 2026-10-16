@@ -396,6 +396,21 @@ namespace DiagIT
                 int cpuMax = Tweaks.CpuMaxPercent();
                 Check(tweaksOk && cpuMax >= 1 && cpuMax <= 100, "todos os ajustes sabem dizer se estão ligados (estado máximo do processador: " + cpuMax + "%)");
 
+                bool readsOk = true;
+                try
+                {
+                    string pg, pn; Tweaks.ActivePlan(out pg, out pn);
+                    int tf; long tb; Tweaks.TempInfo(out tf, out tb);
+                    List<string> su = Tweaks.StartupPrograms();
+                    Say("  plano de energia: " + pn + "; programas ao iniciar: " + su.Count + "; temporários > 3 dias: " + tf + " arquivos; modo de jogo: " + Tweaks.GameMode());
+                    readsOk = tf >= 0 && tb >= 0 && su != null;
+                }
+                catch (Exception ex) { readsOk = false; Say("  leitura falhou: " + ex.Message); }
+                Check(readsOk, "plano de energia, programas de inicialização, temporários e modo de jogo são lidos sem alterar nada");
+                bool groupsOk = false, perfNoTrack = true;
+                foreach (Tweak tw in Tweaks.All) { if (tw.Group == "desempenho") { groupsOk = true; if (tw.Id == "energia" && tw.Track) perfNoTrack = false; } }
+                Check(groupsOk && perfNoTrack, "ajustes de desempenho existem e o plano de energia não entra no \"Resolveu?\"");
+
                 Say("== 4e. Testes do próprio DiagIT não viram 'pouca RAM' nem 'picos de disco'");
                 Func<string, SessionData> stress = delegate(string name)
                 {

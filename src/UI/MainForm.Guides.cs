@@ -183,14 +183,7 @@ namespace DiagIT
                 bool on = target.EndsWith("-on", StringComparison.Ordinal);
                 string tid = target.Substring(6, target.Length - 6 - (on ? 3 : 4));
                 Tweak tw = Tweaks.ById(tid);
-                if (tw == null || !NeedAdmin()) return;
-                if (on && tw.IsOn()) { MessageBox.Show(this, "Este ajuste já está ligado.\n\n" + tw.Name, "Passo a passo", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-                if (!on && !tw.IsOn()) { MessageBox.Show(this, "Este ajuste já está no padrão do Windows. Nada a desfazer.", "Passo a passo", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-                if (on && MessageBox.Show(this, tw.What + "\n\nÉ um teste reversível: o botão Desfazer deste passo volta tudo ao padrão." + (tw.Reboot ? "\n\nO Windows só aplica depois de reiniciar." : "") +
-                    "\n\nAplicar agora?", "Experimento de Windows", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-                bool ok = Tweaks.Set(tid, on, out msg);
-                MessageBox.Show(this, msg, "Passo a passo", MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
-                if (ok) StartAnalyzeClick(false);
+                if (tw != null) RunTweak(tid, on, tw.Track);
                 return;
             }
             switch (target)

@@ -103,7 +103,7 @@ namespace DiagIT
             p.Controls.Add(fixConsole);
             p.Controls.Add(Header("Resolver", ""));
 
-            int y = 0;
+            int y = BuildTweakCards(scroll, 0);
             int pageInit, pageMax;
             Fixes.RecommendedPagefile(out pageInit, out pageMax);
 
@@ -371,6 +371,7 @@ namespace DiagIT
 
         void RefreshFixes()
         {
+            RefreshTweakStates();
             ThreadPool.QueueUserWorkItem(delegate
             {
                 string page = Fixes.PagefileStatus();

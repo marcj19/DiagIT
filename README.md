@@ -18,7 +18,10 @@ com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver de
 5. **Resultados**: cada peça como **Saudável**, **Precisa verificar**, **Com defeito** ou **Não verificado** (sempre com ícone, cor e texto),
    e cada achado como **Comprovado**, **Indício** ou **Informação**, com *O que fazer*.
    Um indício anterior ao teste aprovado não deixa a peça suspeita; se o problema voltar depois da aprovação, o DiagIT pede para repetir o teste.
-6. **Resolver**: aplica as soluções com um clique (sempre pedindo confirmação).
+6. **Resolver**: aplica as soluções com um clique (sempre pedindo confirmação). No topo ficam os **ajustes de Windows com Aplicar e Desfazer à vista**:
+   plano de energia Alto desempenho, gravação de jogo em segundo plano (Game DVR), lista de programas que iniciam com o Windows, limpeza de arquivos
+   temporários (só com mais de 3 dias, pulando o que está em uso) e Modo de Jogo; mais os testes de estabilidade (MPO, HAGS, TDR, turbo do processador),
+   um de cada vez e acompanhados pelo "Resolveu?". Tudo é reversível, exceto a limpeza de temporários.
    Os achados principais têm **Resolver passo a passo** (guias dentro do app, ex.: reinstalar o driver de vídeo do jeito certo, voltar a BIOS
    para o padrão) e **Já fiz isso**. Toda correção entra em **Resolveu?**, no topo do Início: o DiagIT compara antes e depois e diz se **resolveu**
    (nenhuma ocorrência por pelo menos 7 dias de uso, com uma barra mostrando o progresso), se está **acompanhando**, ou se **o problema voltou**.

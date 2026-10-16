@@ -1,4 +1,4 @@
-﻿DiagIT v1.5.2 - check-up do seu PC, com testes comprovados
+﻿DiagIT v1.6.0 - check-up do seu PC, com testes comprovados
 ================================================================
 
 COMO USAR
@@ -19,6 +19,8 @@ COMO USAR
    Vai vender ou mostrar o PC a alguem? Em Resultados, "Atestado de saude" gera uma pagina so com
    o que foi medido (com data) e o que NAO foi verificado.
    Quer ver os codigos e a fonte de cada achado? Configuracoes > Modo de exibicao > Tecnico.
+   Quer deixar o Windows mais rapido? Em "Resolver" (no topo) ha ajustes com os botoes Aplicar e Desfazer:
+   plano de energia, gravacao de jogo em segundo plano, programas que iniciam com o Windows, arquivos temporarios.
 7. Vai levar a um tecnico? Em Resultados, "Relatorio" abre um relatorio para imprimir e
    "Pacote para o tecnico" gera um .zip com o relatorio e os dados brutos (sem arquivos pessoais).
 
