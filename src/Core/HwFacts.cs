@@ -144,7 +144,7 @@ namespace DiagIT
             foreach (VolumeInfo v in h.Volumes)
             {
                 double pct = v.SizeGB > 0 ? 100 * v.FreeGB / v.SizeGB : 0;
-                bool low = pct < 10 || v.FreeGB < 15;
+                bool low = pct < 10 || (v.FreeGB < 15 && v.SizeGB >= 64);   // partições pequenas do fabricante (recuperação, drivers) vêm quase cheias
                 f.Add(new Fact("Volumes", v.Letter + ":" + (v.Label.Length > 0 ? " (" + v.Label + ")" : "") + (v.Disk >= 0 ? " — disco " + v.Disk : ""),
                     v.FreeGB.ToString("0", Pt) + " GB livres de " + v.SizeGB.ToString("0", Pt) + " GB (" + pct.ToString("0") + "%), " + v.FileSystem + ", " + v.Health,
                     v.Health != "saudável" ? 2 : low ? 1 : 0, low ? "Pouco espaço livre deixa o SSD lento e pode impedir atualizações e o arquivo de paginação de crescer." : null));
@@ -258,10 +258,13 @@ namespace DiagIT
             else if (hub != null && hub.Nvml != null) { h.PcieLanes = hub.Nvml.PcieLanes; h.PcieGenLevel = hub.Nvml.PcieGen; }
             if (h.PcieLanes > 0)
             {
+                // em repouso a placa pode baixar o link para economizar energia, e no notebook quem define as pistas é o fabricante
                 bool reduced = h.PcieMaxLanes > 0 && h.PcieLanes < h.PcieMaxLanes;
+                bool lapLink = reduced && h.IsLaptop;
                 string gen = h.PcieGenLevel >= 0 && hub != null && hub.Adl != null ? "PCIe " + (h.PcieGenLevel + 1) + ".0 " : h.PcieGenLevel > 0 ? "PCIe " + h.PcieGenLevel + ".0 " : "";
-                f.Add(new Fact("Placa de vídeo", "Link PCIe", gen + "x" + h.PcieLanes + (h.PcieMaxLanes > 0 ? " (a placa suporta até x" + h.PcieMaxLanes + ")" : ""), reduced ? 2 : 0,
-                    reduced ? "A GPU está usando menos pistas do que suporta: slot sujo, placa mal encaixada, riser defeituoso ou slot da placa-mãe com problema." : null));
+                f.Add(new Fact("Placa de vídeo", "Link PCIe", gen + "x" + h.PcieLanes + (h.PcieMaxLanes > 0 ? " (a placa suporta até x" + h.PcieMaxLanes + ")" : ""), lapLink ? 0 : reduced ? 1 : 0,
+                    lapLink ? "Normal em notebook: o fabricante liga a placa de vídeo com o número de pistas que escolheu, e a placa reduz o link quando está em repouso para poupar bateria."
+                    : reduced ? "Medido agora, com a placa possivelmente em repouso. Se o teste de placa de vídeo também medir menos pistas sob carga, pode ser slot sujo, placa mal encaixada, riser defeituoso ou slot da placa-mãe com problema." : null));
             }
 
             // ---------- Discos (saúde lida do próprio disco)
@@ -387,6 +390,7 @@ namespace DiagIT
             if (IsBenignDevice(d))
                 return "É a conexão USB do water cooler Corsair. O cooler funciona sem ela, mas para monitorar a bomba e a temperatura do líquido instale o Corsair iCUE.";
             if (d.Code == 28 || d.Code == 1 || d.Code == 18) return "Instale o driver do fabricante (site do fabricante da placa-mãe ou do próprio dispositivo) ou procure em Windows Update > Atualizações opcionais.";
+            if (d.Code == 22) return "Desativado no Gerenciador de Dispositivos, por você ou por um programa (VPN, por exemplo). Se não usa, pode ignorar.";
             if (d.Code == 43) return "O dispositivo reportou falha: reconecte-o, troque de porta USB e reinstale o driver. Se repetir, o dispositivo pode estar com defeito.";
             return "Abra o Gerenciador de Dispositivos para ver os detalhes e reinstalar o driver.";
         }

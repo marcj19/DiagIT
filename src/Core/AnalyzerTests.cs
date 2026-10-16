@@ -199,7 +199,7 @@ namespace DiagIT
             }
 
             double lanes = t.Get("t_pcie_lanes_max");
-            if (d.Hw != null && d.Hw.PcieMaxLanes > 0 && !double.IsNaN(lanes) && lanes > 0 && lanes < d.Hw.PcieMaxLanes)
+            if (d.Hw != null && !d.Hw.IsLaptop && d.Hw.PcieMaxLanes > 0 && !double.IsNaN(lanes) && lanes > 0 && lanes < d.Hw.PcieMaxLanes)
                 // compara com o máximo da PLACA DE VÍDEO, não com o do slot: em slots ligados em x4 (segundo slot, algumas placas-mãe) isso é normal, por isso é indício
                 d.Findings.Add(New(Sev.Warn, "GPU conectada com menos pistas PCIe (x" + N0(lanes) + " de x" + d.Hw.PcieMaxLanes + ")" + where, "Medido pela própria GPU sob carga.",
                     "Veja se a placa está no slot principal. Se estiver, desligue o PC, reencaixe a placa de vídeo, limpe o slot e não use riser. Persistindo, o slot da placa-mãe pode estar com defeito. (Em slots secundários ligados em x4, isso é normal.)", false, Comp.Board)
@@ -342,14 +342,16 @@ namespace DiagIT
                 d.Findings.Add(f);
             }
 
-            if (h.PcieLanes > 0 && h.PcieMaxLanes > 0 && h.PcieLanes < h.PcieMaxLanes)
+            // leitura de agora, com a placa possivelmente em repouso (ela pode baixar o link para economizar): é indício; a prova vem do teste de placa de vídeo, sob carga.
+            // Em notebook o número de pistas é escolha do fabricante.
+            if (!h.IsLaptop && h.PcieLanes > 0 && h.PcieMaxLanes > 0 && h.PcieLanes < h.PcieMaxLanes)
             {
                 Finding f = new Finding();
-                f.Sev = Sev.Crit; f.Source = "Medição da placa de vídeo"; f.Confirmed = true; f.Primary = (int)Comp.Board;
+                f.Sev = Sev.Warn; f.Source = "Medição da placa de vídeo"; f.Primary = (int)Comp.Board;
                 f.Title = "Placa de vídeo usando x" + h.PcieLanes + " de x" + h.PcieMaxLanes + " pistas PCIe";
-                f.Evidence = "O link negociado entre a GPU e o slot está reduzido.";
-                f.Advice = "Reencaixe a placa de vídeo, limpe o slot, evite risers. Persistindo, o slot está com defeito.";
-                f.Weigh(Comp.Board, 0.6).Weigh(Comp.Gpu, 0.2);
+                f.Evidence = "O link entre a placa de vídeo e o slot estava reduzido no momento da leitura.";
+                f.Advice = "Rode o teste de placa de vídeo: ele mede as pistas com a placa em carga. Se continuar reduzido, reencaixe a placa, limpe o slot e evite risers. (Em slots secundários ligados em x4, isso é normal.)";
+                f.Weigh(Comp.Board, 0.3).Weigh(Comp.Gpu, 0.1);
                 d.Findings.Add(f);
             }
             // ---------- dispositivos sem driver / com falha

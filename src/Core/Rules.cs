@@ -278,10 +278,14 @@ namespace DiagIT
         }
 
         /// <summary>Plataforma do processador (soquete, memória, PCIe, upgrades que encaixam), ou null se o modelo não é conhecido.</summary>
+        /// <summary>Processador de notebook: i5-13420H, i7-1165G7, Ryzen 7 7840HS, Ryzen 5 7535U, Core Ultra 7 155H. (Os desktop com G, como o 5600G, ficam de fora.)</summary>
+        static readonly System.Text.RegularExpressions.Regex MobileCpu = new System.Text.RegularExpressions.Regex(@"\d{3,5}(H|HX|HS|HK|U|P|Y|G\d)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
         public static CompatFamily CompatFor(string cpuName)
         {
             Ensure();
             if (string.IsNullOrEmpty(cpuName)) return null;
+            if (MobileCpu.IsMatch(cpuName)) return null;
             foreach (CompatFamily f in Compat) if (Matches(cpuName, f.Detect)) return f;
             return null;
         }

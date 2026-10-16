@@ -704,6 +704,36 @@ namespace DiagIT
                 SensorHub.Map(msiSens, sm);
                 Check(sm[F.BoardTemp] == 58, "temperatura da placa-mãe não usa o sensor \"CPU\" do chip da placa (" + sm[F.BoardTemp] + " °C)");
                 Check(sm[F.CpuFan] == 0 && SensorHub.OtherFanRpm == 2139, "CPU_FAN em 0 RPM com outra ventoinha girando é reconhecido");
+
+                Say("== 16. Notebook (i5-13420H + RTX 4050 Laptop, pacote real de um testador)");
+                // o Windows reenviou 11 relatórios antigos 31 vezes cada: 340 eventos em 3 dias, nenhum travamento novo
+                Func<DateTime, string, string, string, WinEvent> werRetry = delegate(DateTime t, string code, string dump, string id)
+                {
+                    WinEvent e = new WinEvent(); e.Provider = "Windows Error Reporting"; e.Id = 1001; e.Time = t;
+                    string[] p = new string[23]; for (int i = 0; i < p.Length; i++) p[i] = "";
+                    p[2] = "LiveKernelEvent"; p[5] = code; p[15] = @"\\?\C:\WINDOWS\LiveKernelReports\WATCHDOG\" + dump; p[19] = id; p[20] = "2049";
+                    e.P = p; return e;
+                };
+                List<WinEvent> retries = new List<WinEvent>();
+                for (int k = 0; k < 31; k++)
+                {
+                    retries.Add(werRetry(DateTime.Now.AddHours(-k * 2), "141", "WATCHDOG-" + DateTime.Now.AddDays(-38).ToString("yyyyMMdd") + "-1354.dmp", "548a3887-8bc3-4d3a-adb4-1d3e5e3c8c4b"));
+                    retries.Add(werRetry(DateTime.Now.AddHours(-k * 2), "193", "WATCHDOG-" + DateTime.Now.AddDays(-5).ToString("yyyyMMdd") + "-0910.dmp", "1dbc1362-0000-4000-8000-000000000001"));
+                }
+                EventScanner.CollapseWerRetries(retries, 30);
+                Check(retries.Count == 1 && retries[0].Prop(5) == "193" && retries[0].Time.Date == DateTime.Now.AddDays(-5).Date && retries[0].Time.Hour == 9,
+                    "62 reenvios de 2 relatórios: fica 1 (o de 38 dias atrás sai), no horário real do arquivo");
+                HwSnapshot lapHw = new HwSnapshot(); lapHw.IsLaptop = true; lapHw.CpuName = "13th Gen Intel(R) Core(TM) i5-13420H"; lapHw.GpuName = "NVIDIA GeForce RTX 4050 Laptop GPU";
+                lapHw.PcieLanes = 4; lapHw.PcieMaxLanes = 8;
+                lapHw.RamModules = 1; lapHw.DualChannel = false; lapHw.RamTotalGb = 16; lapHw.RamConfMts = 5200; lapHw.RamRatedMts = 5600; lapHw.RamType = 34;
+                TestResult lapGpu = okTest(TestKind.Gpu); lapGpu.Set("t_pcie_lanes_max", 4);
+                Diagnosis dLap = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult> { lapGpu }, lapHw);
+                Check(!dLap.Findings.Exists(delegate(Finding f) { return f.Title.Contains("pistas PCIe"); }), "notebook com a placa ligada em x4 de x8: não acusa defeito de slot");
+                Check(Rules.CompatFor(lapHw.CpuName) == null && Rules.CompatFor("AMD Ryzen 7 7840HS") == null && Rules.CompatFor("AMD Ryzen 5 5600G") != null,
+                    "processador de notebook não usa os números da plataforma de desktop (o 5600G de desktop continua)");
+                List<Finding> tLap2 = Analyzer.BalanceTips(lapHw, new List<SessionData>(), new List<TestResult>(), dmOk);
+                Check(!tLap2.Exists(delegate(Finding f) { return f.Title.Contains("mas o pente suporta"); }) && tLap2.Exists(delegate(Finding f) { return f.Sev == Sev.Ok && f.Title.Contains("definida pelo fabricante"); }),
+                    "notebook: sem dica de ativar XMP na BIOS");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;

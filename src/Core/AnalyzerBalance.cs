@@ -77,10 +77,14 @@ namespace DiagIT
                     tips.Add(Tip(Sev.Ok, "", "Memória em dual channel (" + h.RamModules + " pentes)", "Capacidade total " + N0(h.RamTotalGb) + " GB.", "", null, null));
 
                 int conf = Mts(h.RamConfMts, h.RamType), rated = Mts(h.RamRatedMts, h.RamType);
-                if (conf > 0 && rated > conf * 1.05)
+                if (conf > 0 && rated > conf * 1.05 && lap)
+                    // notebook não tem XMP/EXPO na BIOS: quem define a velocidade é o fabricante (e o processador móvel costuma aceitar menos que o pente)
+                    tips.Add(Tip(Sev.Ok, "", "Memória a " + conf + " MT/s (em notebook, a velocidade é definida pelo fabricante)",
+                        "O pente suporta " + rated + " MT/s, mas notebooks não têm opção para mudar isso na BIOS.", "", null, null));
+                else if (conf > 0 && rated > conf * 1.05)
                     tips.Add(Tip(Sev.Info, BDraw, "A memória roda a " + conf + " MT/s, mas o pente suporta " + rated + " MT/s",
                         "O perfil de velocidade da memória (XMP, DOCP ou EXPO) está desligado na BIOS.",
-                        "Ativar {perfil_memoria} na BIOS é de graça e costuma dar um ganho real em jogos, principalmente em processadores Ryzen. Depois de ativar, use o PC normalmente e rode o teste de memória do DiagIT; se aparecer instabilidade, volte ao padrão.",
+                        "Ativar {perfil_memoria} na BIOS é de graça e costuma dar um ganho real em jogos" + (h.CpuName.IndexOf("Ryzen", StringComparison.OrdinalIgnoreCase) >= 0 ? ", principalmente em processadores Ryzen" : "") + ". Depois de ativar, use o PC normalmente e rode o teste de memória do DiagIT; se aparecer instabilidade, volte ao padrão.",
                         "ram-perfil", "Como fazer"));
                 else if (conf > 0 && h.RamType == 26 && conf <= 2700)
                     tips.Add(Tip(Sev.Info, BCheap, "A memória é lenta para um processador atual: DDR4 a " + conf + " MT/s",

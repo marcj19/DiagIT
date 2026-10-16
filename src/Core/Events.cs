@@ -73,15 +73,57 @@ namespace DiagIT
             say("Travamentos de aplicativos...");
             Run(r, "Application", Q("(" + Prov("Application Error") + " and " + Ids(1000) + ") or (" +
                 Prov("Application Hang") + " and " + Ids(1002) + ")", days), 600, false);
-            Run(r, "Application", Q(Prov("Windows Error Reporting") + " and " + Ids(1001), days), 400, false);
+            Run(r, "Application", Q(Prov("Windows Error Reporting") + " and " + Ids(1001), days), 1500, false);   // os reenvios ocupam muito espaço (veja CollapseWerRetries)
 
             say("Instalações de drivers e atualizações...");
             Run(r, "Application", Q(Prov("MsiInstaller") + " and " + Ids(1033), days), 300, true);
             Run(r, "System", Q("(" + Prov("Microsoft-Windows-WindowsUpdateClient") + " and " + Ids(19) + ") or (" + Prov("Microsoft-Windows-UserPnp") + " and " + Ids(20001, 20003) + ")", days), 500, true);
 
+            CollapseWerRetries(r, days);
             r.Sort(delegate(WinEvent a, WinEvent b) { return b.Time.CompareTo(a.Time); });
             say("Concluído.");
             return r;
+        }
+
+        static readonly Regex ReportId = new Regex(@"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+        static readonly Regex LiveDumpTime = new Regex(@"-(\d{8})-(\d{4})\.dmp", RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// Quando o Windows não consegue enviar um relatório de erro, ele tenta de novo a cada login e grava outro evento 1001 igual
+        /// (mesmo identificador do relatório). Num notebook, 11 travamentos de maio a setembro viraram 340 eventos em 3 dias de outubro.
+        /// Fica um evento por relatório; nos travamentos recuperados (LiveKernelEvent) o horário real vem do nome do arquivo
+        /// (WATCHDOG-20260908-1354.dmp), e o que aconteceu antes do período analisado sai da lista.
+        /// </summary>
+        public static void CollapseWerRetries(List<WinEvent> r, int days)
+        {
+            DateTime cut = DateTime.Now.AddDays(-days);
+            Dictionary<string, WinEvent> first = new Dictionary<string, WinEvent>();
+            List<WinEvent> drop = new List<WinEvent>();
+            foreach (WinEvent e in r)
+            {
+                if (e.Provider != "Windows Error Reporting" || e.Id != 1001) continue;
+                string id = e.Prop(19).Trim();
+                if (!ReportId.IsMatch(id)) continue;
+                WinEvent seen;
+                if (first.TryGetValue(id, out seen))
+                {
+                    if (e.Time < seen.Time) { drop.Add(seen); first[id] = e; } else drop.Add(e);
+                }
+                else first[id] = e;
+            }
+            foreach (WinEvent e in first.Values)
+            {
+                if (e.Prop(2) != "LiveKernelEvent") continue;
+                Match m = LiveDumpTime.Match(e.Prop(15));
+                DateTime t;
+                if (m.Success && DateTime.TryParseExact(m.Groups[1].Value + m.Groups[2].Value, "yyyyMMddHHmm", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out t) && t <= e.Time.AddMinutes(5))
+                {
+                    e.Time = t;
+                    if (t < cut) drop.Add(e);
+                }
+            }
+            if (drop.Count > 0) r.RemoveAll(delegate(WinEvent e) { return drop.Contains(e); });
         }
 
         static void Run(List<WinEvent> res, string log, string xpath, int max, bool withMsg)

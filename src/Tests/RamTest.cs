@@ -41,6 +41,28 @@ namespace DiagIT
         readonly List<string> records = new List<string>();
         readonly Dictionary<int, int> bitHits = new Dictionary<int, int>();
 
+        /// <summary>Os programas que mais ocupam memória agora (somando todos os processos de cada um), para a pessoa saber o que fechar.</summary>
+        static string TopMemoryUsers()
+        {
+            try
+            {
+                Dictionary<string, long> by = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                foreach (System.Diagnostics.Process p in System.Diagnostics.Process.GetProcesses())
+                    using (p)
+                    {
+                        try { long v; by.TryGetValue(p.ProcessName, out v); by[p.ProcessName] = v + p.WorkingSet64; } catch { }
+                    }
+                List<KeyValuePair<string, long>> l = new List<KeyValuePair<string, long>>(by);
+                l.RemoveAll(delegate(KeyValuePair<string, long> kv) { return kv.Value < 300L * 1024 * 1024 || kv.Key == "DiagIT" || kv.Key == "Memory Compression" || kv.Key == "System"; });
+                l.Sort(delegate(KeyValuePair<string, long> a, KeyValuePair<string, long> b) { return b.Value.CompareTo(a.Value); });
+                if (l.Count == 0) return "";
+                List<string> t = new List<string>();
+                for (int i = 0; i < Math.Min(3, l.Count); i++) t.Add(l[i].Key + " " + (l[i].Value / 1073741824.0).ToString("0.0", new System.Globalization.CultureInfo("pt-BR")) + " GB");
+                return " (os que mais usam: " + string.Join(", ", t.ToArray()) + ")";
+            }
+            catch { return ""; }
+        }
+
         public override void Run(TestContext ctx, TestResult r, int seconds)
         {
             MEMSTAT m = new MEMSTAT(); m.dwLength = (uint)Marshal.SizeOf(typeof(MEMSTAT));
@@ -56,8 +78,9 @@ namespace DiagIT
             if (target < 256L * 1024 * 1024)
             {
                 r.Status = "error";
-                r.Summary = "Memória livre insuficiente para testar (RAM livre " + (availPhys >> 20) + " MB, memória virtual livre " + (availCommit >> 20) +
-                    " MB). Feche programas e, se a memória virtual estiver quase esgotada, aumente o arquivo de paginação na página Resolver.";
+                r.Summary = "Memória livre insuficiente para testar (RAM livre " + (availPhys >> 20) + " MB, memória virtual livre " + (availCommit >> 20) + " MB). " +
+                    (availPhys - reserve < 256L * 1024 * 1024 ? "Os programas abertos estão ocupando a memória" + TopMemoryUsers() + ": feche-os e rode de novo." :
+                     "Feche programas e, se a memória virtual estiver quase esgotada, aumente o arquivo de paginação na página Resolver.");
                 return;
             }
             if (opt != null && opt.MaxMB > 0) target = Math.Min(target, opt.MaxMB * 1024 * 1024);
