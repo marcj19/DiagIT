@@ -38,6 +38,7 @@ namespace DiagIT
         /// <summary>Velocidade que o pente suporta (nominal) e a que está configurada agora, em MT/s; capacidade total em GB; tipo SMBIOS (26 = DDR4, 34 = DDR5).</summary>
         public int RamRatedMts, RamConfMts, RamType;
         public double RamTotalGb;
+        public double VramMB = double.NaN;
         /// <summary>Geração máxima de PCIe que a placa de vídeo suporta (4 = PCIe 4.0), ou -1.</summary>
         public int PcieMaxGen = -1;
         public bool DualChannel;
@@ -246,6 +247,7 @@ namespace DiagIT
                 f.Add(new Fact("Placa de vídeo", "Driver", "sem driver do fabricante", 2, null));
             }
             double vram = NativeInfo.TotalVramMB();
+            h.VramMB = vram;
             if (!double.IsNaN(vram)) f.Add(new Fact("Placa de vídeo", "Memória de vídeo", (vram / 1024).ToString("0.0", Pt) + " GB", -1, null));
             PcieMaxFromPnp(h);
             if (hub != null && hub.Adl != null)
@@ -498,7 +500,7 @@ namespace DiagIT
 
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern IntPtr SetupDiGetClassDevs(IntPtr guid, string enumerator, IntPtr hwnd, uint flags);
-        [DllImport("setupapi.dll", SetLastError = true)]
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool SetupDiOpenDeviceInfo(IntPtr set, [MarshalAs(UnmanagedType.LPWStr)] string id, IntPtr hwnd, uint flags, ref SP_DEVINFO_DATA data);
         [DllImport("setupapi.dll", SetLastError = true)]
         static extern bool SetupDiGetDevicePropertyW(IntPtr set, ref SP_DEVINFO_DATA data, ref DEVPROPKEY key, out uint type, byte[] buf, uint size, out uint req, uint flags);

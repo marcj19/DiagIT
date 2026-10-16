@@ -82,7 +82,7 @@ namespace DiagIT
                         "O perfil de velocidade da memória (XMP, DOCP ou EXPO) está desligado na BIOS.",
                         "Ativar {perfil_memoria} na BIOS é de graça e costuma dar um ganho real em jogos, principalmente em processadores Ryzen. Depois de ativar, use o PC normalmente e rode o teste de memória do DiagIT; se aparecer instabilidade, volte ao padrão.",
                         "ram-perfil", "Como fazer"));
-                else if (conf > 0 && h.RamType == 26 && conf <= 2666)
+                else if (conf > 0 && h.RamType == 26 && conf <= 2700)
                     tips.Add(Tip(Sev.Info, BCheap, "A memória é lenta para um processador atual: DDR4 a " + conf + " MT/s",
                         "Não há perfil mais rápido para ativar: " + conf + " MT/s é o que o pente foi feito para entregar." + (fam != null && OfficialMem(fam, h.RamType) > conf ? " O seu processador aceita oficialmente até " + OfficialMem(fam, h.RamType) + " MT/s." : ""),
                         "Kits DDR4-3200 ou 3600 custam pouco. Testes de imprensa costumam mostrar ganho em jogos que dependem do processador, mas o tamanho varia muito por jogo e o DiagIT não mediu isso no seu PC. Antes de comprar, confira no site do fabricante da placa-mãe a velocidade máxima de memória que ela e o processador aceitam." +
@@ -120,6 +120,23 @@ namespace DiagIT
                     else
                         tips.Add(Tip(Sev.Ok, "", "Placa de vídeo com o link PCIe no máximo do conjunto", "Banda medida: " + up.ToString("0.0", Pt) + " GB/s com " + N0(lanes) + " pistas.", "", null, null));
                 }
+            }
+
+            // ---------------------------------------------------------------- 3b. Memória de vídeo pequena
+            if (h != null && !double.IsNaN(h.VramMB) && h.VramMB > 0 && h.VramMB <= 4200)
+            {
+                // quanto da VRAM os jogos usaram de verdade (95% do tempo abaixo disso)
+                List<double> vu = new List<double>();
+                foreach (SessionData sd in sessions)
+                    if (GameSession(sd)) foreach (Sample s in sd.S) if (!double.IsNaN(s.V[F.GpuMemPct])) vu.Add(s.V[F.GpuMemPct]);
+                double p95 = double.NaN;
+                if (vu.Count >= 150) { vu.Sort(); p95 = vu[(int)(vu.Count * 0.95)]; }
+                string gb = (h.VramMB / 1024).ToString("0.#", Pt);
+                tips.Add(Tip(Sev.Info, BWhere, "A placa de vídeo tem só " + gb + " GB de memória (VRAM)",
+                    (h.GpuName.Length > 0 ? h.GpuName.Trim() + " com " + gb + " GB." : gb + " GB de memória de vídeo.") +
+                    (!double.IsNaN(p95) ? " Nas suas partidas, a memória de vídeo ficou em até " + N0(p95) + "% de uso" + (p95 >= 90 ? ": está no limite." : ".") : ""),
+                    "Quando a memória de vídeo acaba, o jogo engasga, as texturas demoram a aparecer e o driver pode travar. De graça: texturas no baixo ou médio e navegador e Discord fechados durante o jogo (eles também usam memória de vídeo). " +
+                    (lap ? "Em notebook a placa de vídeo não se troca." : "Se quiser gastar, uma placa de vídeo com 8 GB ou mais é o upgrade que mais rende aqui; confira antes a fonte de energia."), null, null));
             }
 
             // ---------------------------------------------------------------- 4. Quem limita quem, medido nas partidas

@@ -355,6 +355,11 @@ namespace DiagIT
                 List<Finding> tGood = Analyzer.BalanceTips(hGood, new List<SessionData> { playSess(70, 60, 400) }, new List<TestResult>(), dmOk);
                 Check(tGood[0].Sev == Sev.Ok && tGood[0].Title.StartsWith("Nenhum ajuste ou upgrade se destaca") && tGood.TrueForAll(delegate(Finding f) { return f.Sev == Sev.Ok; }),
                       "tudo bom (tela, memória, disco, equilíbrio): nenhuma dica de gasto, tudo OK");
+                HwSnapshot hIntel = new HwSnapshot(); hIntel.CpuName = "11th Gen Intel(R) Core(TM) i7-11700 @ 2.50GHz"; hIntel.GpuName = "NVIDIA GeForce GTX 750 Ti";
+                hIntel.RamModules = 2; hIntel.DualChannel = true; hIntel.RamTotalGb = 32; hIntel.RamConfMts = 2667; hIntel.RamRatedMts = 2667; hIntel.RamType = 26; hIntel.VramMB = 2048;
+                List<Finding> tIntel = Analyzer.BalanceTips(hIntel, new List<SessionData>(), new List<TestResult>(), dmOk);
+                Check(tIntel.Exists(delegate(Finding f) { return f.Title.Contains("DDR4 a 2667") && f.Evidence.Contains("3200 MT/s"); }), "i7-11700 com DDR4-2666 (o Windows informa 2667): memória lenta, o processador aceita 3200");
+                Check(tIntel.Exists(delegate(Finding f) { return f.Title.Contains("só 2 GB de memória (VRAM)"); }) && !tGood.Exists(delegate(Finding f) { return f.Title.Contains("VRAM"); }), "placa de vídeo de 2 GB: dica de memória de vídeo");
                 MonthSummary ms = Analyzer.BuildMonth(new List<WinEvent>(), new List<SessionData> { playSess(70, 60, 10) }, allOk);
                 Check(ms.BlueScreens == 0 && ms.UnexpectedShutdowns == 0 && ms.Sessions == 1 && ms.HoursPlayed > 0.9 && ms.TestsTotal == 5 && ms.TestsPassed == 5, "resumo de 30 dias: zeros de verdade, partidas, horas e testes aprovados");
 
@@ -942,6 +947,15 @@ namespace DiagIT
                 Say(dg.Verdict);
                 for (int i = 0; i < 8; i++) Say("   " + CompInfo.Names[i].PadRight(28) + dg.States[i].Status + " — " + dg.States[i].Headline);
                 foreach (Finding f in dg.Findings) Say("   [" + f.Label + "] " + f.Title);
+                // página Desempenho com os dados reais (para conferir em cada plataforma)
+                List<SessionData> sds = new List<SessionData>();
+                foreach (SessionInfo si in SessionStore.ListAll())
+                    if (si.Start > DateTime.Now.AddDays(-30)) { SessionData sd = new SessionData(); sd.Info = si; sd.S = SessionStore.LoadSamples(si); sds.Add(sd); }
+                DisplayMode dm = DisplayInfo.Read();
+                Say("");
+                Say("== Desempenho (tela: " + (dm == null ? "não lida" : dm.Width + "x" + dm.Height + " " + dm.CurrentHz + " Hz, máx " + dm.MaxHz + " Hz") + ")");
+                foreach (Finding f in Analyzer.BalanceTips(h, sds, TestStore.ListAll(), dm))
+                    Say("   [" + (f.Sev == Sev.Ok ? "OK" : f.Badge) + "] " + f.Title + "\n      " + f.Evidence.Replace("\n", "\n      ") + (f.Advice.Length > 0 ? "\n      > " + f.Advice.Replace("\n", "\n        ") : ""));
                 hub.Close();
             }
             catch (Exception e) { Say("EXCEÇÃO: " + e); }
