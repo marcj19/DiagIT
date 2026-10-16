@@ -368,7 +368,16 @@ namespace DiagIT
         bool StartPlan(List<object[]> plan, bool guided)
         {
             if (plan.Count == 0 || runner.Busy) return false;
-            if (plan.Exists(delegate(object[] o) { return (TestKind)o[0] == TestKind.Ram; }) && !RamReady(false)) return false;
+            if (plan.Exists(delegate(object[] o) { return (TestKind)o[0] == TestKind.Ram; }))
+            {
+                int ready = RamReady(false);
+                if (ready == 0) return false;
+                if (ready == 2)
+                {
+                    plan = plan.FindAll(delegate(object[] o) { return (TestKind)o[0] != TestKind.Ram; });
+                    if (plan.Count == 0) return false;
+                }
+            }
             testQueue.Clear();
             for (int i = 1; i < plan.Count; i++) testQueue.Enqueue(plan[i]);
             runPlan.Clear(); runPlan.AddRange(plan);
@@ -441,25 +450,25 @@ namespace DiagIT
         }
 
         /// <summary>
-        /// Confere se há memória livre para o teste de RAM. Com pouca, mostra quais programas estão ocupando e deixa a pessoa fechar e tentar de novo.
-        /// midRun: o teste já foi recusado no meio da verificação (Ignorar segue para o próximo teste).
+        /// Confere se há memória livre para o teste de RAM. Só avisa quando o teste ficaria pequeno de verdade: num PC de 8 GB o próprio Windows
+        /// já ocupa metade, e testar o que sobra é o normal. Quando avisa, mostra os programas que dá para fechar (não as partes do Windows).
+        /// Volta 1 = seguir com o teste, 2 = seguir sem ele, 0 = não começar.
         /// </summary>
-        bool RamReady(bool midRun)
+        int RamReady(bool midRun)
         {
             while (true)
             {
-                long mb = RamTest.TestableMB();
-                if (mb < 0 || mb >= 2048) return true;
+                long mb = RamTest.TestableMB(), total = RamTest.TotalMB();
+                if (mb < 0 || mb >= 2048) return 1;
+                if (mb >= 512 && total > 0 && mb >= total * 0.15) return 1;   // o Windows ocupando o normal: testa o que está livre
+                List<KeyValuePair<string, long>> apps = RamTest.ClosableApps();
+                if (apps.Count == 0 && mb >= 256) return 1;                    // nada que a pessoa possa fechar: testa o que dá, sem assustar
                 Show(); Activate();
-                DialogResult a = MessageBox.Show(this,
-                    (mb < 256 ? "O teste de memória RAM não consegue rodar agora: quase toda a memória está ocupada pelos programas abertos."
-                              : "Só dá para testar " + mb.ToString("N0") + " MB da memória agora: o resto está ocupado pelos programas abertos.") +
-                    RamTest.TopMemoryUsers() + "\n\nFeche esses programas (navegador, jogos, launchers) e clique em Repetir." +
-                    (midRun ? "\nIgnorar segue para os próximos testes sem testar a memória." : "\nIgnorar começa assim mesmo."),
-                    "Memória ocupada", MessageBoxButtons.AbortRetryIgnore, MessageBoxIcon.Warning);
+                DialogResult a;
+                using (MemoryDialog dlg = new MemoryDialog(mb, total, apps, mb >= 256, midRun)) a = dlg.ShowDialog(this);
                 if (a == DialogResult.Retry) continue;
-                if (a == DialogResult.Ignore) return mb >= 256 || !midRun;
-                return false;
+                if (a == DialogResult.Ignore) return mb >= 256 ? 1 : 2;
+                return midRun ? 2 : 0;
             }
         }
 
@@ -469,7 +478,7 @@ namespace DiagIT
             if (r.Kind == TestKind.Ram && r.Status == "error" && runPlan.Count > 1 && runResults.Count < runPlan.Count && RamTest.TestableMB() < 256)
             {
                 object[] cur = runPlan[runResults.Count];
-                if (RamReady(true) && RamTest.TestableMB() >= 256 && StartTest(TestKind.Ram, (int)cur[1], cur[2], false)) { ReloadTestHistory(); return; }
+                if (RamReady(true) == 1 && RamTest.TestableMB() >= 256 && StartTest(TestKind.Ram, (int)cur[1], cur[2], false)) { ReloadTestHistory(); return; }
             }
             runResults.Add(r);
             ReloadTestHistory();

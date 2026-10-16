@@ -51,25 +51,60 @@ namespace DiagIT
             return Math.Max(0, t >> 20);
         }
 
-        public static string TopMemoryUsers()
+        /// <summary>Partes do próprio Windows (e o antivírus dele): ocupam memória, mas não são "programas para fechar".</summary>
+        static readonly HashSet<string> SystemProcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+            "System", "Idle", "Registry", "Memory Compression", "svchost", "explorer", "dwm", "csrss", "lsass", "services", "wininit", "winlogon", "smss",
+            "MsMpEng", "MpDefenderCoreService", "NisSrv", "SecurityHealthService", "SearchHost", "SearchIndexer", "StartMenuExperienceHost",
+            "ShellExperienceHost", "RuntimeBroker", "sihost", "ctfmon", "fontdrvhost", "audiodg", "spoolsv", "WmiPrvSE", "TextInputHost",
+            "WidgetService", "Widgets", "dllhost", "conhost", "taskhostw", "LockApp", "ApplicationFrameHost", "SystemSettings", "Taskmgr", "DiagIT", "PresentMon" };
+
+        public static long TotalMB()
         {
+            MEMSTAT m = new MEMSTAT(); m.dwLength = (uint)Marshal.SizeOf(typeof(MEMSTAT));
+            return GlobalMemoryStatusEx(ref m) ? (long)(m.TotalPhys >> 20) : -1;
+        }
+
+        /// <summary>Programas que a pessoa pode fechar e que ocupam bastante memória (todos os processos de cada um somados), com o nome que ela reconhece.</summary>
+        public static List<KeyValuePair<string, long>> ClosableApps()
+        {
+            Dictionary<string, long> by = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> label = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             try
             {
-                Dictionary<string, long> by = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
                 foreach (System.Diagnostics.Process p in System.Diagnostics.Process.GetProcesses())
                     using (p)
                     {
-                        try { long v; by.TryGetValue(p.ProcessName, out v); by[p.ProcessName] = v + p.WorkingSet64; } catch { }
+                        try
+                        {
+                            string n = p.ProcessName;
+                            if (SystemProcs.Contains(n)) continue;
+                            long v; by.TryGetValue(n, out v); by[n] = v + p.WorkingSet64;
+                            if (!label.ContainsKey(n))
+                            {
+                                string desc = null;
+                                try { desc = p.MainModule.FileVersionInfo.FileDescription; } catch { }
+                                label[n] = string.IsNullOrEmpty(desc) || desc.Trim().Length < 3 ? n : desc.Trim();
+                            }
+                        }
+                        catch { }
                     }
-                List<KeyValuePair<string, long>> l = new List<KeyValuePair<string, long>>(by);
-                l.RemoveAll(delegate(KeyValuePair<string, long> kv) { return kv.Value < 300L * 1024 * 1024 || kv.Key == "DiagIT" || kv.Key == "Memory Compression" || kv.Key == "System"; });
-                l.Sort(delegate(KeyValuePair<string, long> a, KeyValuePair<string, long> b) { return b.Value.CompareTo(a.Value); });
-                if (l.Count == 0) return "";
-                List<string> t = new List<string>();
-                for (int i = 0; i < Math.Min(3, l.Count); i++) t.Add(l[i].Key + " " + (l[i].Value / 1073741824.0).ToString("0.0", new System.Globalization.CultureInfo("pt-BR")) + " GB");
-                return " (os que mais usam: " + string.Join(", ", t.ToArray()) + ")";
             }
-            catch { return ""; }
+            catch { }
+            List<KeyValuePair<string, long>> l = new List<KeyValuePair<string, long>>();
+            foreach (KeyValuePair<string, long> kv in by)
+                if (kv.Value >= 300L * 1024 * 1024) l.Add(new KeyValuePair<string, long>(label.ContainsKey(kv.Key) ? label[kv.Key] : kv.Key, kv.Value));
+            l.Sort(delegate(KeyValuePair<string, long> a, KeyValuePair<string, long> b) { return b.Value.CompareTo(a.Value); });
+            if (l.Count > 4) l.RemoveRange(4, l.Count - 4);
+            return l;
+        }
+
+        public static string TopMemoryUsers()
+        {
+            List<KeyValuePair<string, long>> l = ClosableApps();
+            if (l.Count == 0) return "";
+            List<string> t = new List<string>();
+            for (int i = 0; i < Math.Min(3, l.Count); i++) t.Add(l[i].Key + " " + (l[i].Value / 1073741824.0).ToString("0.0", new System.Globalization.CultureInfo("pt-BR")) + " GB");
+            return " (os que mais usam: " + string.Join(", ", t.ToArray()) + ")";
         }
 
         public override void Run(TestContext ctx, TestResult r, int seconds)

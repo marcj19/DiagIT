@@ -74,6 +74,20 @@ namespace DiagIT
                         break;
                     case 14:
                         Shot(dir, "13a-entre-etapas");
+                        // aviso de memória ocupada (exemplo: PC de 8 GB com o navegador aberto)
+                        try
+                        {
+                            System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, long>> apps = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, long>>();
+                            apps.Add(new System.Collections.Generic.KeyValuePair<string, long>("Google Chrome", 2300L << 20));
+                            apps.Add(new System.Collections.Generic.KeyValuePair<string, long>("Discord", 520L << 20));
+                            using (MemoryDialog md = new MemoryDialog(700, 8192, apps, true, false))
+                            {
+                                md.StartPosition = FormStartPosition.Manual; md.Location = new Point(-4000, -4000); md.Show(this);
+                                using (Bitmap bmp = new Bitmap(md.Width, md.Height)) { md.DrawToBitmap(bmp, new Rectangle(0, 0, md.Width, md.Height)); bmp.Save(System.IO.Path.Combine(dir, "13b-memoria-ocupada.png")); }
+                                md.Close();
+                            }
+                        }
+                        catch (Exception e) { Log.Write("Prévia do aviso de memória: " + e.Message); }
                         betweenSteps = false; runResults.Clear(); runPlan.Clear(); testQueue.Clear();
                         if (!withRun) { t.Stop(); ExitApp(); return; }
                         // verificação real e curta (processador, 60 s) só para fotografar a tela "Verificando"
