@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -30,6 +30,7 @@ namespace DiagIT
             if (sessions == null) sessions = new List<SessionData>();
             if (tests == null) tests = new List<TestResult>();
             if (h != null) Rules.SetContext(h.GpuName, h.CpuName);
+            bool lap = h != null && h.IsLaptop;   // notebook: memória e processador costumam não ser trocáveis, e a tela troca de taxa para poupar bateria
 
             // FPS médio real dos jogos (ponderado pelos quadros medidos)
             double fpsSum = 0, fpsFrames = 0;
@@ -47,7 +48,8 @@ namespace DiagIT
                         ? " Seus jogos rodam em média a " + N0(fpsAvg) + " FPS, mas com a tela em " + dm.CurrentHz + " Hz você só vê " + dm.CurrentHz + " quadros por segundo: o resto é desperdiçado." : "";
                     tips.Add(Tip(Sev.Info, BDraw, "Sua tela está em " + dm.CurrentHz + " Hz, mas ela aceita " + dm.MaxHz + " Hz",
                         "Resolução atual " + dm.Width + "×" + dm.Height + ". Taxas oferecidas nessa resolução: " + rates + "." + seen,
-                        "É de graça e é a mudança que mais se sente: imagem bem mais fluida. Em Configurações > Sistema > Tela > Tela avançada, escolha a maior taxa. Depois confira também dentro do jogo. Se a taxa maior não aparecer ou a imagem piscar, troque o cabo (DisplayPort costuma ser o melhor).",
+                        "É de graça e é a mudança que mais se sente: imagem bem mais fluida. Em Configurações > Sistema > Tela > Tela avançada, escolha a maior taxa. Depois confira também dentro do jogo. Se a taxa maior não aparecer ou a imagem piscar, troque o cabo (DisplayPort costuma ser o melhor)." +
+                        (lap ? " Em notebook, o Windows baixa a taxa de propósito na bateria e em tarefas leves para economizar energia: isso é normal. Conecte na tomada e confira durante um jogo." : ""),
                         "monitor-hz", "Como fazer"));
                 }
                 else if (dm.MaxHz >= 100)
@@ -62,7 +64,9 @@ namespace DiagIT
                 if (!h.DualChannel)
                     tips.Add(Tip(Sev.Info, BCheap, "A memória está em canal único (" + h.RamModules + " pente)",
                         "Capacidade total " + N0(h.RamTotalGb) + " GB.",
-                        "Com um só pente, o processador usa metade da banda de memória: costuma custar bastante FPS e deixa o PC mais lento. Colocar um segundo pente igual (nos slots indicados no manual da placa-mãe) é um dos upgrades mais baratos e de maior efeito.", null, null));
+                        "Com um só pente, o processador usa metade da banda de memória: costuma custar bastante FPS e deixa o PC mais lento. " +
+                        (lap ? "Em notebook, a memória muitas vezes é soldada ou o aparelho tem só um slot: veja no manual ou no site do fabricante se existe um segundo slot livre antes de comprar qualquer coisa."
+                             : "Colocar um segundo pente igual (nos slots indicados no manual da placa-mãe) é um dos upgrades mais baratos e de maior efeito."), null, null));
                 else
                     tips.Add(Tip(Sev.Ok, "", "Memória em dual channel (" + h.RamModules + " pentes)", "Capacidade total " + N0(h.RamTotalGb) + " GB.", "", null, null));
 
@@ -82,7 +86,8 @@ namespace DiagIT
                 if (h.RamTotalGb > 0 && h.RamTotalGb <= 8.5)
                     tips.Add(Tip(Sev.Info, BWhere, "Só " + N0(h.RamTotalGb) + " GB de memória é pouco para jogos de hoje",
                         "Muitos jogos recentes e o próprio Windows já usam perto disso.",
-                        "Passar para 16 GB (dois pentes de 8 GB, em dual channel) resolve engasgos de memória e deixa o PC mais fluido. É um upgrade barato e seguro.", null, null));
+                        lap ? "Passar para 16 GB resolve engasgos de memória, mas muitos notebooks têm a memória soldada: confira no manual ou no site do fabricante se ela é trocável antes de comprar."
+                            : "Passar para 16 GB (dois pentes de 8 GB, em dual channel) resolve engasgos de memória e deixa o PC mais fluido. É um upgrade barato e seguro.", null, null));
                 else if (h.RamTotalGb > 0)
                     tips.Add(Tip(Sev.Ok, "", N0(h.RamTotalGb) + " GB de memória: bom para jogos", "", "", null, null));
             }
@@ -128,11 +133,14 @@ namespace DiagIT
                 if (cpuPct >= 40 && gpuPct < 30)
                     tips.Add(Tip(Sev.Info, BWhere, "Nos seus jogos, o processador é o limite; a placa de vídeo está folgada",
                         basis,
-                        "Trocar a placa de vídeo renderia pouco: ela passa a maior parte do tempo esperando o processador. Rendem mais, nesta ordem: aumentar resolução e qualidade gráfica nos jogos (de graça, a placa tem folga), memória mais rápida e, se quiser gastar, um processador mais forte. Antes de comprar um processador, confira na lista do fabricante da placa-mãe quais ele aceita.", null, null));
+                        lap ? "Mesmo assim, em notebook nem processador nem placa de vídeo costumam ser trocáveis. O que rende: aumentar resolução e qualidade gráfica nos jogos (de graça, a placa tem folga), manter o notebook na tomada e com o plano de energia de desempenho, e deixar as saídas de ar desobstruídas."
+                            : "Trocar a placa de vídeo renderia pouco: ela passa a maior parte do tempo esperando o processador. Rendem mais, nesta ordem: aumentar resolução e qualidade gráfica nos jogos (de graça, a placa tem folga), memória mais rápida e, se quiser gastar, um processador mais forte. Antes de comprar um processador, confira na lista do fabricante da placa-mãe quais ele aceita.", null, null));
                 else if (gpuPct >= 50)
                     tips.Add(Tip(Sev.Info, BWhere, "Nos seus jogos, a placa de vídeo é o limite",
                         basis,
-                        "Baixar a qualidade gráfica ou a resolução, ou ligar o upscaling do jogo (FSR, DLSS ou XeSS), dá FPS de graça. Se quiser gastar, uma placa de vídeo mais forte é o upgrade que mais rende aqui; o processador está dando conta.", null, null));
+                        "Baixar a qualidade gráfica ou a resolução, ou ligar o upscaling do jogo (FSR, DLSS ou XeSS), dá FPS de graça. " +
+                        (lap ? "Em notebook a placa de vídeo normalmente não é trocável; manter o aparelho na tomada e com boa ventilação ajuda a placa a trabalhar no máximo."
+                             : "Se quiser gastar, uma placa de vídeo mais forte é o upgrade que mais rende aqui; o processador está dando conta."), null, null));
                 else
                     tips.Add(Tip(Sev.Ok, "", "Processador e placa de vídeo trabalham equilibrados nos seus jogos", basis, "", null, null));
             }
@@ -156,7 +164,8 @@ namespace DiagIT
             if (combo != null)
                 tips.Add(Tip(Sev.Info, BBefore, "Se for trocar a placa de vídeo, confira antes a fonte de energia",
                     "No teste de carga máxima de " + Dt(combo) + " o processador e a placa de vídeo somaram " + N0(combo.Get("t_cpu_power_max") + combo.Get("t_gpu_power_max")) + " W.",
-                    PsuAdvice(combo) + " Uma placa de vídeo nova que consuma mais de 100 W além da atual pede fonte nova junto: some o consumo dela (está no site do fabricante) com o do processador e uns 80 W do resto do PC.", null, null));
+                    lap ? "Em notebook a fonte é o carregador original e a placa de vídeo não se troca: use sempre o carregador do próprio notebook, com a potência indicada nele."
+                        : PsuAdvice(combo) + " Uma placa de vídeo nova que consuma mais de 100 W além da atual pede fonte nova junto: some o consumo dela (está no site do fabricante) com o do processador e uns 80 W do resto do PC.", null, null));
 
             // ---------------------------------------------------------------- 7. Por onde começar (só o que tem dado por trás, do mais barato ao mais caro)
             List<Finding> start = new List<Finding>();

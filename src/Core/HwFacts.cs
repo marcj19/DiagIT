@@ -66,6 +66,8 @@ namespace DiagIT
         public string RealtekNic, RealtekDriver = "";
         /// <summary>Política "não incluir drivers nas atualizações do Windows" ativa.</summary>
         public bool WuDriversBlocked;
+        /// <summary>Notebook, portátil ou tablet (pelo tipo de gabinete ou por ter bateria): memória e processador costumam não ser trocáveis e a tela muda de taxa para poupar bateria.</summary>
+        public bool IsLaptop;
     }
 
     public static class HwFacts
@@ -335,6 +337,7 @@ namespace DiagIT
             h.RealtekDriver = drv;
             if (h.RealtekNic != null) f.Add(new Fact(G, "Placa de rede", h.RealtekNic + (drv.Length > 0 ? " — driver " + drv : ""), -1,
                 "Relatada pela comunidade como causa de engasgos e estalos no áudio mesmo sem cabo de rede."));
+            h.IsLaptop = DetectLaptop();
             h.WuDriversBlocked = Fixes.WuDriversBlocked();
             f.Add(new Fact(G, "Windows Update trocando drivers", h.WuDriversBlocked ? "bloqueado" : "permitido", -1,
                 h.WuDriversBlocked ? null : "O Windows pode substituir o driver de vídeo instalado por você; os Resultados avisam se isso aconteceu."));
@@ -355,6 +358,23 @@ namespace DiagIT
                 case "ports": case "wpd": case "printer": case "smartcardreader": case "biometric": case "swdevice":
                     return true;
             }
+            return false;
+        }
+
+        /// <summary>true para notebook, portátil, tablet e conversíveis (tipo de gabinete SMBIOS 8, 9, 10, 11, 14, 30, 31, 32) ou PC com bateria.</summary>
+        static bool DetectLaptop()
+        {
+            try
+            {
+                foreach (ManagementObject o in Q("SELECT ChassisTypes FROM Win32_SystemEnclosure"))
+                {
+                    ushort[] types = o["ChassisTypes"] as ushort[];
+                    if (types == null) continue;
+                    foreach (ushort t in types) if (t == 8 || t == 9 || t == 10 || t == 11 || t == 14 || t == 30 || t == 31 || t == 32) return true;
+                }
+                foreach (ManagementObject o in Q("SELECT Name FROM Win32_Battery")) return true;
+            }
+            catch { }
             return false;
         }
 

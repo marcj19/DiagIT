@@ -288,6 +288,15 @@ namespace DiagIT
                 int idxFree = tBad[0].Advice.IndexOf("[de graça]"), idxWhere = tBad[0].Advice.IndexOf("[onde o upgrade rende]");
                 Check(idxFree >= 0 && (idxWhere < 0 || idxFree < idxWhere), "a ordem põe o que é de graça antes do que custa dinheiro");
 
+                // notebook: sem conselho de "coloque outro pente" ou "troque o processador", e a tela avisa que o Windows baixa a taxa de propósito
+                hBad.IsLaptop = true;
+                List<Finding> tLap = Analyzer.BalanceTips(hBad, new List<SessionData> { playSess(40, 95, 400) }, new List<TestResult>(), dmLow);
+                Check(tLap.Exists(delegate(Finding f) { return f.Title.Contains("canal único") && f.Advice.Contains("soldada") && !f.Advice.Contains("Colocar um segundo pente"); }) &&
+                      tLap.Exists(delegate(Finding f) { return f.Title.Contains("o processador é o limite") && f.Advice.Contains("costumam ser trocáveis") && !f.Advice.Contains("um processador mais forte"); }) &&
+                      tLap.Exists(delegate(Finding f) { return f.Title.Contains("60 Hz, mas ela aceita 165 Hz") && f.Advice.Contains("baixa a taxa de propósito"); }),
+                      "notebook: não manda trocar memória nem processador e explica que o Windows baixa a taxa da tela de propósito");
+                hBad.IsLaptop = false;
+
                 DisplayMode dmOk = new DisplayMode(); dmOk.Width = 1920; dmOk.Height = 1080; dmOk.CurrentHz = 165; dmOk.MaxHz = 165; dmOk.Rates.AddRange(new int[] { 60, 165 });
                 HwSnapshot hGood = new HwSnapshot(); hGood.RamModules = 2; hGood.DualChannel = true; hGood.RamTotalGb = 16; hGood.RamConfMts = 3600; hGood.RamRatedMts = 3600; hGood.RamType = 26;
                 VolumeInfo vSsd = new VolumeInfo(); vSsd.Letter = vHdd.Letter; vSsd.Media = "SSD"; hGood.Volumes.Add(vSsd);
