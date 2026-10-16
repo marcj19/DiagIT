@@ -367,6 +367,7 @@ namespace DiagIT
         bool StartPlan(List<object[]> plan, bool guided)
         {
             if (plan.Count == 0 || runner.Busy) return false;
+            if (plan.Exists(delegate(object[] o) { return (TestKind)o[0] == TestKind.Ram; }) && !RamReady(false)) return false;
             testQueue.Clear();
             for (int i = 1; i < plan.Count; i++) testQueue.Enqueue(plan[i]);
             runPlan.Clear(); runPlan.AddRange(plan);
@@ -438,8 +439,37 @@ namespace DiagIT
             runPower.WindowSeconds = 0; runPower.SetData(l);
         }
 
+        /// <summary>
+        /// Confere se há memória livre para o teste de RAM. Com pouca, mostra quais programas estão ocupando e deixa a pessoa fechar e tentar de novo.
+        /// midRun: o teste já foi recusado no meio da verificação (Ignorar segue para o próximo teste).
+        /// </summary>
+        bool RamReady(bool midRun)
+        {
+            while (true)
+            {
+                long mb = RamTest.TestableMB();
+                if (mb < 0 || mb >= 2048) return true;
+                Show(); Activate();
+                DialogResult a = MessageBox.Show(this,
+                    (mb < 256 ? "O teste de memória RAM não consegue rodar agora: quase toda a memória está ocupada pelos programas abertos."
+                              : "Só dá para testar " + mb.ToString("N0") + " MB da memória agora: o resto está ocupado pelos programas abertos.") +
+                    RamTest.TopMemoryUsers() + "\n\nFeche esses programas (navegador, jogos, launchers) e clique em Repetir." +
+                    (midRun ? "\nIgnorar segue para os próximos testes sem testar a memória." : "\nIgnorar começa assim mesmo."),
+                    "Memória ocupada", MessageBoxButtons.AbortRetryIgnore, MessageBoxIcon.Warning);
+                if (a == DialogResult.Retry) continue;
+                if (a == DialogResult.Ignore) return mb >= 256 || !midRun;
+                return false;
+            }
+        }
+
         void OnTestFinished(TestResult r)
         {
+            // teste de RAM recusado por falta de memória livre no meio do check-up: em vez de pular calado, pede para fechar programas e tenta de novo
+            if (r.Kind == TestKind.Ram && r.Status == "error" && runPlan.Count > 1 && runResults.Count < runPlan.Count && RamTest.TestableMB() < 256)
+            {
+                object[] cur = runPlan[runResults.Count];
+                if (RamReady(true) && RamTest.TestableMB() >= 256 && StartTest(TestKind.Ram, (int)cur[1], cur[2], false)) { ReloadTestHistory(); return; }
+            }
             runResults.Add(r);
             ReloadTestHistory();
             ShowTestResult(r);

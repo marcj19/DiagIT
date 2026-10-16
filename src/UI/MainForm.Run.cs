@@ -113,6 +113,15 @@ namespace DiagIT
             return r;
         }
 
+        /// <summary>O motivo de cada teste que não conseguiu rodar, com as palavras do próprio teste (memória ocupada, falta de administrador...).</summary>
+        static string ErroredNote(List<TestResult> done)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (TestResult t in done)
+                if (t.Status == "error") sb.Append(" O teste de " + TestResult.KindLabel(t.Kind) + " não rodou: " + (t.Summary.Length > 0 ? t.Summary : "abra o DiagIT como administrador e tente de novo."));
+            return sb.ToString();
+        }
+
         void RefreshRun()
         {
             if (runFlow == null) return;
@@ -172,7 +181,7 @@ namespace DiagIT
                 runCard.Title = runCard.ErrorState ? "A verificação parou com um problema" : "Verificação interrompida";
                 runCard.Text_ = runCard.ErrorState ? "Veja em Resultados o que falhou e o que fazer." :
                     "A verificação parou antes do fim. As peças que faltaram continuam sem verificação; você pode recomeçar quando quiser em Verificar peças." +
-                    (done.Exists(delegate(TestResult t) { return t.Status == "error"; }) ? " Um dos testes não conseguiu rodar: abra o DiagIT como administrador." : "");
+                    ErroredNote(done);
                 runCard.TimeLeft = ""; runCard.Total = "";
             }
             else
@@ -180,7 +189,7 @@ namespace DiagIT
                 runCard.Progress = done.Count > 0 ? 1 : 0;
                 runCard.ErrorState = done.Exists(delegate(TestResult t) { return t.Status == "failed" || t.Status == "crashed"; });
                 runCard.Title = done.Count > 0 ? (runCard.ErrorState ? "A verificação encontrou um problema" : "Verificação concluída") : "Tudo parado";
-                runCard.Text_ = done.Count > 0 ? (runCard.ErrorState ? "Veja em Resultados o que falhou e o que fazer." : "As peças verificadas passaram. Veja em Resultados o que isso significa para o seu PC.") :
+                runCard.Text_ = done.Count > 0 ? (runCard.ErrorState ? "Veja em Resultados o que falhou e o que fazer." : "As peças verificadas passaram. Veja em Resultados o que isso significa para o seu PC.") + ErroredNote(done) :
                     "Nenhum teste está rodando agora.";
                 runCard.TimeLeft = ""; runCard.Total = "";
             }

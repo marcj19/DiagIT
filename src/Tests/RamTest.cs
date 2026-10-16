@@ -42,7 +42,16 @@ namespace DiagIT
         readonly Dictionary<int, int> bitHits = new Dictionary<int, int>();
 
         /// <summary>Os programas que mais ocupam memória agora (somando todos os processos de cada um), para a pessoa saber o que fechar.</summary>
-        static string TopMemoryUsers()
+        /// <summary>Quanto o teste de memória conseguiria usar agora (MB); abaixo de 256 ele não roda.</summary>
+        public static long TestableMB()
+        {
+            MEMSTAT m = new MEMSTAT(); m.dwLength = (uint)Marshal.SizeOf(typeof(MEMSTAT));
+            if (!GlobalMemoryStatusEx(ref m)) return -1;
+            long t = Math.Min((long)m.AvailPhys - 1536L * 1024 * 1024, (long)m.AvailPageFile - 1024L * 1024 * 1024);
+            return Math.Max(0, t >> 20);
+        }
+
+        public static string TopMemoryUsers()
         {
             try
             {
