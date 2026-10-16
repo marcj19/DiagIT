@@ -734,6 +734,23 @@ namespace DiagIT
                 List<Finding> tLap2 = Analyzer.BalanceTips(lapHw, new List<SessionData>(), new List<TestResult>(), dmOk);
                 Check(!tLap2.Exists(delegate(Finding f) { return f.Title.Contains("mas o pente suporta"); }) && tLap2.Exists(delegate(Finding f) { return f.Sev == Sev.Ok && f.Title.Contains("definida pelo fabricante"); }),
                     "notebook: sem dica de ativar XMP na BIOS");
+
+                Say("== 17. Placa de vídeo integrada");
+                Check(VideoAdapters.IsIntegrated("Intel(R) UHD Graphics 730") && VideoAdapters.IsIntegrated("Intel(R) Iris(R) Xe Graphics") && VideoAdapters.IsIntegrated("Intel(R) Arc(TM) Graphics") &&
+                      VideoAdapters.IsIntegrated("AMD Radeon(TM) Graphics") && VideoAdapters.IsIntegrated("AMD Radeon 780M Graphics") && VideoAdapters.IsIntegrated("AMD Radeon(TM) Vega 8 Graphics"),
+                    "integradas: Intel UHD, Iris Xe, Arc Graphics (Core Ultra), Radeon Graphics, 780M, Vega 8");
+                Check(!VideoAdapters.IsIntegrated("NVIDIA GeForce RTX 4050 Laptop GPU") && !VideoAdapters.IsIntegrated("AMD Radeon RX 7600") && !VideoAdapters.IsIntegrated("Intel(R) Arc(TM) A770 Graphics") &&
+                      !VideoAdapters.IsIntegrated("AMD Radeon RX 6700 XT") && !VideoAdapters.IsIntegrated("NVIDIA GeForce GTX 750 Ti"),
+                    "dedicadas: RTX 4050 Laptop, RX 7600, Arc A770, RX 6700 XT, GTX 750 Ti");
+                VideoAdapter vaI = new VideoAdapter(); vaI.Name = "Intel(R) UHD Graphics"; VideoAdapter vaN = new VideoAdapter(); vaN.Name = "NVIDIA GeForce RTX 4050 Laptop GPU";
+                Check(VideoAdapters.Primary(new List<VideoAdapter> { vaI, vaN }) == vaN && VideoAdapters.Primary(new List<VideoAdapter> { vaI }) == vaI, "notebook com Intel + NVIDIA: a principal é a NVIDIA");
+                HwSnapshot igp = new HwSnapshot(); igp.CpuName = "AMD Ryzen 5 5600G with Radeon Graphics"; igp.GpuName = "AMD Radeon(TM) Graphics"; igp.GpuIntegrated = true; igp.VramMB = 512;
+                igp.RamModules = 1; igp.DualChannel = false; igp.RamTotalGb = 16; igp.RamConfMts = 3200; igp.RamRatedMts = 3200; igp.RamType = 26; igp.PcieLanes = 0;
+                List<Finding> tIgp = Analyzer.BalanceTips(igp, new List<SessionData>(), new List<TestResult>(), dmOk);
+                Check(tIgp.Exists(delegate(Finding f) { return f.Title.Contains("integrada"); }) && !tIgp.Exists(delegate(Finding f) { return f.Title.Contains("VRAM"); }) &&
+                      tIgp.Exists(delegate(Finding f) { return f.Title.Contains("canal único") && f.Advice.Contains("integrada"); }),
+                    "integrada: dica própria (sem 'só 0,5 GB de VRAM') e o canal único pesa mais");
+                Say("");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");
                 return fails == 0 ? 0 : 1;

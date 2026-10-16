@@ -16,6 +16,61 @@ namespace DiagIT
         static extern int D3D11CreateDevice(IntPtr adapter, int driverType, IntPtr software, uint flags, int[] levels, uint numLevels,
             uint sdk, out IntPtr device, out int level, out IntPtr context);
 
+        [DllImport("dxgi.dll")]
+        static extern int CreateDXGIFactory1(ref Guid riid, out IntPtr factory);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct AdapterDesc1
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Description;
+            public uint VendorId, DeviceId, SubSysId, Revision;
+            public UIntPtr DedicatedVideoMemory, DedicatedSystemMemory, SharedSystemMemory;
+            public uint LuidLow; public int LuidHigh;
+            public uint Flags;
+        }
+        delegate int EnumAdapters1Fn(IntPtr self, uint i, out IntPtr adapter);
+        delegate int GetDesc1Fn(IntPtr self, out AdapterDesc1 d);
+
+        /// <summary>Placa usada no teste (nome e memória de vídeo dedicada). Num notebook com duas placas, o padrão do Windows seria a integrada.</summary>
+        public string AdapterName = "";
+        public double DedicatedMB = double.NaN;
+        public bool Integrated;
+
+        /// <summary>A placa com mais memória de vídeo dedicada (a dedicada, quando há duas); IntPtr.Zero deixa o Windows escolher.</summary>
+        static IntPtr BestAdapter(out string name, out double dedicatedMb)
+        {
+            name = ""; dedicatedMb = double.NaN;
+            IntPtr factory = IntPtr.Zero, best = IntPtr.Zero;
+            try
+            {
+                Guid iid = new Guid("770aae78-f26f-4dba-a829-253c83d1b387");   // IDXGIFactory1
+                if (CreateDXGIFactory1(ref iid, out factory) < 0) return IntPtr.Zero;
+                EnumAdapters1Fn enumA = Fn<EnumAdapters1Fn>(factory, 12);
+                ulong bestMem = 0;
+                for (uint i = 0; i < 16; i++)
+                {
+                    IntPtr a;
+                    if (enumA(factory, i, out a) < 0) break;
+                    AdapterDesc1 d;
+                    bool keep = false;
+                    if (Fn<GetDesc1Fn>(a, 10)(a, out d) >= 0 && (d.Flags & 2) == 0 && d.VendorId != 0x1414)   // sem software nem o "Basic Render" da Microsoft
+                    {
+                        ulong mem = d.DedicatedVideoMemory.ToUInt64();
+                        if (best == IntPtr.Zero || mem > bestMem)
+                        {
+                            if (best != IntPtr.Zero) Release(best);
+                            best = a; bestMem = mem; keep = true;
+                            name = d.Description ?? ""; dedicatedMb = mem / 1048576.0;
+                        }
+                    }
+                    if (!keep) Release(a);
+                }
+            }
+            catch { if (best != IntPtr.Zero) Release(best); best = IntPtr.Zero; }
+            finally { if (factory != IntPtr.Zero) Release(factory); }
+            return best;
+        }
+
         [DllImport("d3dcompiler_47.dll", CharSet = CharSet.Ansi)]
         static extern int D3DCompile([MarshalAs(UnmanagedType.LPStr)] string src, UIntPtr len, string name, IntPtr defines, IntPtr include,
             string entry, string target, uint f1, uint f2, out IntPtr code, out IntPtr errors);
@@ -59,9 +114,16 @@ namespace DiagIT
         public static Dx11 Create()
         {
             IntPtr dev, ctx; int lvl;
-            int hr = D3D11CreateDevice(IntPtr.Zero, 1, IntPtr.Zero, 0, new int[] { 0xb000 }, 1, 7, out dev, out lvl, out ctx);
+            string an; double amb;
+            IntPtr adapter = BestAdapter(out an, out amb);
+            // com uma placa escolhida o tipo de driver tem que ser "desconhecido" (0); sem escolha, o padrão do Windows (1 = hardware)
+            int hr = D3D11CreateDevice(adapter, adapter != IntPtr.Zero ? 0 : 1, IntPtr.Zero, 0, new int[] { 0xb000 }, 1, 7, out dev, out lvl, out ctx);
+            if (hr < 0 && adapter != IntPtr.Zero) { an = ""; amb = double.NaN; hr = D3D11CreateDevice(IntPtr.Zero, 1, IntPtr.Zero, 0, new int[] { 0xb000 }, 1, 7, out dev, out lvl, out ctx); }
+            if (adapter != IntPtr.Zero) Release(adapter);
             if (hr < 0) throw new Exception("Direct3D 11 indisponível (0x" + hr.ToString("X8") + ")");
             Dx11 d = new Dx11();
+            d.AdapterName = an; d.DedicatedMB = amb;
+            d.Integrated = an.Length > 0 && (VideoAdapters.IsIntegrated(an) || (!double.IsNaN(amb) && amb < 600));
             d.Dev = dev; d.Ctx = ctx;
             d.createBuffer = Fn<CreateBufferFn>(dev, 3);
             d.createUav = Fn<CreateUavFn>(dev, 8);
@@ -263,12 +325,20 @@ void Err(uint idx, uint expect, uint got) {
                 if (!dx.RawBuffer(burnBytes, out burnA, out burnAU) || !dx.RawBuffer(burnBytes, out burnB, out burnBU))
                     throw new Exception("sem memória de vídeo para o teste de cálculo");
 
+                if (dx.AdapterName.Length > 0)
+                {
+                    r.Detail("Placa testada: " + dx.AdapterName.Trim() + (dx.Integrated ? " (integrada ao processador)" : ""));
+                    r.Set("integrated", dx.Integrated ? 1 : 0);
+                }
+
                 // ---- blocos de VRAM
                 List<IntPtr[]> vram = new List<IntPtr[]>();
-                if (!opt.ComputeOnly)
+                if (dx.Integrated && !opt.ComputeOnly)
+                    r.Detail("Placa integrada: ela não tem memória de vídeo própria, usa a memória RAM do PC (que o teste de memória verifica).");
+                else if (!opt.ComputeOnly)
                 {
                     ctx.Phase = "Reservando memória de vídeo";
-                    double total = NativeInfo.TotalVramMB();
+                    double total = !double.IsNaN(dx.DedicatedMB) && dx.DedicatedMB > 0 ? dx.DedicatedMB : NativeInfo.TotalVramMB();
                     double used = UsedVramMB(ctx);
                     // margem para o Windows não mover a VRAM para a RAM: 700 MB em placas grandes, 256 MB nas de até 4 GB
                     // (numa GTX 750 Ti de 2 GB com 1,2 GB em uso pela área de trabalho, a margem fixa de 700 MB não deixava nada para testar)
@@ -306,8 +376,11 @@ void Err(uint idx, uint expect, uint got) {
                 r.Set("burn_iters", iters);
 
                 // ---- banda real do barramento PCIe (RAM -> VRAM e VRAM -> RAM), cronometrada
-                ctx.Phase = "Medindo a banda PCIe";
-                MeasurePcie(r);
+                if (!dx.Integrated)
+                {
+                    ctx.Phase = "Medindo a banda PCIe";
+                    MeasurePcie(r);
+                }
 
                 // ---- laço principal
                 ctx.Phase = "Estressando GPU";
@@ -385,7 +458,7 @@ void Err(uint idx, uint expect, uint got) {
                     r.Status = ctx.Cancel ? "aborted" : "passed";
                     r.Summary = "Nenhum erro: GPU em carga total por " + min.ToString("0.#") + " min sem travar, " + cycles + " cálculos idênticos conferidos" +
                         (vramPasses > 0 ? " e " + vramPasses + " passadas em " + (r.Get("vram_tested_mb") / 1024).ToString("0.0") + " GB de VRAM sem erro." :
-                         !opt.ComputeOnly ? ". A memória de vídeo (VRAM) não foi testada: estava quase toda em uso. Feche jogos, navegador e outros programas e rode de novo." : ".");
+                         !opt.ComputeOnly && !dx.Integrated ? ". A memória de vídeo (VRAM) não foi testada: estava quase toda em uso. Feche jogos, navegador e outros programas e rode de novo." : ".");
                 }
             }
             finally

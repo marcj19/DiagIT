@@ -71,6 +71,7 @@ namespace DiagIT
                     tips.Add(Tip(Sev.Info, BCheap, "A memória está em canal único (" + h.RamModules + " pente)",
                         "Capacidade total " + N0(h.RamTotalGb) + " GB.",
                         "Com um só pente, o processador usa metade da banda de memória: costuma custar bastante FPS e deixa o PC mais lento. " +
+                        (h.GpuIntegrated ? "Com placa de vídeo integrada a perda é ainda maior, porque ela usa essa mesma memória como memória de vídeo. " : "") +
                         (lap ? "Em notebook, a memória muitas vezes é soldada ou o aparelho tem só um slot: veja no manual ou no site do fabricante se existe um segundo slot livre antes de comprar qualquer coisa."
                              : "Colocar um segundo pente igual (nos slots indicados no manual da placa-mãe) é um dos upgrades mais baratos e de maior efeito."), null, null));
                 else
@@ -127,7 +128,13 @@ namespace DiagIT
             }
 
             // ---------------------------------------------------------------- 3b. Memória de vídeo pequena
-            if (h != null && !double.IsNaN(h.VramMB) && h.VramMB > 0 && h.VramMB <= 4200)
+            if (h != null && h.GpuIntegrated)
+                tips.Add(Tip(Sev.Info, BWhere, "Seus jogos rodam na placa de vídeo integrada ao processador",
+                    (h.GpuName.Length > 0 ? h.GpuName.Trim() + ". " : "") + "Ela não tem memória própria: usa a memória RAM do PC e divide a energia e a refrigeração com o processador.",
+                    "Para jogos, rende: memória em dual channel (dois pentes), a mais rápida que o processador aceita, e jogos em qualidade baixa ou com upscaling (FSR ou XeSS). " +
+                    (lap ? "Em notebook a placa de vídeo não se troca: mantenha-o na tomada e com o plano de energia de desempenho."
+                         : "Se quiser gastar, uma placa de vídeo dedicada é, de longe, o upgrade que mais muda o FPS; confira antes se a fonte de energia aguenta."), null, null));
+            else if (h != null && !double.IsNaN(h.VramMB) && h.VramMB > 0 && h.VramMB <= 4200)
             {
                 // quanto da VRAM os jogos usaram de verdade (95% do tempo abaixo disso)
                 List<double> vu = new List<double>();

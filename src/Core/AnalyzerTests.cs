@@ -199,7 +199,7 @@ namespace DiagIT
             }
 
             double lanes = t.Get("t_pcie_lanes_max");
-            if (d.Hw != null && !d.Hw.IsLaptop && d.Hw.PcieMaxLanes > 0 && !double.IsNaN(lanes) && lanes > 0 && lanes < d.Hw.PcieMaxLanes)
+            if (d.Hw != null && !d.Hw.IsLaptop && !d.Hw.GpuIntegrated && t.Get("integrated") != 1 && d.Hw.PcieMaxLanes > 0 && !double.IsNaN(lanes) && lanes > 0 && lanes < d.Hw.PcieMaxLanes)
                 // compara com o máximo da PLACA DE VÍDEO, não com o do slot: em slots ligados em x4 (segundo slot, algumas placas-mãe) isso é normal, por isso é indício
                 d.Findings.Add(New(Sev.Warn, "GPU conectada com menos pistas PCIe (x" + N0(lanes) + " de x" + d.Hw.PcieMaxLanes + ")" + where, "Medido pela própria GPU sob carga.",
                     "Veja se a placa está no slot principal. Se estiver, desligue o PC, reencaixe a placa de vídeo, limpe o slot e não use riser. Persistindo, o slot da placa-mãe pode estar com defeito. (Em slots secundários ligados em x4, isso é normal.)", false, Comp.Board)
@@ -344,7 +344,7 @@ namespace DiagIT
 
             // leitura de agora, com a placa possivelmente em repouso (ela pode baixar o link para economizar): é indício; a prova vem do teste de placa de vídeo, sob carga.
             // Em notebook o número de pistas é escolha do fabricante.
-            if (!h.IsLaptop && h.PcieLanes > 0 && h.PcieMaxLanes > 0 && h.PcieLanes < h.PcieMaxLanes)
+            if (!h.IsLaptop && !h.GpuIntegrated && h.PcieLanes > 0 && h.PcieMaxLanes > 0 && h.PcieLanes < h.PcieMaxLanes)
             {
                 Finding f = new Finding();
                 f.Sev = Sev.Warn; f.Source = "Medição da placa de vídeo"; f.Primary = (int)Comp.Board;

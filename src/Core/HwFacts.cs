@@ -39,6 +39,7 @@ namespace DiagIT
         public int RamRatedMts, RamConfMts, RamType;
         public double RamTotalGb;
         public double VramMB = double.NaN;
+        public bool GpuIntegrated;   // só placa integrada ao processador (sem placa de vídeo dedicada)
         /// <summary>Geração máxima de PCIe que a placa de vídeo suporta (4 = PCIe 4.0), ou -1.</summary>
         public int PcieMaxGen = -1;
         public bool DualChannel;
@@ -231,6 +232,7 @@ namespace DiagIT
                 DateTime d = gpuA.DriverDate;
                 h.GpuDriver = gpuA.DriverVersion;
                 h.GpuName = gpuA.Name;
+                h.GpuIntegrated = VideoAdapters.IsIntegrated(gpuA.Name);
                 h.GpuDriverAgeDays = d > DateTime.MinValue ? (int)(DateTime.Now - d).TotalDays : -1;
                 f.Add(new Fact("Placa de vídeo", "Modelo", gpuA.Name, -1, null));
                 f.Add(new Fact("Placa de vídeo", "Driver", h.GpuDriver + (d > DateTime.MinValue ? " de " + d.ToString("dd/MM/yyyy", Pt) : ""),
@@ -248,15 +250,17 @@ namespace DiagIT
             }
             double vram = NativeInfo.TotalVramMB();
             h.VramMB = vram;
-            if (!double.IsNaN(vram)) f.Add(new Fact("Placa de vídeo", "Memória de vídeo", (vram / 1024).ToString("0.0", Pt) + " GB", -1, null));
-            PcieMaxFromPnp(h);
+            if (h.GpuIntegrated)
+                f.Add(new Fact("Placa de vídeo", "Tipo", "integrada ao processador", -1, "Usa a memória RAM do PC como memória de vídeo; por isso a memória em dual channel faz bastante diferença nos jogos."));
+            else if (!double.IsNaN(vram)) f.Add(new Fact("Placa de vídeo", "Memória de vídeo", (vram / 1024).ToString("0.0", Pt) + " GB", -1, null));
+            if (!h.GpuIntegrated) PcieMaxFromPnp(h);   // a integrada não usa slot PCIe
             if (hub != null && hub.Adl != null)
             {
                 int g, w; hub.Adl.PcieLink(out g, out w);
                 h.PcieLanes = w; h.PcieGenLevel = g;
             }
             else if (hub != null && hub.Nvml != null) { h.PcieLanes = hub.Nvml.PcieLanes; h.PcieGenLevel = hub.Nvml.PcieGen; }
-            if (h.PcieLanes > 0)
+            if (h.PcieLanes > 0 && !h.GpuIntegrated)
             {
                 // em repouso a placa pode baixar o link para economizar energia, e no notebook quem define as pistas é o fabricante
                 bool reduced = h.PcieMaxLanes > 0 && h.PcieLanes < h.PcieMaxLanes;

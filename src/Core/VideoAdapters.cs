@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Management;
 
@@ -68,8 +68,26 @@ namespace DiagIT
         }
 
         /// <summary>A placa de verdade (a primeira que não é genérica), ou null se só há o adaptador básico.</summary>
+        /// <summary>
+        /// Placa de vídeo integrada ao processador (usa a memória RAM do PC): Intel UHD / Iris Xe / "Arc Graphics" dos Core Ultra,
+        /// AMD "Radeon Graphics" / "Radeon 780M" / "Vega 8". As dedicadas têm número de modelo: Intel Arc A770, Radeon RX 7600, qualquer NVIDIA.
+        /// </summary>
+        public static bool IsIntegrated(string name)
+        {
+            string n = (name ?? "").ToLowerInvariant();
+            if (n.Length == 0 || n.Contains("nvidia") || n.Contains("geforce") || n.Contains("quadro")) return false;
+            if (n.Contains("intel"))
+                return !System.Text.RegularExpressions.Regex.IsMatch(n, @"arc\S*\s+(\(tm\)\s+)?[ab]\d{3}");
+            if (n.Contains("radeon") || n.Contains("amd") || n.Contains("vega"))
+                return !n.Contains(" rx ") && !n.Contains("rx ") && !n.Contains(" pro ") &&
+                       (n.Contains("vega") || System.Text.RegularExpressions.Regex.IsMatch(n, @"\d{3}m\b") || n.TrimEnd().EndsWith("graphics"));
+            return false;
+        }
+
+        /// <summary>A placa principal: a dedicada quando o PC tem as duas (notebook com Intel + NVIDIA, por exemplo), senão a integrada.</summary>
         public static VideoAdapter Primary(List<VideoAdapter> l)
         {
+            foreach (VideoAdapter a in l) if (!a.Generic && !IsIntegrated(a.Name)) return a;
             foreach (VideoAdapter a in l) if (!a.Generic) return a;
             return null;
         }
