@@ -1019,3 +1019,73 @@ namespace DiagIT
         }
     }
 }
+
+namespace DiagIT
+{
+    /// <summary>"Calendário de saúde": um quadradinho por dia dos últimos 30 dias (verde = jogou sem problema, cinza = sem uso, vermelho = problema de verdade).</summary>
+    public class HealthStrip : FlowControl
+    {
+        List<DayStat> days = new List<DayStat>();
+        readonly ToolTip tip = new ToolTip();
+        int hover = -1;
+
+        public void Show(MonthSummary m) { days = m != null ? m.Days : new List<DayStat>(); Invalidate(); }
+
+        public override int Measure(int width) { return Theme.S(72); }
+
+        int Cell(int x)
+        {
+            if (days.Count == 0) return -1;
+            int w = Math.Max(8, (Width - Theme.S(2)) / days.Count);
+            int i = x / w;
+            return i >= 0 && i < days.Count ? i : -1;
+        }
+
+        string Describe(DayStat d)
+        {
+            string play = d.Hours >= 0.05 ? d.Hours.ToString("0.#") + " h jogadas" : "sem jogo gravado";
+            List<string> p = new List<string>();
+            if (d.BlueScreens > 0) p.Add(d.BlueScreens + " tela(s) azul(is)");
+            if (d.Shutdowns > 0) p.Add(d.Shutdowns + " desligamento(s) sem aviso");
+            if (d.VideoSymptoms > 0) p.Add(d.VideoSymptoms + " queda(s) de vídeo");
+            return d.Day.ToString("dd/MM") + ": " + play + (p.Count > 0 ? ", " + string.Join(", ", p.ToArray()) : ", sem problemas");
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            int i = Cell(e.X);
+            if (i != hover) { hover = i; tip.SetToolTip(this, i >= 0 ? Describe(days[i]) : ""); }
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.Clear(Theme.Bg);
+            if (days.Count == 0) return;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            int n = days.Count, gap = Theme.S(4), w = Math.Max(8, (Width - Theme.S(2)) / n), cw = w - gap, ch = Theme.S(30);
+            for (int i = 0; i < n; i++)
+            {
+                DayStat d = days[i];
+                Color c = d.Problems > 0 ? Theme.Bad : d.Hours >= 0.05 ? Theme.Good : Theme.Panel2;
+                Rectangle r = new Rectangle(i * w, 0, cw, ch);
+                using (GraphicsPath p = Theme.Round(r, Theme.S(4))) using (SolidBrush b = new SolidBrush(c)) g.FillPath(b, p);
+            }
+            int ly = ch + Theme.S(8);
+            Theme.Text_(g, "há 30 dias", Theme.Font(8f), Theme.Faint, new Rectangle(0, ly, Theme.S(90), Theme.S(16)), 0);
+            Theme.Text_(g, "hoje", Theme.Font(8f), Theme.Faint, new Rectangle(Math.Max(0, n * w - Theme.S(40)), ly, Theme.S(40), Theme.S(16)), TextFormatFlags.Right);
+            // legenda
+            int lx = Math.Max(Theme.S(110), n * w / 2 - Theme.S(190));
+            string[] names = { "jogou sem problema", "sem uso", "problema de verdade" };
+            Color[] cols = { Theme.Good, Theme.Panel2, Theme.Bad };
+            for (int i = 0; i < 3; i++)
+            {
+                using (SolidBrush b = new SolidBrush(cols[i])) g.FillRectangle(b, lx, ly + Theme.S(3), Theme.S(10), Theme.S(10));
+                int tw = TextRenderer.MeasureText(names[i], Theme.Font(8f)).Width;
+                Theme.Text_(g, names[i], Theme.Font(8f), Theme.Faint, new Rectangle(lx + Theme.S(14), ly, tw + Theme.S(6), Theme.S(16)), 0);
+                lx += Theme.S(14) + tw + Theme.S(22);
+            }
+        }
+    }
+}

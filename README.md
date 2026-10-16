@@ -43,6 +43,16 @@ Regras que mantêm o verde honesto (e o alarme verdadeiro quando há problema re
 - **Programas que não são jogo** (TeamSpeak, Discord, navegadores...) nunca são tratados como jogo.
 - O aviso no fim de cada partida mostra só o que é novo **dessa** partida (e o FPS), não os alertas dos últimos 30 dias.
 - "Resolveu?" conta antes e depois do mesmo jeito (só com sintoma) e um achado resolvido vira histórico.
+- **"Fui eu que desliguei"**: o usuário pode marcar desligamentos inesperados como ação dele (segurou o botão de energia). Eles ficam no histórico e no relatório, mas
+  deixam de contar; só vale para aquele horário, então um desligamento novo sem marcação volta a alarmar. Uma partida que parou junto com um desligamento normal do
+  Windows (eventos 1074 e 6006) não é tratada como queda.
+- **Modo de exibição** (Configurações): *Simples* (padrão) usa rótulos do dia a dia e esconde os menus avançados; *Técnico* mostra a fonte e os códigos de cada achado,
+  abre os detalhes e libera Ao vivo, Hardware e Partidas gravadas. O diagnóstico é o mesmo nos dois.
+- **Calendário de saúde** no Início: um quadradinho por dia dos últimos 30 dias (verde = jogou sem problema, cinza = sem uso, vermelho = problema de verdade).
+- **Atestado de saúde** (Resultados): uma página para mostrar a quem vai comprar, vender ou receber o PC, só com o que foi medido, com data e prova de cada peça,
+  e com o que **não** foi verificado. Não é laudo técnico.
+- **Compatibilidade e upgrades** (página Desempenho): a plataforma do seu processador (soquete, memória aceita, PCIe) e os processadores mais fortes que encaixam
+  sem trocar placa-mãe nem memória, sempre mandando conferir a lista do fabricante. Em notebook, esses conselhos não aparecem.
    Para defeitos que aparecem de vez em quando, o **check-up à noite** (3 h ou 8 h) testa por horas e impede o PC de dormir.
 7. **Desempenho**: o que segura o seu PC e onde um ajuste ou upgrade rende, com **dado do seu PC por trás** de cada dica (nada genérico). Mostra, por exemplo:
    tela em 60 Hz com monitor que aceita mais (de graça), perfil de velocidade da memória desligado na BIOS, memória em canal único ou lenta, só 8 GB, Windows em HD,
@@ -124,7 +134,9 @@ substituir o executável que estiver aberto. Testes sem interface: `DiagIT.exe -
 ## Regras em dados (contribua sem programar)
 
 O conhecimento do diagnóstico fica em [`data/`](data): códigos de tela azul, textos por fabricante (AMD, NVIDIA, Intel), clock oficial das
-placas, programas que causam engasgos e a tradução para linguagem simples. Os arquivos são embutidos no executável; uma pasta `data` ao lado
+placas, programas que causam engasgos, a tradução para linguagem simples, **o que é normal e não vira alarme** (`normal.json`: programas que nunca são
+jogo, dispositivos sem driver que são inofensivos) e **a compatibilidade de plataformas** (`compatibilidade.json`: soquete, memória, PCIe e upgrades que
+encaixam por família de processador). Os arquivos são embutidos no executável; uma pasta `data` ao lado
 do `DiagIT.exe` substitui as regras embutidas, para testar uma edição sem compilar. Veja [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Aviso do Windows ao abrir

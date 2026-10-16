@@ -77,6 +77,7 @@ namespace DiagIT
         public bool Notify = true;
         public bool AlwaysAdmin = true;
         public bool Overlay = true;          // painel no jogo (FPS, temperaturas) durante as partidas
+        public bool Technical = false;       // modo de exibição: false = simples (padrão), true = técnico (códigos, fontes, tudo aberto)
         public int OverlayCorner = 0;        // 0 sup. esquerdo, 1 sup. direito, 2 inf. esquerdo, 3 inf. direito
         public string IgnoreList =
             "dwm,explorer,chrome,msedge,msedgewebview2,firefox,brave,opera,vivaldi,steamwebhelper,discord,spotify," +
@@ -132,22 +133,9 @@ namespace DiagIT
 
         public void ResetCache() { ignoreSet = null; gameSet = null; }
 
-        /// <summary>Programas de comunicação, navegação e produtividade que nunca são tratados como jogo, mesmo usando a placa de vídeo (a lista salva do usuário não precisa conhecê-los).</summary>
-        static readonly HashSet<string> NeverGames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "teamspeak", "teamspeak3", "ts3client_win64", "ts3client_win32", "teamspeak 3", "discord", "discordptb", "discordcanary", "slack", "teams", "ms-teams", "msteams", "zoom",
-            "skype", "telegram", "signal", "whatsapp", "telegramdesktop", "obs", "obs64", "obs32", "streamlabs obs", "spotify", "chrome", "msedge", "firefox", "brave", "opera", "vivaldi",
-            "steamwebhelper", "explorer", "dwm", "vlc", "outlook", "onenote", "notion", "figma", "code", "devenv", "claude", "wallpaper32", "wallpaper64", "msedgewebview2"
-        };
+        /// <summary>true = esse programa nunca é um jogo (comunicação, navegador, produtividade): a lista fica em data/normal.json.</summary>
+        public static bool IsNeverGame(string name) { return Rules.IsNeverGame(name); }
 
-        /// <summary>true = esse programa nunca é um jogo (comunicação, navegador, produtividade).</summary>
-        public static bool IsNeverGame(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return false;
-            string n = name.Trim();
-            if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) n = n.Substring(0, n.Length - 4);
-            return NeverGames.Contains(n);
-        }
 
         /// <summary>"Isso não é um jogo": tira o programa da lista de jogos e põe na de ignorados, e salva.</summary>
         public void MarkNotAGame(string proc)
@@ -197,6 +185,7 @@ namespace DiagIT
                         case "notify": s.Notify = v == "1"; break;
                         case "admin": s.AlwaysAdmin = v == "1"; break;
                         case "overlay": s.Overlay = v == "1"; break;
+                        case "mode": s.Technical = v == "tecnico"; break;
                         case "overlay_corner": int oc; if (int.TryParse(v, out oc)) s.OverlayCorner = Math.Max(0, Math.Min(3, oc)); break;
                         case "ignore": if (v.Length > 0) s.IgnoreList = v; break;
                         case "games": if (v.Length > 0) s.GameList = v; break;
@@ -228,6 +217,7 @@ namespace DiagIT
                     "notify=" + (Notify ? "1" : "0"),
                     "admin=" + (AlwaysAdmin ? "1" : "0"),
                     "overlay=" + (Overlay ? "1" : "0"),
+                    "mode=" + (Technical ? "tecnico" : "simples"),
                     "overlay_corner=" + OverlayCorner,
                     "games=" + GameList,
                     "ignore=" + IgnoreList

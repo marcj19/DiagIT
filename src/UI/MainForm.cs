@@ -24,6 +24,7 @@ namespace DiagIT
 
         Panel side, content;
         NavButton[] navs;
+        Label advLabel;
         Panel[] pages;
         int curPage = -1;
         System.Windows.Forms.Timer ui;
@@ -41,6 +42,7 @@ namespace DiagIT
         public MainForm(AppSettings cfg, Watcher w, TestRunner runner, bool startHidden, List<SessionInfo> recovered, TestResult crashedTest)
         {
             this.cfg = cfg;
+            FindingCard.Technical = cfg.Technical;
             this.w = w;
             this.runner = runner;
             allowVisible = !startHidden;
@@ -267,6 +269,7 @@ namespace DiagIT
             int[] main = { P_HOME, P_PROBLEM, P_TESTS, P_DIAG, P_PERF, P_FIX };
             foreach (int i in main) { navs[i] = NavItem(caps[i], ics[i], i, y); y += Theme.S(46); }
             Label adv = new Label();
+            advLabel = adv;
             adv.Text = "AVANÇADO";
             adv.Font = Theme.Font(8f, FontStyle.Bold);
             adv.ForeColor = Color.FromArgb(111, 123, 137);
@@ -276,11 +279,12 @@ namespace DiagIT
             y += Theme.S(40);
             int[] more = { P_LIVE, P_HW, P_SESS };
             foreach (int i in more) { navs[i] = NavItem(caps[i], ics[i], i, y); y += Theme.S(46); }
+            ApplyViewMode(false);
 
             sideStatus = new SideStatus();
             sideStatus.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
             sideStatus.SetBounds(0, side.Height - Theme.S(150), side.Width, Theme.S(84));
-            sideStatus.Click += delegate { Navigate(runner.Busy ? P_RUN : w.Current != null ? P_LIVE : P_SESS); };
+            sideStatus.Click += delegate { Navigate(runner.Busy ? P_RUN : !cfg.Technical ? P_HOME : w.Current != null ? P_LIVE : P_SESS); };
             side.Controls.Add(sideStatus);
             navs[P_SET] = NavItem(caps[P_SET], ics[P_SET], P_SET, side.Height - Theme.S(58));
             navs[P_SET].Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
@@ -547,7 +551,7 @@ namespace DiagIT
         VerdictBlock lblVerdict;
         CompStateList bars;
         FindingList flist;
-        FlatButton btnAnalyze, btnExport, btnPackage;
+        FlatButton btnAnalyze, btnExport, btnCert, btnPackage;
         Diagnosis lastDiag;
         List<SessionData> lastDiagSessions = new List<SessionData>();
 
@@ -558,7 +562,7 @@ namespace DiagIT
 
             Panel top = new Panel();
             top.Dock = DockStyle.Top;
-            top.Height = Theme.S(48);
+            top.Height = Theme.S(70);   // duas linhas: botões e, abaixo, o estado da análise
             p.Controls.Add(top);
             top.BringToFront();
 
@@ -575,8 +579,12 @@ namespace DiagIT
             btnExport.Location = new Point(btnAnalyze.Right + Theme.S(8), Theme.S(6));
             btnExport.Click += delegate { ExportReport(); };
             top.Controls.Add(btnExport);
+            btnCert = new FlatButton("Atestado de saúde", false);
+            btnCert.Location = new Point(btnExport.Right + Theme.S(8), Theme.S(6));
+            btnCert.Click += delegate { ExportCertificate(); };
+            top.Controls.Add(btnCert);
             btnPackage = new FlatButton("Pacote para o técnico", false);
-            btnPackage.Location = new Point(btnExport.Right + Theme.S(8), Theme.S(6));
+            btnPackage.Location = new Point(btnCert.Right + Theme.S(8), Theme.S(6));
             btnPackage.Click += delegate { ExportPackage(); };
             top.Controls.Add(btnPackage);
 
@@ -584,7 +592,7 @@ namespace DiagIT
             lblDiagStatus.ForeColor = Theme.Muted;
             lblDiagStatus.AutoSize = false;
             lblDiagStatus.TextAlign = ContentAlignment.MiddleLeft;
-            lblDiagStatus.SetBounds(btnPackage.Right + Theme.S(12), Theme.S(6), Theme.S(400), Theme.S(32));
+            lblDiagStatus.SetBounds(0, Theme.S(46), Theme.S(700), Theme.S(20));
             top.Controls.Add(lblDiagStatus);
 
             TableLayoutPanel t = new TableLayoutPanel();
@@ -673,6 +681,15 @@ namespace DiagIT
         void OnFindingAction(Finding f, string action)
         {
             if (action == "guide" && f.Guide != null) { OpenGuide(f.Guide, f); return; }
+            if (action == "annot" && f.AnnotKind.Length > 0 && f.Times.Count > 0)
+            {
+                if (MessageBox.Show(this, "Marcar " + (f.Times.Count == 1 ? "este desligamento" : "estes " + f.Times.Count + " desligamentos") + " como ação sua (por exemplo, você segurou o botão de energia ou desligou o PC no estabilizador)?\n\n" +
+                    "Eles continuam no histórico e no relatório, mas deixam de contar como problema. Vale só para esses horários: se o PC desligar de novo sem você ter feito nada, o alerta volta.\n\n" +
+                    "Só marque se tiver certeza de que foi você.", "Fui eu que desliguei", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+                Annotations.Add(f.AnnotKind, f.Times);
+                StartAnalyzeClick(false);
+                return;
+            }
             if (action != "fix") return;
             string scope = Analyzer.ScopeOf(f);
             if (MessageBox.Show(this, "Marcar como feito: \"" + Analyzer.FirstSentence(f.Advice) + "\"\n\nO DiagIT vai acompanhar se os " + Analyzer.ScopeName(scope) +
@@ -700,24 +717,27 @@ namespace DiagIT
         }
 
         /// <summary>Dados do relatório coletados em segundo plano (drivers e versão do Windows levam alguns segundos).</summary>
-        void WithReport(string doing, Action<string, ReportExtras> done)
+        void WithReport(string doing, Action<string, ReportExtras> done) { WithReport(doing, false, done); }
+
+        /// <summary>certificate: monta o atestado de saúde de uma página em vez do relatório completo.</summary>
+        void WithReport(string doing, bool certificate, Action<string, ReportExtras> done)
         {
             if (lastDiag == null) { MessageBox.Show(this, "Espere a análise terminar (alguns segundos) e tente de novo.", "DiagIT"); return; }
             Diagnosis d = lastDiag;
             List<SessionData> sds = lastDiagSessions;
             MachineInfo m = machine ?? new MachineInfo();
-            btnExport.Enabled = btnPackage.Enabled = false;
+            btnExport.Enabled = btnCert.Enabled = btnPackage.Enabled = false;
             SetDiagStatus(doing);
             Thread t = new Thread(delegate()
             {
                 try
                 {
                     ReportExtras x = ReportExtras.Collect(events);
-                    string html = Report.Build(d, m, sds, x);
+                    string html = certificate ? Report.BuildCertificate(d, m, x) : Report.Build(d, m, sds, x);
                     Post(delegate { done(html, x); });
                 }
                 catch (Exception e) { Log.Write("Relatório: " + e); Post(delegate { MessageBox.Show(this, "Não foi possível gerar o relatório:\n" + e.Message, "DiagIT"); }); }
-                finally { Post(delegate { btnExport.Enabled = btnPackage.Enabled = true; SetDiagStatus(""); }); }
+                finally { Post(delegate { btnExport.Enabled = btnCert.Enabled = btnPackage.Enabled = true; SetDiagStatus(""); }); }
             });
             t.IsBackground = true;
             t.Start();
@@ -729,6 +749,21 @@ namespace DiagIT
             {
                 try { Process.Start(Report.Save(html)); }
                 catch (Exception e) { MessageBox.Show(this, "Não foi possível abrir o relatório:\n" + e.Message, "DiagIT"); }
+            });
+        }
+
+        void ExportCertificate()
+        {
+            WithReport("Montando o atestado de saúde...", true, delegate(string html, ReportExtras x)
+            {
+                try
+                {
+                    Paths.Ensure();
+                    string path = System.IO.Path.Combine(Paths.Reports, "atestado_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".html");
+                    System.IO.File.WriteAllText(path, html, new System.Text.UTF8Encoding(true));
+                    Process.Start(path);   // abre no navegador: imprimir ou salvar em PDF
+                }
+                catch (Exception e) { MessageBox.Show(this, "Não foi possível abrir o atestado:\n" + e.Message, "DiagIT"); }
             });
         }
 

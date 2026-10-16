@@ -1,0 +1,12 @@
+{
+  "_sobre": "O que é normal e não deve virar alarme. 'nunca_jogo' = programas que nunca são tratados como jogo (nome do processo, sem .exe), mesmo usando a placa de vídeo. 'dispositivos_inofensivos' = dispositivos sem driver que não causam travamento nem tela azul: 'nomes' são trechos do nome do dispositivo e 'classes' são classes do Gerenciador de Dispositivos. Vídeo, sistema, armazenamento e rede nunca devem entrar aqui. Quem contribui pode editar sem programar.",
+  "nunca_jogo": [
+    "teamspeak", "teamspeak3", "ts3client_win64", "ts3client_win32", "teamspeak 3", "discord", "discordptb", "discordcanary", "slack", "teams", "ms-teams", "msteams", "zoom",
+    "skype", "telegram", "signal", "whatsapp", "telegramdesktop", "obs", "obs64", "obs32", "streamlabs obs", "spotify", "chrome", "msedge", "firefox", "brave", "opera", "vivaldi",
+    "steamwebhelper", "explorer", "dwm", "vlc", "outlook", "onenote", "notion", "figma", "code", "devenv", "claude", "wallpaper32", "wallpaper64", "msedgewebview2"
+  ],
+  "dispositivos_inofensivos": {
+    "nomes": ["h80i", "h100i", "h115i", "h150i", "corsair", "nzxt", "kraken", "lian li", "rgb"],
+    "classes": ["usb", "hidclass", "bluetooth", "media", "camera", "image", "keyboard", "mouse", "ports", "wpd", "printer", "smartcardreader", "biometric", "swdevice"]
+  }
+}

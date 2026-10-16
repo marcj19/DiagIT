@@ -15,6 +15,7 @@ namespace DiagIT
         readonly List<StepRow> homeSteps = new List<StepRow>();
         SectionTitle fixesTitle;
         MonthStrip monthStrip;
+        HealthStrip healthStrip;
         FixList fixList;
 
         static readonly TestKind[] KindOrder = { TestKind.Cpu, TestKind.Ram, TestKind.Gpu, TestKind.Disk, TestKind.Combined };
@@ -74,6 +75,8 @@ namespace DiagIT
             homeFlow.Controls.Add(new SectionTitle("Seus últimos 30 dias", false));
             monthStrip = new MonthStrip();
             homeFlow.Controls.Add(monthStrip);
+            healthStrip = new HealthStrip();
+            homeFlow.Controls.Add(healthStrip);
 
             homeFlow.Controls.Add(new SectionTitle("Suas peças", true));
             parts = new PartsGrid();
@@ -245,6 +248,7 @@ namespace DiagIT
             if (fixList.Items.Count > 0) { homeFlow.Place(fixesTitle, hero); homeFlow.Place(fixList, fixesTitle); }
             fixList.Invalidate();
             monthStrip.Show(d != null ? d.Month : null);
+            healthStrip.Show(d != null ? d.Month : null);
             homeFlow.Relayout();
         }
     }

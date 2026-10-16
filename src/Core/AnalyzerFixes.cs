@@ -58,7 +58,7 @@ namespace DiagIT
             if (scope == "desligamentos" || all)
             {
                 foreach (WinEvent e in ev)
-                    if (e.Provider == "Microsoft-Windows-Kernel-Power" && e.Id == 41 && ParseCode(e.Prop(0)) == 0 &&
+                    if (e.Provider == "Microsoft-Windows-Kernel-Power" && e.Id == 41 && ParseCode(e.Prop(0)) == 0 && !Annotations.Has("desligamento", e.Time) &&
                         !r.Exists(delegate(DateTime t) { return Math.Abs((t - e.Time).TotalMinutes) < 10; })) r.Add(e.Time);
             }
             if (scope == "engasgos" || all)

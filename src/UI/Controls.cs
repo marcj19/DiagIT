@@ -795,13 +795,17 @@ namespace DiagIT
         readonly Finding f;
         const TextFormatFlags WB = TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left;
         int hTitle, hAdv, hTech;
-        Rectangle toggleRect = Rectangle.Empty, guideRect = Rectangle.Empty, fixRect = Rectangle.Empty;
+        Rectangle toggleRect = Rectangle.Empty, guideRect = Rectangle.Empty, fixRect = Rectangle.Empty, annotRect = Rectangle.Empty;
         public bool Highlight, Expanded;
         public event EventHandler ToggledDetails;
         public event Action<Finding, string> ActionClicked;
-        bool HasActions { get { return (f.Advice.Length > 0 && (f.Sev == Sev.Crit || f.Sev == Sev.Warn)) || (f.Tip && f.Guide != null); } }
+        bool HasActions { get { return (f.Advice.Length > 0 && (f.Sev == Sev.Crit || f.Sev == Sev.Warn)) || (f.Tip && f.Guide != null) || f.AnnotKind.Length > 0; } }
 
-        public FindingCard(Finding f) { this.f = f; AccessibleName = f.Plain; AccessibleDescription = f.Advice; }
+        /// <summary>Modo técnico: mostra a fonte do achado e abre os detalhes por padrão; o simples usa rótulos do dia a dia e deixa os detalhes recolhidos.</summary>
+        public static bool Technical;
+        static string ChipText(string conf) { return Technical ? conf : conf == "INDÍCIO" ? "ATENÇÃO" : conf == "INFORMAÇÃO" ? "PARA SABER" : conf; }
+
+        public FindingCard(Finding f) { this.f = f; Expanded = Technical; AccessibleName = f.Plain; AccessibleDescription = f.Advice; }
         public Finding Finding { get { return f; } }
 
         bool HasTech { get { return f.Evidence.Length > 0 || f.Simple.Length > 0; } }
@@ -853,7 +857,7 @@ namespace DiagIT
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            Cursor = toggleRect.Contains(e.Location) || guideRect.Contains(e.Location) || fixRect.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
+            Cursor = toggleRect.Contains(e.Location) || guideRect.Contains(e.Location) || fixRect.Contains(e.Location) || annotRect.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
             base.OnMouseMove(e);
         }
 
@@ -861,6 +865,7 @@ namespace DiagIT
         {
             if (guideRect.Contains(e.Location) && ActionClicked != null) ActionClicked(f, "guide");
             else if (fixRect.Contains(e.Location) && ActionClicked != null) ActionClicked(f, "fix");
+            else if (annotRect.Contains(e.Location) && ActionClicked != null) ActionClicked(f, "annot");
             else if (toggleRect.Contains(e.Location))
             {
                 Expanded = !Expanded;
@@ -887,8 +892,8 @@ namespace DiagIT
                 g.DrawPath(pen, p);
             }
             int x = Theme.S(20), iw = InnerW(Width), y = Theme.S(16);
-            int cw = Theme.TagPill(g, x, y, conf, LabelText(f), LabelColor(f), bg);
-            if (f.Source.Length > 0)
+            int cw = Theme.TagPill(g, x, y, ChipText(conf), LabelText(f), LabelColor(f), bg);
+            if (Technical && f.Source.Length > 0)
                 Theme.Text_(g, f.Source, Theme.Font(8.5f), Theme.Faint, new Rectangle(x + cw + Theme.S(10), y, iw - cw - Theme.S(10), Theme.S(20)), TextFormatFlags.VerticalCenter);
             y += Theme.S(20) + Theme.S(10);
             TextRenderer.DrawText(g, f.Plain, Theme.Font(11f, FontStyle.Bold), new Rectangle(x, y, iw, hTitle), Theme.Text, WB);
@@ -901,7 +906,7 @@ namespace DiagIT
                 TextRenderer.DrawText(g, f.Advice, Theme.Font(9.5f), new Rectangle(x, y, iw, hAdv), Theme.Soft, WB);
                 y += hAdv;
             }
-            guideRect = fixRect = Rectangle.Empty;
+            guideRect = fixRect = annotRect = Rectangle.Empty;
             if (HasActions)
             {
                 y += Theme.S(12);
@@ -925,6 +930,16 @@ namespace DiagIT
                     using (GraphicsPath p = Theme.Round(fixRect, Theme.S(9)))
                     using (Pen pen = new Pen(Theme.Border2)) g.DrawPath(pen, p);
                     Theme.Text_(g, fl, Theme.Font(9f, FontStyle.Bold), Theme.Text, fixRect, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    bx = fixRect.Right + Theme.S(10);
+                }
+                if (f.AnnotKind.Length > 0)
+                {
+                    string al = "Fui eu que desliguei";
+                    int aw = TextRenderer.MeasureText(al, Theme.Font(9f, FontStyle.Bold)).Width + Theme.S(28);
+                    annotRect = new Rectangle(bx, y, aw, bh);
+                    using (GraphicsPath p = Theme.Round(annotRect, Theme.S(9)))
+                    using (Pen pen = new Pen(Theme.Border2)) g.DrawPath(pen, p);
+                    Theme.Text_(g, al, Theme.Font(9f, FontStyle.Bold), Theme.Text, annotRect, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 }
                 y += bh;
             }

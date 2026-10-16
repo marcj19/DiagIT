@@ -28,6 +28,8 @@ namespace DiagIT
     public class GuideAction { public string Label = "", Type = "", Target = ""; }
     public class GuideStep { public string Title = "", Text = ""; public List<GuideAction> Actions = new List<GuideAction>(); }
     public class Guide { public string Id = "", Title = "", Summary = "", Done = "", Scope = ""; public List<GuideStep> Steps = new List<GuideStep>(); }
+    /// <summary>Plataforma de processador: soquete, memória aceita, PCIe do processador e upgrades que encaixam sem trocar a placa-mãe (data/compatibilidade.json).</summary>
+    public class CompatFamily { public string Name = "", Socket = "", MemType = "", Note = ""; public int MemMaxMts, Pcie; public string[] Detect = new string[0], Upgrades = new string[0]; }
 
     /// <summary>
     /// Regras de conhecimento em dados (pasta data/ do repositório, embutidas no executável).
@@ -55,7 +57,11 @@ namespace DiagIT
         public static readonly List<Guide> Guides = new List<Guide>();
         public static readonly List<KeyValuePair<string, string>> GuideLinks = new List<KeyValuePair<string, string>>();   // começo do título → guia
 
-        public static readonly string[] Files = { "telas-azuis", "fabricantes", "placas-de-video", "programas", "linguagem-simples", "drivers", "guias" };
+        public static readonly List<CompatFamily> Compat = new List<CompatFamily>();
+        public static readonly HashSet<string> NeverGames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public static readonly List<string> BenignNames = new List<string>(), BenignClasses = new List<string>();
+
+        public static readonly string[] Files = { "telas-azuis", "fabricantes", "placas-de-video", "programas", "linguagem-simples", "drivers", "guias", "normal", "compatibilidade" };
 
         // ------------------------------------------------------------------ leitura
         static string ReadText(string name)
@@ -222,6 +228,24 @@ namespace DiagIT
                         Dictionary<string, object> x = Obj(o);
                         GuideLinks.Add(new KeyValuePair<string, string>(Str(x, "inicio_do_titulo"), Str(x, "guia")));
                     }
+
+                    cur = "normal";
+                    Dictionary<string, object> nd = Obj(js.DeserializeObject(ReadText(cur)));
+                    foreach (string s in Strs(nd, "nunca_jogo")) NeverGames.Add(s.Trim());
+                    Dictionary<string, object> bd = Obj(nd["dispositivos_inofensivos"]);
+                    foreach (string s in Strs(bd, "nomes")) BenignNames.Add(s.Trim().ToLowerInvariant());
+                    foreach (string s in Strs(bd, "classes")) BenignClasses.Add(s.Trim().ToLowerInvariant());
+
+                    cur = "compatibilidade";
+                    Dictionary<string, object> cd = Obj(js.DeserializeObject(ReadText(cur)));
+                    foreach (object o in List(cd["familias"]))
+                    {
+                        Dictionary<string, object> x = Obj(o);
+                        CompatFamily cf = new CompatFamily();
+                        cf.Name = Str(x, "nome"); cf.Detect = Strs(x, "detectar"); cf.Socket = Str(x, "soquete"); cf.MemType = Str(x, "memoria");
+                        cf.MemMaxMts = (int)Num(x["memoria_oficial_mts"]); cf.Pcie = (int)Num(x["pcie"]); cf.Upgrades = Strs(x, "melhores_no_mesmo_soquete"); cf.Note = Str(x, "nota");
+                        Compat.Add(cf);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -251,6 +275,25 @@ namespace DiagIT
             Ensure();
             foreach (VideoVendor v in Video) if (Matches(gpuName, v.Detect)) return v;
             return VideoDefault;
+        }
+
+        /// <summary>Plataforma do processador (soquete, memória, PCIe, upgrades que encaixam), ou null se o modelo não é conhecido.</summary>
+        public static CompatFamily CompatFor(string cpuName)
+        {
+            Ensure();
+            if (string.IsNullOrEmpty(cpuName)) return null;
+            foreach (CompatFamily f in Compat) if (Matches(cpuName, f.Detect)) return f;
+            return null;
+        }
+
+        /// <summary>Programa que nunca é tratado como jogo (comunicação, navegador, produtividade; data/normal.json).</summary>
+        public static bool IsNeverGame(string name)
+        {
+            Ensure();
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.Trim();
+            if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) n = n.Substring(0, n.Length - 4);
+            return NeverGames.Contains(n);
         }
 
         public static CpuVendor CpuFor(string cpuName)

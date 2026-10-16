@@ -39,6 +39,9 @@ namespace DiagIT
         /// <summary>Dica de desempenho (página Desempenho), não um problema: selo próprio (ex.: "DE GRAÇA"), botão "Como fazer" e sem "Já fiz isso".</summary>
         public bool Tip;
         public string Badge = "", ActionLabel = "";
+        /// <summary>Tipo de anotação que o usuário pode fazer sobre este achado ("desligamento" = "fui eu que desliguei") e os horários dos eventos.</summary>
+        public string AnnotKind = "";
+        public List<DateTime> Times = new List<DateTime>();
         /// <summary>O mesmo achado em linguagem do dia a dia (camada simples da interface). Vazio = usa o Title.</summary>
         public string Simple = "";
 
@@ -418,13 +421,27 @@ namespace DiagIT
                 List<WinEvent> e6008 = Where(ev, delegate(WinEvent e) { return e.Provider == "EventLog" && e.Id == 6008; });
                 noBsod = e6008;
             }
+            // "fui eu que desliguei": os eventos que o usuário marcou ficam no histórico, mas não contam; um novo sem marcação conta normalmente
+            int mine = noBsod.FindAll(delegate(WinEvent e) { return Annotations.Has("desligamento", e.Time); }).Count;
+            if (mine > 0) noBsod = noBsod.FindAll(delegate(WinEvent e) { return !Annotations.Has("desligamento", e.Time); });
+            if (mine > 0 && noBsod.Count == 0)
+            {
+                Finding fm = new Finding();
+                fm.Sev = Sev.Info; fm.Source = "Eventos do Windows";
+                fm.Title = "Você marcou " + mine + (mine == 1 ? " desligamento" : " desligamentos") + " como seu" + (mine == 1 ? "" : "s");
+                fm.Evidence = "O Windows registrou " + mine + (mine == 1 ? " desligamento inesperado" : " desligamentos inesperados") + " (Kernel-Power 41), e você disse que foi ação sua (por exemplo, segurou o botão de energia). Ficam no histórico e no relatório, mas não contam como problema. Se acontecer de novo sem você ter desligado, o alerta volta.";
+                fm.Advice = "Nada a fazer.";
+                d.Findings.Add(fm);
+            }
             if (noBsod.Count > 0)
             {
                 double w = Scale(noBsod.Count, 4);
                 Finding f = new Finding();
-                f.Sev = noBsod.Count >= 3 ? Sev.Crit : Sev.Warn; f.Source = "Eventos do Windows";
+                f.Sev = noBsod.Count >= 3 ? Sev.Crit : Sev.Warn; f.Source = "Eventos do Windows"; f.Symptom = true;
+                f.AnnotKind = "desligamento"; foreach (WinEvent ne in noBsod) f.Times.Add(ne.Time);
                 f.Title = "O PC desligou/reiniciou sem aviso e sem tela azul — " + noBsod.Count + "×";
-                f.Evidence = "Registro de 'desligamento inesperado' (Kernel-Power 41 com código de erro 0). Último em " + D(noBsod[0].Time) + ".\n" + Recent(noBsod, 5);
+                f.Evidence = "Registro de 'desligamento inesperado' (Kernel-Power 41 com código de erro 0). Último em " + D(noBsod[0].Time) + ".\n" + Recent(noBsod, 5) +
+                    (mine > 0 ? "\n(" + mine + " desligamento(s) anterior(es) você marcou como seu(s) e não entram na conta.)" : "");
                 f.Advice = "Esse é o padrão clássico de fonte falhando/sem potência, superaquecimento (proteção térmica corta tudo), " +
                     "ou falha de hardware que trava o sistema inteiro. Descarte antes: queda de energia, régua/filtro de linha e o botão " +
                     "de energia sendo pressionado. Se acontece em jogo, a fonte e a temperatura são as primeiras suspeitas.";
@@ -1042,6 +1059,10 @@ namespace DiagIT
                     if (e.Provider == "Microsoft-Windows-Kernel-Power" && e.Id == 41 && e.Time >= end.AddMinutes(-2) && e.Time <= end.AddMinutes(45))
                     { power = e; }
                 }
+                // o Windows foi desligado ou reiniciado em ordem (1074 ou 6006) logo depois de a gravação parar: foi o usuário (ou uma atualização), não uma queda
+                if (power == null && events.Exists(delegate(WinEvent e)
+                    { return ((e.Provider == "User32" && e.Id == 1074) || (e.Provider == "EventLog" && e.Id == 6006)) && e.Time >= end.AddMinutes(-3) && e.Time <= end.AddMinutes(10); }))
+                    continue;
                 bool confirmed = power != null;
                 bool highLoad = (!double.IsNaN(lc) && lc >= 80) || (!double.IsNaN(lg) && lg >= 90);
                 bool lowLoad = !double.IsNaN(lc) && !double.IsNaN(lg) && lc < 40 && lg < 40;

@@ -55,8 +55,9 @@ namespace DiagIT
                 Prov("amdkmdag", "amdwddmg", "atikmdag", "nvlddmkm", "igfx"), days), 400, true);
 
             say("Quedas de energia e telas azuis...");
+            // 1074 (reinício ou desligamento pedido por um programa ou pelo usuário) e 6006 (serviço de eventos parou em ordem) dizem que um desligamento foi normal
             Run(r, "System", Q("(" + Prov("Microsoft-Windows-Kernel-Power") + " and " + Ids(41) + ") or (" +
-                Prov("EventLog") + " and " + Ids(6008) + ") or (" +
+                Prov("EventLog") + " and " + Ids(6008, 6006) + ") or (" + Prov("User32") + " and " + Ids(1074) + ") or (" +
                 Prov("Microsoft-Windows-WER-SystemErrorReporting") + " and " + Ids(1001, 1019) + ")", days), 400, true);   // 1019 = driver apontado pelo Windows
 
             say("Erros de disco...");

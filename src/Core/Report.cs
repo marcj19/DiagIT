@@ -83,7 +83,7 @@ namespace DiagIT
     /// Relatório imprimível em duas partes: página 1 em linguagem simples (para o dono do PC) e a parte técnica (para quem vai analisar).
     /// Fundo claro para imprimir/salvar em PDF.
     /// </summary>
-    public static class Report
+    public static partial class Report
     {
         static readonly CultureInfo Pt = new CultureInfo("pt-BR");
         static string H(string s) { return WebUtility.HtmlEncode(s ?? ""); }

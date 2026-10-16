@@ -60,6 +60,7 @@ namespace DiagIT
             try
             {
                 Paths.Ensure();
+                Annotations.UseMemory(null);   // o autoteste nunca lê nem grava as anotações reais do usuário
                 // 2 telas azuis 0x1A (MEMORY_MANAGEMENT) há 5 dias, também gravadas em Minidump
                 Func<int, List<WinEvent>> bsods = delegate(int daysAgo)
                 {
@@ -244,6 +245,15 @@ namespace DiagIT
                 Say("  " + nt + " | " + ns + " | suspeitas: " + suspectOrFailed + " | indícios: " + indicios);
                 Check(suspectOrFailed == 0 && indicios == 0 && nt == "Seu PC está saudável", "tudo aprovado + ruído (reset isolado, driver do Windows Update, ventoinha 0 RPM em water cooler, USB do cooler): saudável, zero indícios");
                 Check(d.Findings.Exists(delegate(Finding f) { return Analyzer.Confidence(f) == "INFORMAÇÃO" && f.Title.StartsWith("Travamentos de GPU"); }), "o reset isolado continua visível, como informação");
+                // atestado de saúde: uma página com a prova de cada peça, o resumo de 30 dias e o que NÃO foi verificado
+                Diagnosis dCert = Analyzer.Run(new List<SessionData>(), noise, new List<DiskHealth>(), 30, allOk, hwNoise);
+                MachineInfo miCert = new MachineInfo(); miCert.Cpu = "AMD Ryzen 5 5500"; miCert.Gpu = "AMD Radeon RX 7600"; miCert.Board = "Gigabyte A520M K V2"; miCert.Os = "Windows 11 Pro";
+                string cert = System.Net.WebUtility.HtmlDecode(Report.BuildCertificate(dCert, miCert, new ReportExtras()));   // o HTML guarda acentos como entidades
+                foreach (string needle in new string[] { "Atestado de saúde do PC", "Seu PC está saudável", "Teste de Processador (CPU) aprovado em", "+12 V mínimo 11,90 V", "Últimos 30 dias", "O que este atestado não cobre", "Não é laudo técnico", "AMD Radeon RX 7600" }) if (!cert.Contains(needle)) Say("  falta no atestado: " + needle);
+                Check(cert.Contains("Atestado de saúde do PC") && cert.Contains("Seu PC está saudável") && cert.Contains("Teste de Processador (CPU) aprovado em") && cert.Contains("+12 V mínimo 11,90 V") &&
+                      cert.Contains("Últimos 30 dias") && cert.Contains("O que este atestado não cobre") && cert.Contains("Não é laudo técnico") && cert.Contains("AMD Radeon RX 7600"),
+                      "atestado de saúde: veredito, configuração, prova de cada peça com data, 30 dias e o que não cobre");
+
                 // e o problema real não some: 3 resets com programa fechando junto + tela azul de vídeo continuam alarmando
                 List<WinEvent> real = new List<WinEvent>(); DateTime tr0 = DateTime.Now.AddMinutes(-30);
                 for (int k2 = 0; k2 < 3; k2++) { DateTime tk = tr0.AddMinutes(-k2 * 10); real.Add(lke193(tk)); real.Add(appCrash(tk.AddSeconds(1), "jogo.exe")); }
@@ -288,6 +298,32 @@ namespace DiagIT
                 int idxFree = tBad[0].Advice.IndexOf("[de graça]"), idxWhere = tBad[0].Advice.IndexOf("[onde o upgrade rende]");
                 Check(idxFree >= 0 && (idxWhere < 0 || idxFree < idxWhere), "a ordem põe o que é de graça antes do que custa dinheiro");
 
+                // compatibilidade: a plataforma vem de data/compatibilidade.json
+                Func<string, CompatFamily> fam0 = delegate(string cpu) { return Rules.CompatFor(cpu); };
+                Check(fam0("AMD Ryzen 5 5500 6-Core Processor").Pcie == 3 && fam0("AMD Ryzen 5 5600G with Radeon Graphics").Pcie == 3 && fam0("AMD Ryzen 5 5600X 6-Core Processor").Pcie == 4 &&
+                      fam0("AMD Ryzen 5 5600 6-Core Processor").Pcie == 4 && fam0("AMD Ryzen 7 5800X3D 8-Core Processor").Socket == "AM4" && fam0("AMD Ryzen 5 3600 6-Core Processor").Name == "Ryzen 3000" &&
+                      fam0("AMD Ryzen 7 7800X3D 8-Core Processor").Socket == "AM5" && fam0("12th Gen Intel(R) Core(TM) i5-12400F").Socket == "LGA1700" && fam0("13th Gen Intel(R) Core(TM) i7-13700K").Note.Contains("0x12B") &&
+                      fam0("Processador Desconhecido X9") == null,
+                      "compatibilidade: cada processador cai na plataforma certa (PCIe, soquete) e o desconhecido não inventa nada");
+                Check(Rules.NeverGames.Contains("teamspeak") && Rules.NeverGames.Contains("discord") && Rules.BenignNames.Contains("corsair") && Rules.BenignClasses.Contains("usb") &&
+                      !Rules.BenignClasses.Contains("display") && !Rules.BenignClasses.Contains("system") && !Rules.BenignClasses.Contains("net"),
+                      "normal.json: lista do que nunca é jogo e dos dispositivos inofensivos; vídeo, sistema e rede nunca entram");
+                bool compatOk = Rules.Compat.Count >= 8;
+                foreach (CompatFamily cfm in Rules.Compat) if (cfm.Name.Length == 0 || cfm.Detect.Length == 0 || cfm.Socket.Length == 0 || cfm.MemMaxMts <= 0 || cfm.Pcie < 3 || cfm.Note.Length == 0) compatOk = false;
+                Check(compatOk, "compatibilidade.json: toda família tem nome, trechos para detectar, soquete, memória, PCIe e nota (" + Rules.Compat.Count + " famílias)");
+                List<Finding> tPlat = Analyzer.BalanceTips(hBad, new List<SessionData> { playSess(40, 95, 400) }, new List<TestResult>(), dmLow);
+                Finding platTip = tPlat.Find(delegate(Finding f) { return f.Title.StartsWith("Sua plataforma"); });
+                Check(platTip != null && platTip.Title.Contains("AM4 com DDR4") && platTip.Advice.Contains("Ryzen 7 5700X3D") && platTip.Advice.Contains("lista de processadores suportados") && platTip.Advice.Contains("o upgrade que mais rende") && platTip.Badge == "ONDE O UPGRADE RENDE" &&
+                      tPlat[0].Advice.IndexOf("Sua plataforma") < 0,
+                      "plataforma AM4: diz o que encaixa sem trocar placa-mãe, manda conferir a lista do fabricante e liga ao processador ser o limite");
+                hBad.RamRatedMts = 2400;   // sem perfil para ativar: cai na dica de memória lenta, que cita o máximo oficial do processador
+                Check(Analyzer.BalanceTips(hBad, new List<SessionData>(), new List<TestResult>(), dmLow).Exists(delegate(Finding f) { return f.Evidence.Contains("O seu processador aceita oficialmente até 3200 MT/s"); }),
+                      "memória lenta: cita o máximo oficial que o processador aceita (3200 MT/s no Ryzen 5 5500)");
+                hBad.RamRatedMts = 3200;
+                hBad.IsLaptop = true;
+                Check(Analyzer.BalanceTips(hBad, new List<SessionData>(), new List<TestResult>(), dmLow).TrueForAll(delegate(Finding f) { return !f.Title.StartsWith("Sua plataforma"); }), "notebook: não sugere upgrade de plataforma");
+                hBad.IsLaptop = false;
+
                 // notebook: sem conselho de "coloque outro pente" ou "troque o processador", e a tela avisa que o Windows baixa a taxa de propósito
                 hBad.IsLaptop = true;
                 List<Finding> tLap = Analyzer.BalanceTips(hBad, new List<SessionData> { playSess(40, 95, 400) }, new List<TestResult>(), dmLow);
@@ -305,6 +341,38 @@ namespace DiagIT
                       "tudo bom (tela, memória, disco, equilíbrio): nenhuma dica de gasto, tudo OK");
                 MonthSummary ms = Analyzer.BuildMonth(new List<WinEvent>(), new List<SessionData> { playSess(70, 60, 10) }, allOk);
                 Check(ms.BlueScreens == 0 && ms.UnexpectedShutdowns == 0 && ms.Sessions == 1 && ms.HoursPlayed > 0.9 && ms.TestsTotal == 5 && ms.TestsPassed == 5, "resumo de 30 dias: zeros de verdade, partidas, horas e testes aprovados");
+
+                Say("== 4k. 'Fui eu que desliguei' e desligamento limpo");
+                Func<DateTime, WinEvent> kp41 = delegate(DateTime t)
+                {
+                    WinEvent e = new WinEvent(); e.Provider = "Microsoft-Windows-Kernel-Power"; e.Id = 41; e.Time = t; e.P = new string[] { "0" }; return e;
+                };
+                Predicate<Finding> offF = delegate(Finding f) { return f.Title.StartsWith("O PC desligou/reiniciou sem aviso"); };
+                DateTime off1 = DateTime.Now.AddDays(-3), off2 = DateTime.Now.AddDays(-2);
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { kp41(off1), kp41(off2) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Finding fOff = d.Findings.Find(offF);
+                Check(fOff != null && fOff.AnnotKind == "desligamento" && fOff.Times.Count == 2 && fOff.Sev == Sev.Warn, "dois desligamentos sem aviso: alerta com o botão 'Fui eu que desliguei'");
+                Annotations.Add("desligamento", fOff.Times);
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { kp41(off1), kp41(off2) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(d.Findings.Find(offF) == null && d.Findings.Exists(delegate(Finding f) { return f.Title.StartsWith("Você marcou 2 desligamentos"); }) &&
+                      Analyzer.BuildMonth(sorted(new List<WinEvent> { kp41(off1), kp41(off2) }), new List<SessionData>(), new List<TestResult>()).UnexpectedShutdowns == 0,
+                      "marcados como seus: saem da conta e do resumo de 30 dias, mas continuam visíveis como informação");
+                d = Analyzer.Run(new List<SessionData>(), sorted(new List<WinEvent> { kp41(off1), kp41(off2), kp41(DateTime.Now.AddHours(-5)) }), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(d.Findings.Find(offF) != null && d.Findings.Find(offF).Title.EndsWith("1×"), "um desligamento NOVO, sem marcação: o alerta volta (só ele conta)");
+
+                Func<SessionData> cutSession = delegate()
+                {
+                    SessionData sd = new SessionData(); sd.Info = new SessionInfo(); sd.Info.Id = "cut"; sd.Info.Game = "jogo.exe"; sd.Info.Status = "interrupted";
+                    sd.Info.Start = DateTime.Now.AddHours(-6); sd.Info.End = DateTime.Now.AddHours(-5);
+                    for (int i = 0; i < 30; i++) { Sample s = new Sample(); s.Time = sd.Info.Start.AddSeconds(i * 2); s.V[F.Cpu] = 50; s.V[F.Gpu] = 60; sd.S.Add(s); }
+                    return sd;
+                };
+                SessionData cutS = cutSession();
+                WinEvent shut = new WinEvent(); shut.Provider = "User32"; shut.Id = 1074; shut.Time = cutS.Info.End.Value.AddMinutes(1);
+                Predicate<Finding> cutF = delegate(Finding f) { return f.Title.StartsWith("Partida interrompida"); };
+                d = Analyzer.Run(new List<SessionData> { cutSession() }, new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Diagnosis dClean = Analyzer.Run(new List<SessionData> { cutS }, new List<WinEvent> { shut }, new List<DiskHealth>(), 30, new List<TestResult>(), new HwSnapshot());
+                Check(d.Findings.Find(cutF) != null && dClean.Findings.Find(cutF) == null, "gravação que parou junto com um desligamento normal do Windows (1074): não é queda");
 
                 Say("== 4g. Ajustes reversíveis de Windows (só leitura aqui)");
                 bool tweaksOk = Tweaks.All.Count >= 5;

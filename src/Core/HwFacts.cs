@@ -347,18 +347,12 @@ namespace DiagIT
         /// <summary>Conexão USB de water cooler: o cooler funciona sem o driver, só falta o monitoramento. Não é causa de travamento nem de tela azul.</summary>
         public static bool IsBenignDevice(ProblemDevice d)
         {
+            // listas em data/normal.json: water coolers e RGB, e periféricos sem driver (USB, controles, Bluetooth, câmera...) que funcionam em modo básico
+            // e não causam travamento nem tela azul; vídeo, sistema, armazenamento e rede continuam contando
+            Rules.Ensure();
             string n = d.Name.ToLowerInvariant();
-            if (n.Contains("h80i") || n.Contains("h100i") || n.Contains("h115i") || n.Contains("h150i") || n.Contains("corsair") ||
-                n.Contains("nzxt") || n.Contains("kraken") || n.Contains("lian li") || n.Contains("rgb")) return true;
-            // periféricos sem driver (USB, controles, Bluetooth, câmera, áudio USB...) funcionam em modo básico e não causam travamento nem tela azul;
-            // vídeo, sistema, armazenamento e rede continuam contando
-            switch ((d.Class ?? "").ToLowerInvariant())
-            {
-                case "usb": case "hidclass": case "bluetooth": case "media": case "camera": case "image": case "keyboard": case "mouse":
-                case "ports": case "wpd": case "printer": case "smartcardreader": case "biometric": case "swdevice":
-                    return true;
-            }
-            return false;
+            foreach (string b in Rules.BenignNames) if (b.Length > 0 && n.Contains(b)) return true;
+            return Rules.BenignClasses.Contains((d.Class ?? "").ToLowerInvariant());
         }
 
         /// <summary>true para notebook, portátil, tablet e conversíveis (tipo de gabinete SMBIOS 8, 9, 10, 11, 14, 30, 31, 32) ou PC com bateria.</summary>

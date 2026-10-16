@@ -51,7 +51,10 @@ namespace DiagIT
                         Navigate(P_HOME);
                         homeFlow.AutoScrollPosition = new Point(0, homeFlow.AutoScrollMinSize.Height);
                         break;
-                    case 11: Shot(dir, "11-inicio-correcoes"); Navigate(P_PERF); break;
+                    case 11:
+                        Shot(dir, "11-inicio-correcoes"); Navigate(P_PERF);
+                        try { System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "17-atestado.html"), Report.BuildCertificate(lastDiag, machine ?? new MachineInfo(), new ReportExtras()), new System.Text.UTF8Encoding(true)); } catch (Exception ex) { Log.Write("Atestado (prévia): " + ex.Message); }
+                        break;
                     case 12: Shot(dir, "11b-desempenho"); OpenGuide("video-voltou", null); guideDone[0] = true; guideDone[1] = true; guideStep = 3; LayoutGuide(); break;
                     case 13:
                         Shot(dir, "12-guia");

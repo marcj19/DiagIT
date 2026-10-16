@@ -11,7 +11,7 @@ namespace DiagIT
     /// </summary>
     public static partial class Analyzer
     {
-        const string BDraw = "DE GRAÇA", BCheap = "BARATO", BWhere = "ONDE O UPGRADE RENDE", BLimit = "LIMITE DO CONJUNTO", BDaily = "MAIOR GANHO NO DIA A DIA", BBefore = "ANTES DE UM UPGRADE";
+        const string BDraw = "DE GRAÇA", BCheap = "BARATO", BWhere = "ONDE O UPGRADE RENDE", BLimit = "LIMITE DO CONJUNTO", BDaily = "MAIOR GANHO NO DIA A DIA", BBefore = "ANTES DE UM UPGRADE", BPlatform = "SUA PLATAFORMA";
 
         static Finding Tip(Sev sev, string badge, string title, string evidence, string advice, string guide, string actionLabel)
         {
@@ -31,6 +31,9 @@ namespace DiagIT
             if (tests == null) tests = new List<TestResult>();
             if (h != null) Rules.SetContext(h.GpuName, h.CpuName);
             bool lap = h != null && h.IsLaptop;   // notebook: memória e processador costumam não ser trocáveis, e a tela troca de taxa para poupar bateria
+
+            CompatFamily fam = h != null ? Rules.CompatFor(h.CpuName) : null;   // plataforma do processador (data/compatibilidade.json)
+            bool cpuLimited = false;
 
             // FPS médio real dos jogos (ponderado pelos quadros medidos)
             double fpsSum = 0, fpsFrames = 0;
@@ -78,8 +81,9 @@ namespace DiagIT
                         "ram-perfil", "Como fazer"));
                 else if (conf > 0 && h.RamType == 26 && conf <= 2666)
                     tips.Add(Tip(Sev.Info, BCheap, "A memória é lenta para um processador atual: DDR4 a " + conf + " MT/s",
-                        "Não há perfil mais rápido para ativar: " + conf + " MT/s é o que o pente foi feito para entregar.",
-                        "Kits DDR4-3200 ou 3600 custam pouco e costumam dar um ganho perceptível, principalmente em jogos que dependem do processador. Antes de comprar, confira no site do fabricante da placa-mãe a velocidade máxima de memória que ela e o processador aceitam.", null, null));
+                        "Não há perfil mais rápido para ativar: " + conf + " MT/s é o que o pente foi feito para entregar." + (fam != null && fam.MemMaxMts > conf ? " O seu processador aceita oficialmente até " + fam.MemMaxMts + " MT/s." : ""),
+                        "Kits DDR4-3200 ou 3600 custam pouco e costumam dar um ganho perceptível, principalmente em jogos que dependem do processador. Antes de comprar, confira no site do fabricante da placa-mãe a velocidade máxima de memória que ela e o processador aceitam." +
+                        (lap ? " Em notebook, confira antes se a memória é trocável." : ""), null, null));
                 else if (conf > 0)
                     tips.Add(Tip(Sev.Ok, "", "Memória rodando na velocidade do pente: " + conf + " MT/s", "", "", null, null));
 
@@ -107,7 +111,9 @@ namespace DiagIT
                     if (gen < h.PcieMaxGen && gen < 4)
                         tips.Add(Tip(Sev.Info, BLimit, "A placa de vídeo suporta PCIe " + h.PcieMaxGen + ".0, mas o conjunto entrega PCIe " + gen + ".0",
                             "O teste de placa mediu " + up.ToString("0.0", Pt) + " GB/s com " + N0(lanes) + " pistas (" + perLane.ToString("0.0", Pt) + " GB/s por pista, que é PCIe " + gen + ".0). Medido em " + Dt(gpuTest) + ".",
-                            "O limite vem do processador ou da placa-mãe, não de defeito. Em placas de 8 pistas como esta o efeito costuma ser pequeno na maioria dos jogos, e maior só quando o jogo passa da memória de vídeo. Não vale trocar peças só por isso; considere apenas se for trocar processador e placa-mãe por outro motivo. (Alguns processadores, como as séries com G e o Ryzen 5 5500, só têm PCIe 3.0.)", null, null));
+                            (fam != null && fam.Pcie == gen ? "O limite é do seu processador (" + fam.Name + "): ele só entrega PCIe " + gen + ".0 para a placa de vídeo, não é defeito. " : "O limite vem do processador ou da placa-mãe, não de defeito. ") +
+                            "Em placas de 8 pistas como esta o efeito costuma ser pequeno na maioria dos jogos, e maior só quando o jogo passa da memória de vídeo. Não vale trocar peças só por isso; considere apenas se for trocar processador e placa-mãe por outro motivo." +
+                            (fam == null ? " (Alguns processadores, como as séries com G e o Ryzen 5 5500, só têm PCIe 3.0.)" : ""), null, null));
                     else
                         tips.Add(Tip(Sev.Ok, "", "Placa de vídeo com o link PCIe no máximo do conjunto", "Banda medida: " + up.ToString("0.0", Pt) + " GB/s com " + N0(lanes) + " pistas.", "", null, null));
                 }
@@ -130,7 +136,7 @@ namespace DiagIT
             {
                 double cpuPct = cpuB * 100.0 / n, gpuPct = gpuB * 100.0 / n, gpuAvg = gpuSum / n;
                 string basis = "Medido em " + (n * 2 / 60) + " minutos de partidas: " + N0(cpuPct) + "% do tempo o processador (um núcleo no limite) segurou a placa, " + N0(gpuPct) + "% do tempo a placa foi o limite. Uso médio da placa de vídeo: " + N0(gpuAvg) + "%.";
-                if (cpuPct >= 40 && gpuPct < 30)
+                if (cpuPct >= 40 && gpuPct < 30 && (cpuLimited = true))
                     tips.Add(Tip(Sev.Info, BWhere, "Nos seus jogos, o processador é o limite; a placa de vídeo está folgada",
                         basis,
                         lap ? "Mesmo assim, em notebook nem processador nem placa de vídeo costumam ser trocáveis. O que rende: aumentar resolução e qualidade gráfica nos jogos (de graça, a placa tem folga), manter o notebook na tomada e com o plano de energia de desempenho, e deixar as saídas de ar desobstruídas."
@@ -143,6 +149,20 @@ namespace DiagIT
                              : "Se quiser gastar, uma placa de vídeo mais forte é o upgrade que mais rende aqui; o processador está dando conta."), null, null));
                 else
                     tips.Add(Tip(Sev.Ok, "", "Processador e placa de vídeo trabalham equilibrados nos seus jogos", basis, "", null, null));
+            }
+
+            // ---------------------------------------------------------------- 4b. Plataforma: o que o processador aceita e o que encaixa sem trocar a placa-mãe
+            if (fam != null && !lap)
+            {
+                StringBuilder ev = new StringBuilder();
+                ev.Append("Processador detectado: " + h.CpuName.Trim() + ". Plataforma: " + fam.Name + ". Soquete " + fam.Socket + ". Memória aceita: " + fam.MemType + ", oficialmente até " + fam.MemMaxMts + " MT/s. ");
+                ev.Append("O processador entrega PCIe " + fam.Pcie + ".0 para a placa de vídeo.");
+                StringBuilder adv = new StringBuilder();
+                if (fam.Upgrades.Length > 0)
+                    adv.Append("Para ganhar desempenho SEM trocar a placa-mãe nem a memória, os processadores mais fortes que encaixam no mesmo soquete são, por exemplo: " + string.Join(", ", fam.Upgrades) + ". ");
+                adv.Append(fam.Note + " Antes de comprar qualquer coisa, confira a lista de processadores suportados da sua placa-mãe e a versão da BIOS (em Hardware aparece o modelo da placa e a data da BIOS): é a lista do fabricante que manda, não esta dica.");
+                if (cpuLimited) adv.Append(" Como o seu processador é o limite nos jogos (veja a dica de equilíbrio), este é o upgrade que mais rende.");
+                tips.Add(Tip(Sev.Info, cpuLimited ? BWhere : BPlatform, "Sua plataforma: " + fam.Socket + " com " + fam.MemType + " (" + fam.Name + ")", ev.ToString(), adv.ToString(), null, null));
             }
 
             // ---------------------------------------------------------------- 5. Disco do Windows
@@ -170,7 +190,7 @@ namespace DiagIT
             // ---------------------------------------------------------------- 7. Por onde começar (só o que tem dado por trás, do mais barato ao mais caro)
             List<Finding> start = new List<Finding>();
             string[] order = { BDraw, BCheap, BDaily, BWhere, BLimit };
-            foreach (string b in order) foreach (Finding f in tips) if (f.Badge == b && f.Sev == Sev.Info && start.Count < 4) start.Add(f);
+            foreach (string b in order) foreach (Finding f in tips) if (f.Badge == b && f.Sev == Sev.Info && start.Count < 4 && !f.Title.StartsWith("Sua plataforma")) start.Add(f);
             Finding head;
             if (start.Count == 0)
                 head = Tip(Sev.Ok, "", "Nenhum ajuste ou upgrade se destaca: seu PC está bem equilibrado", "Tudo o que o DiagIT consegue medir (tela, memória, link da placa, disco, equilíbrio entre processador e placa) está bom para o que o conjunto entrega.", "", null, null);
@@ -184,7 +204,7 @@ namespace DiagIT
             // o que tem ação vem primeiro (na ordem do mais barato ao mais caro); os "OK", que provam que está bom, vêm depois
             List<Finding> sorted = new List<Finding>();
             sorted.Add(head);
-            string[] full = { BDraw, BCheap, BDaily, BWhere, BLimit, BBefore };
+            string[] full = { BDraw, BCheap, BDaily, BWhere, BLimit, BPlatform, BBefore };
             foreach (string b in full) foreach (Finding f in tips) if (f.Sev == Sev.Info && f.Badge == b) sorted.Add(f);
             foreach (Finding f in tips) if (f.Sev == Sev.Ok) sorted.Add(f);
             tips = sorted;
@@ -201,6 +221,16 @@ namespace DiagIT
     {
         public int BlueScreens, UnexpectedShutdowns, VideoSymptoms, Sessions, TestsPassed, TestsTotal;
         public double HoursPlayed;
+        /// <summary>Um item por dia dos ultimos 30 dias (do mais antigo ao de hoje): horas jogadas e problemas com sintoma.</summary>
+        public List<DayStat> Days = new List<DayStat>();
+    }
+
+    public class DayStat
+    {
+        public DateTime Day;
+        public double Hours;
+        public int BlueScreens, Shutdowns, VideoSymptoms;
+        public int Problems { get { return BlueScreens + Shutdowns + VideoSymptoms; } }
     }
 
     public static partial class Analyzer
@@ -215,6 +245,27 @@ namespace DiagIT
             m.VideoSymptoms = GpuCrashTimes(events, true).Count;
             foreach (SessionData sd in sessions)
                 if (GameSession(sd)) { m.Sessions++; m.HoursPlayed += sd.Info.Duration.TotalHours; }
+            // calendario: um item por dia, do mais antigo ao de hoje
+            DateTime today = DateTime.Now.Date;
+            for (int i = 29; i >= 0; i--) { DayStat ds = new DayStat(); ds.Day = today.AddDays(-i); m.Days.Add(ds); }
+            Action<List<DateTime>, int> mark = delegate(List<DateTime> times, int kind)
+            {
+                foreach (DateTime t in times)
+                {
+                    int idx = 29 - (int)(today - t.Date).TotalDays;
+                    if (idx < 0 || idx > 29) continue;
+                    if (kind == 0) m.Days[idx].BlueScreens++; else if (kind == 1) m.Days[idx].Shutdowns++; else m.Days[idx].VideoSymptoms++;
+                }
+            };
+            mark(ProblemTimes("telas-azuis", events, sessions), 0);
+            mark(ProblemTimes("desligamentos", events, new List<SessionData>()), 1);
+            mark(GpuCrashTimes(events, true), 2);
+            foreach (SessionData sd in sessions)
+            {
+                if (!GameSession(sd)) continue;
+                int idx = 29 - (int)(today - sd.Info.Start.Date).TotalDays;
+                if (idx >= 0 && idx <= 29) m.Days[idx].Hours += sd.Info.Duration.TotalHours;
+            }
             DateTime cut = DateTime.Now.AddDays(-30);
             if (tests != null)
                 foreach (TestResult t in tests)

@@ -90,7 +90,7 @@ namespace DiagIT
         NumericUpDown numInterval, numMinGpu, numDelay;
         TextBox txtGames;
         CheckBox chkAuto, chkTray, chkMin, chkNotify, chkAdmin, chkOverlay;
-        Segmented segCorner;
+        Segmented segCorner, segMode;
         TextBox txtIgnore, txtSensors;
         Label lblSensorSrc, lblAdmin, lblPerf;
         FlatButton btnAutostart;
@@ -109,6 +109,15 @@ namespace DiagIT
 
             int y = 0;
             int colW = Theme.S(720);
+
+            y = Section(scroll, "Modo de exibição", y);
+            Label vh = Body("Simples: tudo em linguagem do dia a dia e sem os menus avançados. Técnico: mostra a fonte e os códigos de cada achado, abre os detalhes por padrão e libera Ao vivo, Hardware e Partidas gravadas. Vale na hora; os dados e o diagnóstico são os mesmos nos dois.", true);
+            vh.SetBounds(0, y, colW, Theme.S(44)); scroll.Controls.Add(vh); y += Theme.S(48);
+            segMode = new Segmented(new string[] { "Simples", "Técnico" }, cfg.Technical ? 1 : 0);
+            segMode.Location = new Point(0, y);
+            segMode.SelectedIndexChanged += delegate { cfg.Technical = segMode.SelectedIndex == 1; cfg.Save(); ApplyViewMode(true); };
+            scroll.Controls.Add(segMode);
+            y += segMode.Height + Theme.S(18);
 
             y = Section(scroll, "Monitoramento", y);
             numInterval = Num(scroll, "Intervalo entre leituras (segundos)", cfg.IntervalSec, 1, 10, ref y);
@@ -291,6 +300,16 @@ namespace DiagIT
             cfg.ResetCache();
             cfg.Save();
             MessageBox.Show(this, "Configurações salvas.", "DiagIT");
+        }
+
+        /// <summary>Aplica o modo de exibição: o técnico libera os menus avançados e os detalhes dos achados; o simples os esconde (o diagnóstico é o mesmo).</summary>
+        void ApplyViewMode(bool rerender)
+        {
+            FindingCard.Technical = cfg.Technical;
+            if (advLabel != null) advLabel.Visible = cfg.Technical;
+            foreach (int i in new int[] { P_LIVE, P_HW, P_SESS }) if (navs[i] != null) navs[i].Visible = cfg.Technical;
+            if (!cfg.Technical && (curPage == P_LIVE || curPage == P_HW || curPage == P_SESS)) Navigate(P_HOME);
+            if (rerender && lastDiag != null) { flist.SetFindings(lastDiag.Findings); ShowPerf(lastDiag); RefreshHome(); }
         }
 
         void RefreshAutostartButton()
