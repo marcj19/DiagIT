@@ -14,6 +14,7 @@ namespace DiagIT
         PartsGrid parts;
         readonly List<StepRow> homeSteps = new List<StepRow>();
         SectionTitle fixesTitle;
+        MonthStrip monthStrip;
         FixList fixList;
 
         static readonly TestKind[] KindOrder = { TestKind.Cpu, TestKind.Ram, TestKind.Gpu, TestKind.Disk, TestKind.Combined };
@@ -70,6 +71,9 @@ namespace DiagIT
             hero.AddButton(heroPrimary);
             hero.AddButton(heroSecondary);
             homeFlow.Controls.Add(hero);
+            homeFlow.Controls.Add(new SectionTitle("Seus últimos 30 dias", false));
+            monthStrip = new MonthStrip();
+            homeFlow.Controls.Add(monthStrip);
 
             homeFlow.Controls.Add(new SectionTitle("Suas peças", true));
             parts = new PartsGrid();
@@ -220,7 +224,17 @@ namespace DiagIT
                     homeSteps.Add(r);
                 }
                 if (n == 0)
-                    homeSteps.Add(new StepRow(1, "Tudo certo por aqui", "O DiagIT continua de olho nas suas partidas e avisa se algo mudar.", null, false));
+                { n = 1; homeSteps.Add(new StepRow(1, "Tudo certo por aqui", "O DiagIT continua de olho nas suas partidas e avisa se algo mudar.", null, false)); }
+                // ganhos de graça (tela em 60 Hz com monitor de mais, perfil de memória desligado...): é o que o usuário mais agradece e ninguém acha sozinho
+                List<Finding> free = d.Tips == null ? new List<Finding>() : d.Tips.FindAll(delegate(Finding f) { return f.Badge == "DE GRAÇA"; });
+                if (free.Count > 0 && n < 4)
+                {
+                    List<string> ft = new List<string>();
+                    foreach (Finding f in free) ft.Add(f.Title);
+                    StepRow r = new StepRow(++n, free.Count == 1 ? "Dá para ganhar desempenho de graça" : free.Count + " ajustes de graça deixam o PC mais rápido", string.Join(" • ", ft.ToArray()) + ".", "Ver como", false);
+                    r.Button.Click += delegate { Navigate(P_PERF); };
+                    homeSteps.Add(r);
+                }
             }
             foreach (StepRow r in homeSteps) homeFlow.Controls.Add(r);
             // correções acompanhadas, depois dos passos (a ordem do FlowPanel é a de inclusão)
@@ -230,6 +244,7 @@ namespace DiagIT
             // "Resolveu?" logo abaixo do resumo: é a primeira pergunta de quem fez uma correção
             if (fixList.Items.Count > 0) { homeFlow.Place(fixesTitle, hero); homeFlow.Place(fixList, fixesTitle); }
             fixList.Invalidate();
+            monthStrip.Show(d != null ? d.Month : null);
             homeFlow.Relayout();
         }
     }

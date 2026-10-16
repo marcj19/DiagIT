@@ -265,6 +265,38 @@ namespace DiagIT
                 Check(d.Findings.Find(fpsAny) == null && dGameFps.Findings.Find(fpsAny) != null && AppSettings.IsNeverGame("TeamSpeak") && AppSettings.IsNeverGame("Discord.exe") && !AppSettings.IsNeverGame("cs2"),
                       "TeamSpeak/Discord/navegadores nunca são jogo; um jogo de verdade com os mesmos números continua sendo analisado");
 
+                Say("== 4j. Desempenho: limites e upgrades só com dado por trás; o que está bom vira OK");
+                Func<double, double, int, SessionData> playSess = delegate(double gpuPct, double corePct, int nSamples)
+                {
+                    SessionData sd = new SessionData(); sd.Info = new SessionInfo(); sd.Info.Id = "p" + gpuPct; sd.Info.Game = "jogo.exe"; sd.Info.Status = "ok";
+                    sd.Info.Start = DateTime.Now.AddDays(-1); sd.Info.End = sd.Info.Start.AddHours(1); sd.Info.FpsAvg = 140; sd.Info.FpsLow = 90; sd.Info.Frames = 100000;
+                    for (int i = 0; i < nSamples; i++) { Sample s = new Sample(); s.Time = sd.Info.Start.AddSeconds(i * 2); s.V[F.Gpu] = gpuPct; s.V[F.CoreMax] = corePct; sd.S.Add(s); }
+                    return sd;
+                };
+                DisplayMode dmLow = new DisplayMode(); dmLow.Width = 1920; dmLow.Height = 1080; dmLow.CurrentHz = 60; dmLow.MaxHz = 165; dmLow.Rates.AddRange(new int[] { 60, 144, 165 });
+                HwSnapshot hBad = new HwSnapshot(); hBad.CpuName = "AMD Ryzen 5 5500"; hBad.GpuName = "AMD Radeon RX 7600";
+                hBad.RamModules = 1; hBad.DualChannel = false; hBad.RamTotalGb = 8; hBad.RamConfMts = 2400; hBad.RamRatedMts = 3200; hBad.RamType = 26;
+                VolumeInfo vHdd = new VolumeInfo(); vHdd.Letter = Environment.GetEnvironmentVariable("SystemDrive") ?? "C:"; vHdd.Media = "HDD"; vHdd.SizeGB = 500; hBad.Volumes.Add(vHdd);
+                List<Finding> tBad = Analyzer.BalanceTips(hBad, new List<SessionData> { playSess(40, 95, 400) }, new List<TestResult>(), dmLow);
+                foreach (Finding tf in tBad) Say("  [" + (tf.Badge.Length > 0 ? tf.Badge : tf.Sev == Sev.Ok ? "OK" : "-") + "] " + tf.Title);
+                Check(tBad.Exists(delegate(Finding f) { return f.Title.Contains("60 Hz, mas ela aceita 165 Hz") && f.Badge == "DE GRAÇA" && f.Guide == "monitor-hz" && f.Evidence.Contains("140 FPS"); }), "tela em 60 Hz com monitor de 165 Hz: dica de graça, com os FPS reais do jogador");
+                Check(tBad.Exists(delegate(Finding f) { return f.Title.Contains("roda a 2400 MT/s, mas o pente suporta 3200") && f.Guide == "ram-perfil"; }), "perfil de memória desligado: dica de graça com guia");
+                Check(tBad.Exists(delegate(Finding f) { return f.Title.Contains("canal único"); }) && tBad.Exists(delegate(Finding f) { return f.Title.Contains("Só 8 GB"); }), "um pente de 8 GB: canal único e pouca memória");
+                Check(tBad.Exists(delegate(Finding f) { return f.Title.Contains("Windows está em um HD"); }), "Windows em HD: maior ganho no dia a dia");
+                Check(tBad.Exists(delegate(Finding f) { return f.Title.Contains("o processador é o limite") && f.Evidence.Contains("100% do tempo"); }), "partidas limitadas pelo processador: diz que a placa está folgada, com a medição");
+                Check(tBad[0].Title.StartsWith("Por onde começar: 4 passos"), "'por onde começar' lista no máximo 4 passos, do mais barato ao mais caro");
+                int idxFree = tBad[0].Advice.IndexOf("[de graça]"), idxWhere = tBad[0].Advice.IndexOf("[onde o upgrade rende]");
+                Check(idxFree >= 0 && (idxWhere < 0 || idxFree < idxWhere), "a ordem põe o que é de graça antes do que custa dinheiro");
+
+                DisplayMode dmOk = new DisplayMode(); dmOk.Width = 1920; dmOk.Height = 1080; dmOk.CurrentHz = 165; dmOk.MaxHz = 165; dmOk.Rates.AddRange(new int[] { 60, 165 });
+                HwSnapshot hGood = new HwSnapshot(); hGood.RamModules = 2; hGood.DualChannel = true; hGood.RamTotalGb = 16; hGood.RamConfMts = 3600; hGood.RamRatedMts = 3600; hGood.RamType = 26;
+                VolumeInfo vSsd = new VolumeInfo(); vSsd.Letter = vHdd.Letter; vSsd.Media = "SSD"; hGood.Volumes.Add(vSsd);
+                List<Finding> tGood = Analyzer.BalanceTips(hGood, new List<SessionData> { playSess(70, 60, 400) }, new List<TestResult>(), dmOk);
+                Check(tGood[0].Sev == Sev.Ok && tGood[0].Title.StartsWith("Nenhum ajuste ou upgrade se destaca") && tGood.TrueForAll(delegate(Finding f) { return f.Sev == Sev.Ok; }),
+                      "tudo bom (tela, memória, disco, equilíbrio): nenhuma dica de gasto, tudo OK");
+                MonthSummary ms = Analyzer.BuildMonth(new List<WinEvent>(), new List<SessionData> { playSess(70, 60, 10) }, allOk);
+                Check(ms.BlueScreens == 0 && ms.UnexpectedShutdowns == 0 && ms.Sessions == 1 && ms.HoursPlayed > 0.9 && ms.TestsTotal == 5 && ms.TestsPassed == 5, "resumo de 30 dias: zeros de verdade, partidas, horas e testes aprovados");
+
                 Say("== 4g. Ajustes reversíveis de Windows (só leitura aqui)");
                 bool tweaksOk = Tweaks.All.Count >= 5;
                 foreach (Tweak tw in Tweaks.All) { try { bool on = tw.IsOn(); Say("  " + tw.Id + ": " + (on ? "ligado" : "padrão")); } catch (Exception ex) { tweaksOk = false; Say("  " + tw.Id + " falhou: " + ex.Message); } }

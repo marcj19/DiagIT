@@ -35,6 +35,11 @@ namespace DiagIT
         public List<CrashDump> Dumps = new List<CrashDump>();
         public bool DumpsReadable;
         public int RamModules;
+        /// <summary>Velocidade que o pente suporta (nominal) e a que está configurada agora, em MT/s; capacidade total em GB; tipo SMBIOS (26 = DDR4, 34 = DDR5).</summary>
+        public int RamRatedMts, RamConfMts, RamType;
+        public double RamTotalGb;
+        /// <summary>Geração máxima de PCIe que a placa de vídeo suporta (4 = PCIe 4.0), ou -1.</summary>
+        public int PcieMaxGen = -1;
         public bool DualChannel;
         public bool MixedRam;
         public int PcieLanes = -1, PcieMaxLanes = -1, PcieGenLevel = -1;
@@ -170,13 +175,16 @@ namespace DiagIT
             HashSet<string> channels = new HashSet<string>();
             int speedMin = int.MaxValue;
             double totalGb = 0;
-            foreach (ManagementObject o in Q("SELECT BankLabel,DeviceLocator,Capacity,Speed,ConfiguredClockSpeed,PartNumber,Manufacturer FROM Win32_PhysicalMemory"))
+            foreach (ManagementObject o in Q("SELECT BankLabel,DeviceLocator,Capacity,Speed,ConfiguredClockSpeed,PartNumber,Manufacturer,SMBIOSMemoryType FROM Win32_PhysicalMemory"))
             {
                 h.RamModules++;
                 double gb = 0; try { gb = Convert.ToDouble(o["Capacity"]) / 1073741824.0; } catch { }
                 totalGb += gb;
                 int sp = 0, cf = 0; int.TryParse(S(o, "Speed"), out sp); int.TryParse(S(o, "ConfiguredClockSpeed"), out cf);
                 if (cf > 0) speedMin = Math.Min(speedMin, cf);
+                if (cf > 0 && (h.RamConfMts == 0 || cf < h.RamConfMts)) h.RamConfMts = cf;   // o mais lento manda
+                if (sp > h.RamRatedMts) h.RamRatedMts = sp;
+                int smType; if (int.TryParse(S(o, "SMBIOSMemoryType"), out smType) && smType > 0) h.RamType = smType;
                 string bank = S(o, "BankLabel");
                 if (bank.IndexOf("CHANNEL A", StringComparison.OrdinalIgnoreCase) >= 0) channels.Add("A");
                 if (bank.IndexOf("CHANNEL B", StringComparison.OrdinalIgnoreCase) >= 0) channels.Add("B");
@@ -184,6 +192,7 @@ namespace DiagIT
                 f.Add(new Fact("Memória RAM", bank + " / " + S(o, "DeviceLocator"), gb.ToString("0", Pt) + " GB  " + S(o, "PartNumber") + "  " + cf + " MT/s" +
                     (sp > cf && cf > 0 ? " (suporta " + sp + ")" : ""), -1, null));
             }
+            h.RamTotalGb = totalGb;
             h.DualChannel = channels.Count >= 2 || (h.RamModules >= 2 && channels.Count == 0);
             h.MixedRam = parts.Count > 1;
             if (h.RamModules > 0)
@@ -376,6 +385,8 @@ namespace DiagIT
                     if (!id.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)) continue;
                     object v = DevProp.Get(id, DevProp.MaxLinkWidth);
                     if (v != null) h.PcieMaxLanes = Convert.ToInt32(v);
+                    object gv = DevProp.Get(id, DevProp.MaxLinkSpeed);
+                    if (gv != null) h.PcieMaxGen = Convert.ToInt32(gv);
                     break;
                 }
             }

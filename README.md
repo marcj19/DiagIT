@@ -32,6 +32,8 @@ com os detalhes técnicos (códigos, eventos, medições) a um clique em *Ver de
 ### Verde com prova, sem alarme à toa
 
 O DiagIT mostra "Seu PC está saudável" quando as peças passaram nos testes e nada pede ação, mesmo havendo avisos de rotina, que continuam visíveis como **Informação**.
+No Início, **"Seus últimos 30 dias"** mostra os números que provam isso (telas azuis, desligamentos sem aviso, quedas de vídeo com sintoma, horas jogadas, testes aprovados),
+e nos Resultados os achados vêm separados em **"Pede a sua atenção"**, **"Só para você saber"** e **"Está tudo certo"**.
 Regras que mantêm o verde honesto (e o alarme verdadeiro quando há problema real):
 - **Informação nunca pontua** nem vira "indício"; uma peça só fica em "Precisa verificar" com pelo menos uma evidência de peso, e só um sintoma real (tela azul, TDR, queda no driver, desligamento) passa a suspeita para "Drivers e Windows" quando o teste da peça não reproduz o problema.
 - **Os testes do próprio DiagIT não julgam o dia a dia**: calor, VRAM cheia, CPU a 100%, RAM travada e disco lido inteiro são esperados num teste. Temperatura, ventoinha, VRAM, congelamentos e gargalo usam só partidas de jogo; o clock é comparado partida por partida e precisa se repetir.
@@ -42,7 +44,12 @@ Regras que mantêm o verde honesto (e o alarme verdadeiro quando há problema re
 - O aviso no fim de cada partida mostra só o que é novo **dessa** partida (e o FPS), não os alertas dos últimos 30 dias.
 - "Resolveu?" conta antes e depois do mesmo jeito (só com sintoma) e um achado resolvido vira histórico.
    Para defeitos que aparecem de vez em quando, o **check-up à noite** (3 h ou 8 h) testa por horas e impede o PC de dormir.
-7. **Avançado**: *Ao vivo* (gráficos em tempo real), *Hardware* (tudo que foi lido do PC) e *Partidas gravadas*. Testes individuais e mais longos ficam em *Verificar peças*.
+7. **Desempenho**: o que segura o seu PC e onde um ajuste ou upgrade rende, com **dado do seu PC por trás** de cada dica (nada genérico). Mostra, por exemplo:
+   tela em 60 Hz com monitor que aceita mais (de graça), perfil de velocidade da memória desligado na BIOS, memória em canal único ou lenta, só 8 GB, Windows em HD,
+   link PCIe da placa de vídeo menor que o que ela suporta (medido no teste) e **quem limita quem nos seus jogos** (quanto do tempo o processador segurou a placa e
+   quanto a placa foi o limite, medido nas partidas). Termina em **"Por onde começar"**, do mais barato ao mais caro. O que já está bom aparece em verde.
+   Cada dica de graça tem um passo a passo ("Como fazer"). Nada disso mexe no veredito de saúde.
+8. **Avançado**: *Ao vivo* (gráficos em tempo real), *Hardware* (tudo que foi lido do PC) e *Partidas gravadas*. Testes individuais e mais longos ficam em *Verificar peças*.
 
 ## Testes (resultado verificável, não estimativa)
 

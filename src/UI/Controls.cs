@@ -675,10 +675,36 @@ namespace DiagIT
     }
 
     // ------------------------------------------------------------------ lista de achados (cartões)
+    /// <summary>Título de grupo na lista de achados ("Pede a sua atenção (2)").</summary>
+    public class GroupHeader : Control
+    {
+        public string Text_ = "", Hint = "";
+        public int Count;
+        public Color Tint = Theme.Muted;
+        public GroupHeader()
+        {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            BackColor = Theme.Bg; TabStop = false;
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.Clear(Theme.Bg);
+            string head = Text_ + (Count > 0 ? "  ·  " + Count : "");
+            int w = TextRenderer.MeasureText(head, Theme.Font(10.5f, FontStyle.Bold)).Width;
+            Theme.Text_(g, head, Theme.Font(10.5f, FontStyle.Bold), Tint, new Rectangle(0, 0, w + Theme.S(8), Height), TextFormatFlags.VerticalCenter);
+            if (Hint.Length > 0)
+                Theme.Text_(g, Hint, Theme.Font(9f), Theme.Faint, new Rectangle(w + Theme.S(16), 0, Math.Max(10, Width - w - Theme.S(16)), Height), TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
+    }
+
     public class FindingList : Panel
     {
         readonly List<FindingCard> cards = new List<FindingCard>();
+        readonly List<Control> order = new List<Control>();   // cartões e títulos de grupo, na ordem de exibição
         public event Action<Finding, string> CardAction;
+        /// <summary>Separa o que pede ação do que é só informação e do que está certo (Resultados). A página Desempenho não agrupa.</summary>
+        public bool Grouped;
 
         public FindingList()
         {
@@ -688,17 +714,37 @@ namespace DiagIT
             Theme.Dark(this);
         }
 
+        static int GroupOf(Finding f) { return f.Confirmed || f.Sev == Sev.Crit || f.Sev == Sev.Warn ? 0 : f.Sev == Sev.Ok ? 2 : 1; }
+
         public void SetFindings(List<Finding> list)
         {
             SuspendLayout();
-            foreach (FindingCard c in cards) { Controls.Remove(c); c.Dispose(); }
-            cards.Clear();
+            foreach (Control c in order) { Controls.Remove(c); c.Dispose(); }
+            cards.Clear(); order.Clear();
+            int[] count = new int[3];
+            if (Grouped) foreach (Finding f in list) count[GroupOf(f)]++;
+            int last = -1;
             foreach (Finding f in list)
             {
+                if (Grouped)
+                {
+                    int g = GroupOf(f);
+                    if (g != last)
+                    {
+                        GroupHeader h = new GroupHeader();
+                        h.Count = count[g];
+                        h.Text_ = g == 0 ? "Pede a sua atenção" : g == 1 ? "Só para você saber" : "Está tudo certo";
+                        h.Hint = g == 0 ? "vale agir" : g == 1 ? "nada a fazer agora" : "verificado e bom";
+                        h.Tint = g == 0 ? Theme.WarnText : g == 1 ? Theme.AccentText : Theme.GoodText;
+                        h.Height = Theme.S(30);
+                        order.Add(h); Controls.Add(h);
+                        last = g;
+                    }
+                }
                 FindingCard c = new FindingCard(f);
                 c.ToggledDetails += delegate { Relayout(); };
                 c.ActionClicked += delegate(Finding ff, string a) { if (CardAction != null) CardAction(ff, a); };
-                cards.Add(c);
+                cards.Add(c); order.Add(c);
                 Controls.Add(c);
             }
             ResumeLayout();
@@ -717,11 +763,12 @@ namespace DiagIT
             if (w < 100) return;
             int y = 0;
             SuspendLayout();
-            foreach (FindingCard c in cards)
+            foreach (Control ctl in order)
             {
-                int h = c.Measure(w);
-                c.SetBounds(0, y + AutoScrollPosition.Y, w, h);
-                y += h + Theme.S(10);
+                FindingCard c = ctl as FindingCard;
+                int h = c != null ? c.Measure(w) : ctl.Height;
+                ctl.SetBounds(0, y + AutoScrollPosition.Y, w, h);
+                y += h + (c != null ? Theme.S(10) : Theme.S(4));
             }
             AutoScrollMinSize = new Size(0, y);
             ResumeLayout();
@@ -752,7 +799,7 @@ namespace DiagIT
         public bool Highlight, Expanded;
         public event EventHandler ToggledDetails;
         public event Action<Finding, string> ActionClicked;
-        bool HasActions { get { return f.Advice.Length > 0 && (f.Sev == Sev.Crit || f.Sev == Sev.Warn); } }
+        bool HasActions { get { return (f.Advice.Length > 0 && (f.Sev == Sev.Crit || f.Sev == Sev.Warn)) || (f.Tip && f.Guide != null); } }
 
         public FindingCard(Finding f) { this.f = f; AccessibleName = f.Plain; AccessibleDescription = f.Advice; }
         public Finding Finding { get { return f; } }
@@ -862,7 +909,7 @@ namespace DiagIT
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 if (f.Guide != null)
                 {
-                    string gl = "Resolver passo a passo";
+                    string gl = f.ActionLabel.Length > 0 ? f.ActionLabel : "Resolver passo a passo";
                     int gw = TextRenderer.MeasureText(gl, Theme.Font(9f, FontStyle.Bold)).Width + Theme.S(28);
                     guideRect = new Rectangle(bx, y, gw, bh);
                     using (GraphicsPath p = Theme.Round(guideRect, Theme.S(9)))
@@ -870,12 +917,15 @@ namespace DiagIT
                     Theme.Text_(g, gl, Theme.Font(9f, FontStyle.Bold), Theme.AccentInk, guideRect, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                     bx = guideRect.Right + Theme.S(10);
                 }
-                string fl = "Já fiz isso";
-                int fw = TextRenderer.MeasureText(fl, Theme.Font(9f, FontStyle.Bold)).Width + Theme.S(28);
-                fixRect = new Rectangle(bx, y, fw, bh);
-                using (GraphicsPath p = Theme.Round(fixRect, Theme.S(9)))
-                using (Pen pen = new Pen(Theme.Border2)) g.DrawPath(pen, p);
-                Theme.Text_(g, fl, Theme.Font(9f, FontStyle.Bold), Theme.Text, fixRect, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                if (!f.Tip)   // dica não é problema: não há "Já fiz isso"
+                {
+                    string fl = "Já fiz isso";
+                    int fw = TextRenderer.MeasureText(fl, Theme.Font(9f, FontStyle.Bold)).Width + Theme.S(28);
+                    fixRect = new Rectangle(bx, y, fw, bh);
+                    using (GraphicsPath p = Theme.Round(fixRect, Theme.S(9)))
+                    using (Pen pen = new Pen(Theme.Border2)) g.DrawPath(pen, p);
+                    Theme.Text_(g, fl, Theme.Font(9f, FontStyle.Bold), Theme.Text, fixRect, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                }
                 y += bh;
             }
             if (HasTech)

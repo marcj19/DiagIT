@@ -1,4 +1,4 @@
-﻿DiagIT v1.3.1 - check-up do seu PC, com testes comprovados
+﻿DiagIT v1.4.0 - check-up do seu PC, com testes comprovados
 ================================================================
 
 COMO USAR
@@ -14,7 +14,9 @@ COMO USAR
 5. Veja o resultado em Resultados. Use "Resolver passo a passo" ou "Ja fiz isso":
    o DiagIT acompanha em "Resolveu?" (topo do Inicio) se o problema voltou ou foi resolvido.
    Se o problema voltar, o botao "Ver o plano para resolver" mostra os proximos testes, um de cada vez.
-6. Vai levar a um tecnico? Em Resultados, "Relatorio" abre um relatorio para imprimir e
+6. Quer mais desempenho? Abra "Desempenho": o DiagIT mostra o que segura o seu PC (tela em
+   60 Hz, memoria devagar, link da placa de video...) e por onde comecar, do mais barato ao mais caro.
+7. Vai levar a um tecnico? Em Resultados, "Relatorio" abre um relatorio para imprimir e
    "Pacote para o tecnico" gera um .zip com o relatorio e os dados brutos (sem arquivos pessoais).
 
 REQUISITOS

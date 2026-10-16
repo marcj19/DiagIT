@@ -51,8 +51,9 @@ namespace DiagIT
                         Navigate(P_HOME);
                         homeFlow.AutoScrollPosition = new Point(0, homeFlow.AutoScrollMinSize.Height);
                         break;
-                    case 11: Shot(dir, "11-inicio-correcoes"); OpenGuide("video-voltou", null); guideDone[0] = true; guideDone[1] = true; guideStep = 3; LayoutGuide(); break;
-                    case 12:
+                    case 11: Shot(dir, "11-inicio-correcoes"); Navigate(P_PERF); break;
+                    case 12: Shot(dir, "11b-desempenho"); OpenGuide("video-voltou", null); guideDone[0] = true; guideDone[1] = true; guideStep = 3; LayoutGuide(); break;
+                    case 13:
                         Shot(dir, "12-guia");
                         curGuide = null; ClearGuideProgress();
                         // painel no jogo com quadros de exemplo (~144 FPS com dois engasgos)
@@ -68,11 +69,11 @@ namespace DiagIT
                         testQueue.Clear(); testQueue.Enqueue(runPlan[1]);
                         if (StartTest(TestKind.Cpu, 60, runPlan[0][2], false)) Navigate(P_RUN);
                         break;
-                    case 13: case 14: case 15: case 16: case 17: case 18: break;   // deixa o teste andar
-                    case 19: Shot(dir, "13-verificando-ativo"); runTechToggle.Open = true; runTech.Visible = true; runLayoutKey = ""; RefreshRun(); break;
-                    case 20: Shot(dir, "14-verificando-tecnico"); testQueue.Clear(); runner.Stop(); break;
-                    case 21: case 22: case 23: break;
-                    case 24: Shot(dir, "15-apos-parar"); break;
+                    case 14: case 15: case 16: case 17: case 18: case 19: break;   // deixa o teste andar
+                    case 20: Shot(dir, "13-verificando-ativo"); runTechToggle.Open = true; runTech.Visible = true; runLayoutKey = ""; RefreshRun(); break;
+                    case 21: Shot(dir, "14-verificando-tecnico"); testQueue.Clear(); runner.Stop(); break;
+                    case 22: case 23: case 24: break;
+                    case 25: Shot(dir, "15-apos-parar"); break;
                     default: t.Stop(); ExitApp(); return;
                 }
                 step++;

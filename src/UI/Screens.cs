@@ -982,3 +982,40 @@ namespace DiagIT
         }
     }
 }
+
+namespace DiagIT
+{
+    /// <summary>"Seus últimos 30 dias": cinco números que provam por que o PC está bem (ou mostram onde olhar).</summary>
+    public class MonthStrip : FlowControl
+    {
+        readonly MetricCard[] tiles = new MetricCard[5];
+
+        public MonthStrip()
+        {
+            string[] titles = { "Telas azuis", "Desligou sozinho", "Quedas de vídeo", "Jogou", "Testes aprovados" };
+            for (int i = 0; i < tiles.Length; i++)
+            {
+                tiles[i] = new MetricCard();
+                tiles[i].Title = titles[i];
+                Controls.Add(tiles[i]);
+            }
+        }
+
+        public void Show(MonthSummary m)
+        {
+            if (m == null) m = new MonthSummary();
+            tiles[0].Set(m.BlueScreens.ToString(), "nos últimos 30 dias", double.NaN, m.BlueScreens == 0 ? 0 : 2);
+            tiles[1].Set(m.UnexpectedShutdowns.ToString(), "sem aviso, nos 30 dias", double.NaN, m.UnexpectedShutdowns == 0 ? 0 : 2);
+            tiles[2].Set(m.VideoSymptoms.ToString(), "com sintoma de verdade", double.NaN, m.VideoSymptoms == 0 ? 0 : m.VideoSymptoms < 3 ? 1 : 2);
+            tiles[3].Set(m.HoursPlayed.ToString("0.#") + " h", m.Sessions + (m.Sessions == 1 ? " partida gravada" : " partidas gravadas"), double.NaN, -1);
+            tiles[4].Set(m.TestsTotal == 0 ? "—" : m.TestsPassed + " de " + m.TestsTotal, m.TestsTotal == 0 ? "ainda sem testes" : "testes dos 30 dias", double.NaN, m.TestsTotal == 0 ? -1 : m.TestsPassed == m.TestsTotal ? 0 : 1);
+        }
+
+        public override int Measure(int width)
+        {
+            int gap = Theme.S(10), w = (width - gap * (tiles.Length - 1)) / tiles.Length, h = Theme.S(88);
+            for (int i = 0; i < tiles.Length; i++) tiles[i].SetBounds(i * (w + gap), 0, w, h);
+            return h;
+        }
+    }
+}

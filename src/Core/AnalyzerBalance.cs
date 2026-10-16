@@ -1,0 +1,216 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace DiagIT
+{
+    /// <summary>
+    /// Página "Desempenho": o que segura o PC e onde um ajuste ou upgrade rende. Cada dica só aparece com dado do próprio PC por trás
+    /// (monitor, memória, link PCIe, disco, uso medido de processador e placa nas partidas); o que já está bom vira um "OK" verde.
+    /// Não é diagnóstico de defeito: nada aqui mexe no veredito de saúde.
+    /// </summary>
+    public static partial class Analyzer
+    {
+        const string BDraw = "DE GRAÇA", BCheap = "BARATO", BWhere = "ONDE O UPGRADE RENDE", BLimit = "LIMITE DO CONJUNTO", BDaily = "MAIOR GANHO NO DIA A DIA", BBefore = "ANTES DE UM UPGRADE";
+
+        static Finding Tip(Sev sev, string badge, string title, string evidence, string advice, string guide, string actionLabel)
+        {
+            Finding f = new Finding();
+            f.Tip = true; f.Sev = sev; f.Source = "Desempenho"; f.Badge = sev == Sev.Ok ? "" : badge;
+            f.Title = title; f.Evidence = evidence; f.Advice = advice; f.Guide = guide; f.ActionLabel = actionLabel;
+            return f;
+        }
+
+        /// <summary>Taxa de memória em MT/s: algumas versões do Windows informam em MHz (metade).</summary>
+        static int Mts(int v, int smType) { return (smType == 26 || smType == 34) && v > 0 && v < 1300 ? v * 2 : v; }
+
+        public static List<Finding> BalanceTips(HwSnapshot h, List<SessionData> sessions, List<TestResult> tests, DisplayMode dm)
+        {
+            List<Finding> tips = new List<Finding>();
+            if (sessions == null) sessions = new List<SessionData>();
+            if (tests == null) tests = new List<TestResult>();
+            if (h != null) Rules.SetContext(h.GpuName, h.CpuName);
+
+            // FPS médio real dos jogos (ponderado pelos quadros medidos)
+            double fpsSum = 0, fpsFrames = 0;
+            foreach (SessionData sd in sessions)
+                if (GameSession(sd) && sd.Info.Frames > 600 && !double.IsNaN(sd.Info.FpsAvg)) { fpsSum += sd.Info.FpsAvg * sd.Info.Frames; fpsFrames += sd.Info.Frames; }
+            double fpsAvg = fpsFrames > 0 ? fpsSum / fpsFrames : double.NaN;
+
+            // ---------------------------------------------------------------- 1. Taxa de atualização do monitor
+            if (dm != null && dm.MaxHz > 0)
+            {
+                string rates = string.Join(", ", dm.Rates.ConvertAll<string>(delegate(int r) { return r + " Hz"; }).ToArray());
+                if (dm.CurrentHz + 5 < dm.MaxHz)
+                {
+                    string seen = !double.IsNaN(fpsAvg) && fpsAvg > dm.CurrentHz + 10
+                        ? " Seus jogos rodam em média a " + N0(fpsAvg) + " FPS, mas com a tela em " + dm.CurrentHz + " Hz você só vê " + dm.CurrentHz + " quadros por segundo: o resto é desperdiçado." : "";
+                    tips.Add(Tip(Sev.Info, BDraw, "Sua tela está em " + dm.CurrentHz + " Hz, mas ela aceita " + dm.MaxHz + " Hz",
+                        "Resolução atual " + dm.Width + "×" + dm.Height + ". Taxas oferecidas nessa resolução: " + rates + "." + seen,
+                        "É de graça e é a mudança que mais se sente: imagem bem mais fluida. Em Configurações > Sistema > Tela > Tela avançada, escolha a maior taxa. Depois confira também dentro do jogo. Se a taxa maior não aparecer ou a imagem piscar, troque o cabo (DisplayPort costuma ser o melhor).",
+                        "monitor-hz", "Como fazer"));
+                }
+                else if (dm.MaxHz >= 100)
+                    tips.Add(Tip(Sev.Ok, "", "Tela na taxa máxima: " + dm.CurrentHz + " Hz", "Resolução " + dm.Width + "×" + dm.Height + ", taxas oferecidas: " + rates + ".", "", null, null));
+                else
+                    tips.Add(Tip(Sev.Ok, "", "Tela em " + dm.CurrentHz + " Hz (o máximo que ela oferece nessa resolução)", "Resolução " + dm.Width + "×" + dm.Height + ".", "", null, null));
+            }
+
+            // ---------------------------------------------------------------- 2. Memória RAM
+            if (h != null && h.RamModules > 0)
+            {
+                if (!h.DualChannel)
+                    tips.Add(Tip(Sev.Info, BCheap, "A memória está em canal único (" + h.RamModules + " pente)",
+                        "Capacidade total " + N0(h.RamTotalGb) + " GB.",
+                        "Com um só pente, o processador usa metade da banda de memória: costuma custar bastante FPS e deixa o PC mais lento. Colocar um segundo pente igual (nos slots indicados no manual da placa-mãe) é um dos upgrades mais baratos e de maior efeito.", null, null));
+                else
+                    tips.Add(Tip(Sev.Ok, "", "Memória em dual channel (" + h.RamModules + " pentes)", "Capacidade total " + N0(h.RamTotalGb) + " GB.", "", null, null));
+
+                int conf = Mts(h.RamConfMts, h.RamType), rated = Mts(h.RamRatedMts, h.RamType);
+                if (conf > 0 && rated > conf * 1.05)
+                    tips.Add(Tip(Sev.Info, BDraw, "A memória roda a " + conf + " MT/s, mas o pente suporta " + rated + " MT/s",
+                        "O perfil de velocidade da memória (XMP, DOCP ou EXPO) está desligado na BIOS.",
+                        "Ativar {perfil_memoria} na BIOS é de graça e costuma dar um ganho real em jogos, principalmente em processadores Ryzen. Depois de ativar, use o PC normalmente e rode o teste de memória do DiagIT; se aparecer instabilidade, volte ao padrão.",
+                        "ram-perfil", "Como fazer"));
+                else if (conf > 0 && h.RamType == 26 && conf <= 2666)
+                    tips.Add(Tip(Sev.Info, BCheap, "A memória é lenta para um processador atual: DDR4 a " + conf + " MT/s",
+                        "Não há perfil mais rápido para ativar: " + conf + " MT/s é o que o pente foi feito para entregar.",
+                        "Kits DDR4-3200 ou 3600 custam pouco e costumam dar um ganho perceptível, principalmente em jogos que dependem do processador. Antes de comprar, confira no site do fabricante da placa-mãe a velocidade máxima de memória que ela e o processador aceitam.", null, null));
+                else if (conf > 0)
+                    tips.Add(Tip(Sev.Ok, "", "Memória rodando na velocidade do pente: " + conf + " MT/s", "", "", null, null));
+
+                if (h.RamTotalGb > 0 && h.RamTotalGb <= 8.5)
+                    tips.Add(Tip(Sev.Info, BWhere, "Só " + N0(h.RamTotalGb) + " GB de memória é pouco para jogos de hoje",
+                        "Muitos jogos recentes e o próprio Windows já usam perto disso.",
+                        "Passar para 16 GB (dois pentes de 8 GB, em dual channel) resolve engasgos de memória e deixa o PC mais fluido. É um upgrade barato e seguro.", null, null));
+                else if (h.RamTotalGb > 0)
+                    tips.Add(Tip(Sev.Ok, "", N0(h.RamTotalGb) + " GB de memória: bom para jogos", "", "", null, null));
+            }
+
+            // ---------------------------------------------------------------- 3. Link PCIe da placa de vídeo (medido no teste)
+            TestResult gpuTest = null;
+            foreach (TestResult t in tests)
+                if (t.Kind == TestKind.Gpu && t.Status == "passed" && !double.IsNaN(t.Get("pcie_up_gbs")) && (gpuTest == null || t.Start > gpuTest.Start)) gpuTest = t;
+            if (gpuTest != null && h != null && h.PcieMaxGen >= 3)
+            {
+                double lanes = gpuTest.Get("t_pcie_lanes_max"); if (double.IsNaN(lanes) || lanes <= 0) lanes = h.PcieLanes;
+                double up = gpuTest.Get("pcie_up_gbs");
+                if (lanes > 0 && up > 0)
+                {
+                    double perLane = up / lanes;   // ~0,4 GB/s por pista em PCIe 2.0, ~0,85 em 3.0, ~1,7 em 4.0
+                    int gen = perLane < 0.6 ? 2 : perLane < 1.2 ? 3 : 4;
+                    if (gen < h.PcieMaxGen && gen < 4)
+                        tips.Add(Tip(Sev.Info, BLimit, "A placa de vídeo suporta PCIe " + h.PcieMaxGen + ".0, mas o conjunto entrega PCIe " + gen + ".0",
+                            "O teste de placa mediu " + up.ToString("0.0", Pt) + " GB/s com " + N0(lanes) + " pistas (" + perLane.ToString("0.0", Pt) + " GB/s por pista, que é PCIe " + gen + ".0). Medido em " + Dt(gpuTest) + ".",
+                            "O limite vem do processador ou da placa-mãe, não de defeito. Em placas de 8 pistas como esta o efeito costuma ser pequeno na maioria dos jogos, e maior só quando o jogo passa da memória de vídeo. Não vale trocar peças só por isso; considere apenas se for trocar processador e placa-mãe por outro motivo. (Alguns processadores, como as séries com G e o Ryzen 5 5500, só têm PCIe 3.0.)", null, null));
+                    else
+                        tips.Add(Tip(Sev.Ok, "", "Placa de vídeo com o link PCIe no máximo do conjunto", "Banda medida: " + up.ToString("0.0", Pt) + " GB/s com " + N0(lanes) + " pistas.", "", null, null));
+                }
+            }
+
+            // ---------------------------------------------------------------- 4. Quem limita quem, medido nas partidas
+            int n = 0, cpuB = 0, gpuB = 0; double gpuSum = 0;
+            foreach (SessionData sd in sessions)
+            {
+                if (!GameSession(sd)) continue;
+                foreach (Sample s in sd.S)
+                {
+                    double g = s.V[F.Gpu], c = s.V[F.CoreMax];
+                    if (double.IsNaN(g) || double.IsNaN(c)) continue;
+                    n++; gpuSum += g;
+                    if (g >= 92) gpuB++; else if (g < 80 && c >= 85) cpuB++;
+                }
+            }
+            if (n >= 300)
+            {
+                double cpuPct = cpuB * 100.0 / n, gpuPct = gpuB * 100.0 / n, gpuAvg = gpuSum / n;
+                string basis = "Medido em " + (n * 2 / 60) + " minutos de partidas: " + N0(cpuPct) + "% do tempo o processador (um núcleo no limite) segurou a placa, " + N0(gpuPct) + "% do tempo a placa foi o limite. Uso médio da placa de vídeo: " + N0(gpuAvg) + "%.";
+                if (cpuPct >= 40 && gpuPct < 30)
+                    tips.Add(Tip(Sev.Info, BWhere, "Nos seus jogos, o processador é o limite; a placa de vídeo está folgada",
+                        basis,
+                        "Trocar a placa de vídeo renderia pouco: ela passa a maior parte do tempo esperando o processador. Rendem mais, nesta ordem: aumentar resolução e qualidade gráfica nos jogos (de graça, a placa tem folga), memória mais rápida e, se quiser gastar, um processador mais forte. Antes de comprar um processador, confira na lista do fabricante da placa-mãe quais ele aceita.", null, null));
+                else if (gpuPct >= 50)
+                    tips.Add(Tip(Sev.Info, BWhere, "Nos seus jogos, a placa de vídeo é o limite",
+                        basis,
+                        "Baixar a qualidade gráfica ou a resolução, ou ligar o upscaling do jogo (FSR, DLSS ou XeSS), dá FPS de graça. Se quiser gastar, uma placa de vídeo mais forte é o upgrade que mais rende aqui; o processador está dando conta.", null, null));
+                else
+                    tips.Add(Tip(Sev.Ok, "", "Processador e placa de vídeo trabalham equilibrados nos seus jogos", basis, "", null, null));
+            }
+
+            // ---------------------------------------------------------------- 5. Disco do Windows
+            if (h != null && h.Volumes != null)
+            {
+                VolumeInfo sys = h.Volumes.Find(delegate(VolumeInfo v) { return v.Letter.StartsWith(Environment.GetEnvironmentVariable("SystemDrive") ?? "C:", StringComparison.OrdinalIgnoreCase); });
+                if (sys != null && sys.Media == "HDD")
+                    tips.Add(Tip(Sev.Info, BDaily, "O Windows está em um HD, não em um SSD",
+                        "Unidade " + sys.Letter + " (" + N0(sys.SizeGB) + " GB) detectada como HD mecânico.",
+                        "Passar o Windows e os jogos para um SSD é o upgrade que mais muda o dia a dia: o PC liga em segundos, os programas abrem na hora e os jogos carregam muito mais rápido. Um SSD de 500 GB já resolve.", null, null));
+                else if (sys != null && sys.Media == "SSD")
+                    tips.Add(Tip(Sev.Ok, "", "Windows em SSD", "Unidade " + sys.Letter + ".", "", null, null));
+            }
+
+            // ---------------------------------------------------------------- 6. Fonte, antes de um upgrade de placa de vídeo
+            TestResult combo = null;
+            foreach (TestResult t in tests)
+                if (t.Kind == TestKind.Combined && t.Status == "passed" && !double.IsNaN(t.Get("t_cpu_power_max")) && !double.IsNaN(t.Get("t_gpu_power_max")) && (combo == null || t.Start > combo.Start)) combo = t;
+            if (combo != null)
+                tips.Add(Tip(Sev.Info, BBefore, "Se for trocar a placa de vídeo, confira antes a fonte de energia",
+                    "No teste de carga máxima de " + Dt(combo) + " o processador e a placa de vídeo somaram " + N0(combo.Get("t_cpu_power_max") + combo.Get("t_gpu_power_max")) + " W.",
+                    PsuAdvice(combo) + " Uma placa de vídeo nova que consuma mais de 100 W além da atual pede fonte nova junto: some o consumo dela (está no site do fabricante) com o do processador e uns 80 W do resto do PC.", null, null));
+
+            // ---------------------------------------------------------------- 7. Por onde começar (só o que tem dado por trás, do mais barato ao mais caro)
+            List<Finding> start = new List<Finding>();
+            string[] order = { BDraw, BCheap, BDaily, BWhere, BLimit };
+            foreach (string b in order) foreach (Finding f in tips) if (f.Badge == b && f.Sev == Sev.Info && start.Count < 4) start.Add(f);
+            Finding head;
+            if (start.Count == 0)
+                head = Tip(Sev.Ok, "", "Nenhum ajuste ou upgrade se destaca: seu PC está bem equilibrado", "Tudo o que o DiagIT consegue medir (tela, memória, link da placa, disco, equilíbrio entre processador e placa) está bom para o que o conjunto entrega.", "", null, null);
+            else
+            {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < start.Count; i++) sb.Append((i + 1) + ". " + start[i].Title + (start[i].Badge.Length > 0 ? "  [" + start[i].Badge.ToLowerInvariant() + "]" : "") + "\n");
+                head = Tip(Sev.Info, "POR ONDE COMEÇAR", "Por onde começar: " + start.Count + (start.Count == 1 ? " passo" : " passos") + ", do mais barato ao mais caro",
+                    "Ordem sugerida a partir das medições do seu PC.", "Faça nesta ordem, parando quando estiver satisfeito:\n" + sb.ToString().TrimEnd(), null, null);
+            }
+            // o que tem ação vem primeiro (na ordem do mais barato ao mais caro); os "OK", que provam que está bom, vêm depois
+            List<Finding> sorted = new List<Finding>();
+            sorted.Add(head);
+            string[] full = { BDraw, BCheap, BDaily, BWhere, BLimit, BBefore };
+            foreach (string b in full) foreach (Finding f in tips) if (f.Sev == Sev.Info && f.Badge == b) sorted.Add(f);
+            foreach (Finding f in tips) if (f.Sev == Sev.Ok) sorted.Add(f);
+            tips = sorted;
+            foreach (Finding f in tips) { f.Advice = Rules.Fill(f.Advice); f.Evidence = Rules.Fill(f.Evidence); f.Title = Rules.Fill(f.Title); }
+            return tips;
+        }
+    }
+}
+
+namespace DiagIT
+{
+    /// <summary>Resumo dos últimos 30 dias com números de verdade: o "verde com prova" do Início.</summary>
+    public class MonthSummary
+    {
+        public int BlueScreens, UnexpectedShutdowns, VideoSymptoms, Sessions, TestsPassed, TestsTotal;
+        public double HoursPlayed;
+    }
+
+    public static partial class Analyzer
+    {
+        public static MonthSummary BuildMonth(List<WinEvent> events, List<SessionData> sessions, List<TestResult> tests)
+        {
+            MonthSummary m = new MonthSummary();
+            if (events == null) events = new List<WinEvent>();
+            if (sessions == null) sessions = new List<SessionData>();
+            m.BlueScreens = ProblemTimes("telas-azuis", events, sessions).Count;
+            m.UnexpectedShutdowns = ProblemTimes("desligamentos", events, new List<SessionData>()).Count;
+            m.VideoSymptoms = GpuCrashTimes(events, true).Count;
+            foreach (SessionData sd in sessions)
+                if (GameSession(sd)) { m.Sessions++; m.HoursPlayed += sd.Info.Duration.TotalHours; }
+            DateTime cut = DateTime.Now.AddDays(-30);
+            if (tests != null)
+                foreach (TestResult t in tests)
+                    if (t.Start >= cut) { m.TestsTotal++; if (t.Status == "passed") m.TestsPassed++; }
+            return m;
+        }
+    }
+}

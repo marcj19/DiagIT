@@ -136,6 +136,35 @@
         { "titulo": "Confirme com o teste do processador", "texto": "O teste coloca todos os núcleos no máximo e registra a temperatura. Ele mostra se a refrigeração dá conta de carga máxima.",
           "acoes": [ { "rotulo": "Testar o processador", "tipo": "diagit", "alvo": "teste-cpu" } ] }
       ]
+    },
+    {
+      "id": "monitor-hz",
+      "titulo": "Ligar a taxa de atualização máxima do monitor",
+      "resumo": "Muita gente compra um monitor de 144 Hz ou mais e deixa o Windows em 60 Hz. É de graça e a imagem fica bem mais fluida. Leva 2 minutos.",
+      "feito": "Ajustei a taxa de atualização do monitor",
+      "escopo": "geral",
+      "passos": [
+        { "titulo": "Abra as configurações da tela", "texto": "Clique no botão abaixo para abrir a tela avançada do Windows.",
+          "acoes": [ { "rotulo": "Abrir configurações da tela", "tipo": "abrir", "alvo": "ms-settings:display-advanced" } ] },
+        { "titulo": "Escolha a maior taxa", "texto": "Em \"Escolha uma taxa de atualização\", selecione a maior (por exemplo 144 Hz ou 165 Hz) e confirme. Se o Windows perguntar se quer manter, clique em Manter alterações.", "acoes": [] },
+        { "titulo": "Se a taxa maior não aparecer", "texto": "O cabo ou a porta podem estar limitando. Use cabo DisplayPort (ou HDMI 2.0 ou mais novo) ligado na placa de vídeo, e não na saída da placa-mãe. Alguns monitores também têm, no menu do próprio monitor, uma opção para liberar a taxa alta (às vezes chamada de overclock ou DisplayPort 1.4).", "acoes": [] },
+        { "titulo": "Confira dentro do jogo", "texto": "Abra as opções de vídeo do jogo e veja se a taxa de atualização e o limite de FPS estão na taxa do monitor. Alguns jogos têm o próprio limite, que fica em 60.", "acoes": [] }
+      ]
+    },
+    {
+      "id": "ram-perfil",
+      "titulo": "Ativar o perfil de velocidade da memória",
+      "resumo": "A memória vem de fábrica rodando devagar até você ativar o perfil dela na BIOS. É de graça e costuma dar ganho real em jogos. Leva 5 minutos.",
+      "feito": "Ativei o perfil de velocidade da memória",
+      "escopo": "geral",
+      "passos": [
+        { "titulo": "Entre na BIOS", "texto": "Clique no botão abaixo para reiniciar direto na BIOS. Se não funcionar no seu PC, reinicie e aperte Delete (ou F2) várias vezes logo que ele ligar.",
+          "acoes": [ { "rotulo": "Reiniciar direto na BIOS", "tipo": "diagit", "alvo": "reiniciar-bios" } ] },
+        { "titulo": "Ative o perfil", "texto": "Procure a opção de {perfil_memoria} (também chamada XMP, DOCP, EXPO ou A-XMP, em geral na tela de overclock ou de memória). Ative o Profile 1 e confira se a velocidade passou para a do pente.", "acoes": [] },
+        { "titulo": "Salve e saia", "texto": "Aperte F10 e confirme. O PC reinicia normalmente. Se não ligar, ele volta sozinho ao padrão depois de duas tentativas.", "acoes": [] },
+        { "titulo": "Confirme que ficou estável", "texto": "Rode o teste de memória do DiagIT. Se reprovar, ou se o PC travar ou der tela azul depois, volte a BIOS ao padrão: o perfil estava além do que a sua memória ou placa-mãe aguentam.",
+          "acoes": [ { "rotulo": "Testar a memória", "tipo": "diagit", "alvo": "teste-memoria" } ] }
+      ]
     }
   ],
   "achados": [

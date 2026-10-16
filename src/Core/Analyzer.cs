@@ -36,6 +36,9 @@ namespace DiagIT
         /// Só achados com sintoma passam a suspeita para "Drivers e Windows" quando o teste da peça não reproduz o problema.
         /// </summary>
         public bool Symptom;
+        /// <summary>Dica de desempenho (página Desempenho), não um problema: selo próprio (ex.: "DE GRAÇA"), botão "Como fazer" e sem "Já fiz isso".</summary>
+        public bool Tip;
+        public string Badge = "", ActionLabel = "";
         /// <summary>O mesmo achado em linguagem do dia a dia (camada simples da interface). Vazio = usa o Title.</summary>
         public string Simple = "";
 
@@ -77,6 +80,10 @@ namespace DiagIT
         public List<FixStatus> Fixes = new List<FixStatus>();   // acompanhamento das correções ("corrigiu?")
         /// <summary>Quando o driver de vídeo foi trocado pela última vez (correção registrada); eventos de vídeo anteriores a isso são do driver antigo e não entram na conta atual. MinValue = sem troca.</summary>
         public DateTime DriverSwapAt = DateTime.MinValue;
+        /// <summary>Dicas de desempenho e upgrade (página Desempenho), calculadas a partir do hardware e das partidas.</summary>
+        public List<Finding> Tips = new List<Finding>();
+        /// <summary>Números dos últimos 30 dias (telas azuis, desligamentos, quedas de vídeo, horas jogadas, testes).</summary>
+        public MonthSummary Month = new MonthSummary();
     }
 
     public static class CompInfo
@@ -200,6 +207,8 @@ namespace DiagIT
             }
             AssignGuides(d);
             FixRules(d, events, sessions, fixes);
+            try { d.Month = BuildMonth(events, sessions, tests); } catch (Exception ex) { Log.Write("Resumo de 30 dias: " + ex.Message); }
+            try { d.Tips = BalanceTips(hw, sessions, tests, DisplayInfo.Read()); } catch (Exception ex) { Log.Write("Dicas de desempenho: " + ex.Message); }
             Finish(d);
             BuildStates(d);
             return d;
@@ -361,7 +370,7 @@ namespace DiagIT
                         (isolated > 0 ? "\n" + isolated + " isolado(s): o Windows registrou o reset do vídeo, mas nada fechou nem travou na mesma hora. Isso é comum ao abrir um jogo em tela cheia ou trocar a resolução, e sozinho não prova defeito." : "") +
                         (strongInstall > 0 ? "\n(" + strongInstall + " ocorrência(s) durante a instalação de driver não entraram na conta: são esperadas quando o driver é trocado.)" : "") +
                         (strongOld > 0 ? "\n(" + strongOld + " ocorrência(s) anteriores à troca do driver (" + d.DriverSwapAt.ToString("dd/MM HH:mm", Pt) + ") ficam no histórico e não entram na conta: eram do driver antigo.)" : "");
-                    f.Advice = "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot.";
+                    f.Advice = sym > 0 ? "Driver limpo (DDU), temperatura, energia da GPU, cabos PCIe e slot." : "Nada a fazer agora: o Windows só registrou o reset do vídeo, sem nada travar ou fechar. Se começar a vir com tela preta, jogo fechando ou tela azul, o DiagIT avisa e mostra o plano.";
                     f.Last = strong[0].Time; f.Symptom = sym > 0;
                     f.Weigh(Comp.Gpu, 0.40 * w).Weigh(Comp.Software, 0.20 * w).Weigh(Comp.Psu, 0.12 * w).Weigh(Comp.Cooling, 0.10 * w);
                     d.Findings.Add(f);
@@ -393,7 +402,7 @@ namespace DiagIT
                         "Não há documentação oficial desses códigos; relatos de usuários os ligam a falha de modo de vídeo/timeout do agendador da GPU, " +
                         "mas também a driver de Wi-Fi e a overclock/XMP instável. O dump fica em C:\\Windows\\LiveKernelReports\\WATCHDOG." +
                         (instEp > 0 ? " Episódios durante a instalação de drivers são esperados (o driver de vídeo reinicia a tela ao ser instalado) e pesam pouco." : "") + "\n" + Recent(soft, 4);
-                    f.Advice = "Costumam aparecer junto de congelamentos ou telas pretas. Atualize/reinstale o driver de vídeo (DDU) e o de Wi-Fi, " +
+                    f.Advice = symEp == 0 ? "Nada a fazer agora: é só o registro do reset de vídeo, sem nada travar ou fechar junto. O DiagIT avisa se começar a vir com sintoma." : "Costumam aparecer junto de congelamentos ou telas pretas. Atualize/reinstale o driver de vídeo (DDU) e o de Wi-Fi, " +
                         "desative {perfil_memoria} para testar e anote o horário exato quando o problema acontecer para cruzar com as evidências do DiagIT.";
                     f.Last = soft[0].Time;
                     f.Weigh(Comp.Gpu, 0.22 * w).Weigh(Comp.Software, 0.28 * w).Weigh(Comp.Ram, 0.10 * w);

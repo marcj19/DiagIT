@@ -13,7 +13,7 @@ namespace DiagIT
     public partial class MainForm : Form
     {
         // páginas: as 5 primeiras são o caminho de quem é leigo; as demais ficam em "Avançado"
-        public const int P_HOME = 0, P_PROBLEM = 1, P_TESTS = 2, P_DIAG = 3, P_FIX = 4, P_LIVE = 5, P_HW = 6, P_SESS = 7, P_SET = 8, P_RUN = 9, P_GUIDE = 10, PAGES = 11;
+        public const int P_HOME = 0, P_PROBLEM = 1, P_TESTS = 2, P_DIAG = 3, P_FIX = 4, P_LIVE = 5, P_HW = 6, P_SESS = 7, P_SET = 8, P_RUN = 9, P_GUIDE = 10, P_PERF = 11, PAGES = 12;
         readonly Watcher w;
         readonly AppSettings cfg;
         readonly TestRunner runner;
@@ -60,6 +60,7 @@ namespace DiagIT
             BuildTests();
             BuildDiag();
             BuildHardware();
+            BuildPerf();
             BuildFixes();
             BuildSessions();
             BuildSettings();
@@ -254,6 +255,7 @@ namespace DiagIT
             caps[P_PROBLEM] = "Estou com um problema"; ics[P_PROBLEM] = "help";
             caps[P_TESTS] = "Verificar peças"; ics[P_TESTS] = "search";
             caps[P_DIAG] = "Resultados"; ics[P_DIAG] = "clipboard";
+            caps[P_PERF] = "Desempenho"; ics[P_PERF] = "pulse";
             caps[P_FIX] = "Resolver"; ics[P_FIX] = "wrench";
             caps[P_LIVE] = "Ao vivo"; ics[P_LIVE] = "activity";
             caps[P_HW] = "Hardware"; ics[P_HW] = "chip";
@@ -262,7 +264,7 @@ namespace DiagIT
 
             navs = new NavButton[PAGES];
             int y = Theme.S(90);
-            int[] main = { P_HOME, P_PROBLEM, P_TESTS, P_DIAG, P_FIX };
+            int[] main = { P_HOME, P_PROBLEM, P_TESTS, P_DIAG, P_PERF, P_FIX };
             foreach (int i in main) { navs[i] = NavItem(caps[i], ics[i], i, y); y += Theme.S(46); }
             Label adv = new Label();
             adv.Text = "AVANÇADO";
@@ -494,7 +496,7 @@ namespace DiagIT
                 List<SessionData> all = scope == 0 ? sds : LoadData(ScopeSessions(0, sel));
                 CloseDriverGuideIfDone();
                 Diagnosis d = Analyzer.Run(sds, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load());
-                if (scope != 0) { Diagnosis full = Analyzer.Run(all, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load()); d.Fixes = full.Fixes; }
+                if (scope != 0) { Diagnosis full = Analyzer.Run(all, events, disks, 30, TestStore.ListAll(), hw, FixLog.Load()); d.Fixes = full.Fixes; d.Tips = full.Tips; }
                 Post(delegate { done(d, sds); });
                 SetDiagStatus("Análise concluída às " + DateTime.Now.ToString("HH:mm:ss"));
             }
@@ -611,6 +613,7 @@ namespace DiagIT
 
             flist = new FindingList();
             flist.Dock = DockStyle.Fill;
+            flist.Grouped = true;
             flist.CardAction += delegate(Finding f, string action) { OnFindingAction(f, action); };
             t.Controls.Add(flist, 1, 0);
         }
@@ -658,6 +661,7 @@ namespace DiagIT
             bars.Invalidate();
             lblDiagStatus.Text = "Base: " + d.Tests.Count + " teste(s), " + d.Sessions + " sessão(ões) gravada(s), " + d.EventsTotal + " eventos do Windows (" + d.Days + " dias).";
             flist.SetFindings(d.Findings);
+            ShowPerf(d);
             NotifyFixChanges(d);
             RefreshHome();
             if (goResultsAfterRun) { goResultsAfterRun = false; if (curPage == P_RUN) Navigate(P_DIAG); }

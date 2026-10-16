@@ -212,6 +212,7 @@ namespace DiagIT
         {
             if (f.Confirmed) return "COMPROVADO";
             if (f.Sev == Sev.Ok) return "OK";
+            if (f.Badge.Length > 0) return f.Badge;
             if (f.Sev == Sev.Info) return "INFORMAÇÃO";   // informação nunca é "indício", mesmo com peso interno
             return "INDÍCIO";
         }
