@@ -750,6 +750,22 @@ namespace DiagIT
                 Check(tIgp.Exists(delegate(Finding f) { return f.Title.Contains("integrada"); }) && !tIgp.Exists(delegate(Finding f) { return f.Title.Contains("VRAM"); }) &&
                       tIgp.Exists(delegate(Finding f) { return f.Title.Contains("canal único") && f.Advice.Contains("integrada"); }),
                     "integrada: dica própria (sem 'só 0,5 GB de VRAM') e o canal único pesa mais");
+
+                Say("== 18. Notebook Lenovo (i5-11300H + GTX 1650 em PCIe 3.0 x4)");
+                HwSnapshot lnv = new HwSnapshot(); lnv.IsLaptop = true; lnv.CpuName = "11th Gen Intel(R) Core(TM) i5-11300H @ 3.10GHz"; lnv.GpuName = "NVIDIA GeForce GTX 1650";
+                lnv.MixedRam = true; lnv.RamModules = 2; lnv.DualChannel = true; lnv.RamTotalGb = 24;
+                TestResult lg1 = okTest(TestKind.Gpu); lg1.Set("pcie_up_gbs", 3.14); lg1.Set("t_pcie_gen_max", 3); lg1.Set("t_pcie_lanes_max", 4); lg1.Set("t_cpu_temp_max", 95); lg1.Set("t_gpu_temp_max", 76);
+                TestResult lr1 = okTest(TestKind.Ram);
+                Diagnosis dLnv = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult> { lg1, lr1 }, lnv);
+                Check(dLnv.Findings.Exists(delegate(Finding f) { return f.Sev == Sev.Ok && f.Title.StartsWith("Banda PCIe normal"); }) &&
+                      !dLnv.Findings.Exists(delegate(Finding f) { return f.Title.StartsWith("Banda PCIe da placa de vídeo abaixo"); }), "3,1 GB/s em PCIe 3.0 x4: normal, não acusa conexão lenta");
+                TestResult lg2 = okTest(TestKind.Gpu); lg2.Set("pcie_up_gbs", 1.2); lg2.Set("t_pcie_gen_max", 3); lg2.Set("t_pcie_lanes_max", 4);
+                Diagnosis dLnv2 = Analyzer.Run(new List<SessionData>(), new List<WinEvent>(), new List<DiskHealth>(), 30, new List<TestResult> { lg2 }, lnv);
+                Check(dLnv2.Findings.Exists(delegate(Finding f) { return f.Title.StartsWith("Banda PCIe da placa de vídeo abaixo"); }), "1,2 GB/s no mesmo link: acusa");
+                Check(dLnv.States[(int)Comp.Cooling].Status == CompStatus.Ok, "CPU a 95 °C sob carga, sem reduzir a velocidade: refrigeração verificada (dentro do limite)");
+                Finding mix = dLnv.Findings.Find(delegate(Finding f) { return f.Title == "Pentes de memória de modelos diferentes"; });
+                Check(mix != null && mix.Sev == Sev.Info, "pentes misturados com o teste de RAM aprovado: informação, não indício");
+                Say("");
                 Say("");
                 Say("");
                 Say(fails == 0 ? "TUDO OK" : fails + " FALHA(S)");

@@ -208,12 +208,19 @@ namespace DiagIT
             double up = t.Get("pcie_up_gbs");
             if (!double.IsNaN(up) && t.Kind == TestKind.Gpu)
             {
-                if (up < 4.5)
+                // o esperado depende do link: PCIe 3.0 x4 (comum em notebook) entrega ~3,2 GB/s e está certo assim.
+                // Com geração e pistas medidas sob carga, só acusa abaixo de 60% do que esse link entrega; sem elas, o limite antigo (só no desktop).
+                double lg = t.Get("t_pcie_gen_max"), ln = t.Get("t_pcie_lanes_max");
+                double perLane = lg >= 5 ? 3.4 : lg >= 4 ? 1.7 : lg >= 3 ? 0.85 : lg >= 2 ? 0.42 : double.NaN;
+                double expect = !double.IsNaN(perLane) && !double.IsNaN(ln) && ln > 0 ? perLane * ln : double.NaN;
+                bool slow = !double.IsNaN(expect) ? up < expect * 0.6 : (d.Hw == null || !d.Hw.IsLaptop) && up < 4.5;
+                if (slow)
                     d.Findings.Add(New(Sev.Warn, "Banda PCIe da placa de vídeo abaixo do normal: " + up.ToString("0.0", Pt) + " GB/s" + where,
                         "Medido copiando dados da RAM para a VRAM. Um link PCIe 3.0 x8 entrega ~6–7 GB/s; valores baixos indicam o slot operando em geração menor (PCIe 2.0/1.0) ou com menos pistas.",
                         "Na BIOS, deixe a velocidade do slot PCIe em Auto/Gen3 (ou maior); reencaixe a placa de vídeo e limpe o slot.", false, Comp.Board).Weigh(Comp.Board, 0.35));
                 else
-                    d.Findings.Add(New(Sev.Ok, "Banda PCIe normal: " + up.ToString("0.0", Pt) + " GB/s RAM→GPU" + where, "Compatível com o link esperado para a placa.", "", false, Comp.Board));
+                    d.Findings.Add(New(Sev.Ok, "Banda PCIe normal: " + up.ToString("0.0", Pt) + " GB/s RAM→GPU" + where,
+                        "Compatível com o link" + (!double.IsNaN(expect) ? " medido (PCIe " + N0(lg) + ".0 x" + N0(ln) + ", que entrega cerca de " + expect.ToString("0.0", Pt) + " GB/s)" : " esperado para a placa") + ".", "", false, Comp.Board));
             }
 
             double stalls = t.Get("t_stalls");
@@ -434,12 +441,24 @@ namespace DiagIT
 
             if (h.MixedRam)
             {
+                TestResult ramOk = d.Tests.Find(delegate(TestResult t) { return t.Kind == TestKind.Ram && t.Status == "passed" && t.Start > DateTime.Now.AddDays(-30); });
                 Finding f = new Finding();
-                f.Sev = Sev.Warn; f.Source = "Configuração de hardware";
+                f.Source = "Configuração de hardware";
                 f.Title = "Pentes de memória de modelos diferentes";
-                f.Evidence = "Kits misturados podem não funcionar juntos nas mesmas temporizações.";
-                f.Advice = "Rode o teste de RAM; se houver erros, teste um pente por vez.";
-                f.Weigh(Comp.Ram, 0.2);
+                if (ramOk != null)
+                {
+                    // comum em notebook (um pente soldado de fábrica + um comprado depois): o teste já mostrou que funcionam juntos
+                    f.Sev = Sev.Info;
+                    f.Evidence = "O teste de memória de " + ramOk.Start.ToString("dd/MM", Pt) + " passou sem erros com os dois pentes juntos.";
+                    f.Advice = "Nada a fazer. Se um dia aparecerem telas azuis ou programas fechando, rode o teste de memória de novo.";
+                }
+                else
+                {
+                    f.Sev = Sev.Warn;
+                    f.Evidence = "Kits misturados podem não funcionar juntos nas mesmas temporizações.";
+                    f.Advice = "Rode o teste de RAM; se houver erros, teste um pente por vez.";
+                    f.Weigh(Comp.Ram, 0.2);
+                }
                 d.Findings.Add(f);
             }
             if (h.RamModules > 0 && !h.DualChannel)
@@ -481,11 +500,15 @@ namespace DiagIT
                         if (t.Status == "passed" && (t.Kind == TestKind.Cpu || t.Kind == TestKind.Gpu || t.Kind == TestKind.Combined) && t.Start > DateTime.Now.AddDays(-30))
                         {
                             double ct = t.Get("t_cpu_temp_max"), gh = t.Get("t_gpu_hot_max");
-                            if ((double.IsNaN(ct) || ct < 90) && (double.IsNaN(gh) || gh < 100) && (!double.IsNaN(ct) || !double.IsNaN(gh)))
+                            double gt = t.Get("t_gpu_temp_max");
+                            if ((double.IsNaN(ct) || ct < 96) && (double.IsNaN(gh) || gh < 110) && (double.IsNaN(gt) || gt < 95) && (!double.IsNaN(ct) || !double.IsNaN(gh) || !double.IsNaN(gt)))
                             {
                                 ok = new Finding();
-                                ok.Title = "Temperaturas normais sob carga máxima (" + t.Start.ToString("dd/MM", Pt) + ")";
-                                ok.Evidence = "CPU máx " + (double.IsNaN(ct) ? "—" : N0(ct) + " °C") + ", GPU hotspot máx " + (double.IsNaN(gh) ? "—" : N0(gh) + " °C") + ".";
+                                bool warm = !double.IsNaN(ct) && ct >= 90;
+                                ok.Title = (warm ? "Temperaturas dentro do limite sob carga máxima (" : "Temperaturas normais sob carga máxima (") + t.Start.ToString("dd/MM", Pt) + ")";
+                                ok.Evidence = "CPU máx " + (double.IsNaN(ct) ? "—" : N0(ct) + " °C") + ", GPU máx " + (double.IsNaN(gt) ? "—" : N0(gt) + " °C") +
+                                    (double.IsNaN(gh) ? "" : " (hotspot " + N0(gh) + " °C)") + "." +
+                                    (warm ? " O processador ficou quente, mas abaixo do limite em que ele reduz a velocidade (perto de 100 °C). Em notebook isso é comum; manter as saídas de ar limpas ajuda." : "");
                                 break;
                             }
                         }

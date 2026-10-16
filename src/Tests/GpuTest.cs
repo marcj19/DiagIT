@@ -490,7 +490,7 @@ void Err(uint idx, uint expect, uint got) {
                 r.Set("pcie_up_gbs", upGbs);
                 r.Set("pcie_down_gbs", downGbs);
                 r.Detail("Banda PCIe medida: " + upGbs.ToString("0.0") + " GB/s da RAM para a GPU e " + downGbs.ToString("0.0") + " GB/s da GPU para a RAM " +
-                    "(referência: PCIe 3.0 x8 ou 4.0 x4 ≈ 6–7 GB/s; PCIe 4.0 x8 ≈ 12–14 GB/s; PCIe 3.0 x16 ≈ 12–13 GB/s).");
+                    "(referência: PCIe 3.0 x4 ≈ 3–3,5 GB/s; PCIe 3.0 x8 ou 4.0 x4 ≈ 6–7 GB/s; PCIe 4.0 x8 ≈ 12–14 GB/s; PCIe 3.0 x16 ≈ 12–13 GB/s).");
             }
             catch (Exception e) { r.Detail("Banda PCIe não medida: " + e.Message); }
         }

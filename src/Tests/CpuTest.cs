@@ -106,6 +106,7 @@ namespace DiagIT
             double unitMs = sw.Elapsed.TotalMilliseconds / UNITS;
             RunOn(n - 1, delegate { double[] d = new double[SCRATCH]; ulong[] u = new ulong[SCRATCH]; for (int i = 0; i < UNITS && !ctx.Cancel; i++) refB[i] = Unit(i, d, u); });
             r.Set("unit_ms", unitMs);
+            if (ctx.Cancel) return;   // parado no meio da referência: os cálculos ficaram pela metade, comparar daria erro falso
             int refMismatch = 0;
             for (int i = 0; i < UNITS; i++) if (refA[i] != refB[i]) refMismatch++;
             if (refMismatch > 0)
